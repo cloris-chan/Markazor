@@ -1,0 +1,98 @@
+@using System.Globalization
+
+<article class="markazor-reader-article">
+    <header>
+        <a class="markazor-back-link" href="@BackLinkHref">@BackLinkText</a>
+        <div class="markazor-reader-meta">
+            <span class="markazor-reader-kind">@ArticleKindLabel</span>
+            <time datetime="@Article.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">
+                @Article.PublishedAtUtc.ToString("MMMM d, yyyy", CultureInfo.InvariantCulture)
+            </time>
+            @if (!string.IsNullOrWhiteSpace(Article.Category))
+            {
+                <a href="@TaxonomyLink("/categories", "category", Article.Category)">
+                    @Article.Category
+                </a>
+            }
+        </div>
+        <h1>@Article.Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Article.Summary))
+        {
+            <p class="markazor-reader-dek">@Article.Summary</p>
+        }
+        @if (Article.Tags.Count > 0)
+        {
+            <ul class="markazor-reader-tags" aria-label="Tags">
+                @foreach (string tag in Article.Tags)
+                {
+                    <li><a href="@TaxonomyLink("/tags", "tag", tag)">#@tag</a></li>
+                }
+            </ul>
+        }
+    </header>
+
+    @if (IsLoading)
+    {
+        <p class="markazor-reader-status" role="status">Loading article...</p>
+    }
+    else if (LoadFailed)
+    {
+        <div class="markazor-reader-error" role="alert">
+            <h2>Article unavailable</h2>
+            <p>The published Markdown file could not be loaded. Try reloading the page.</p>
+        </div>
+    }
+    else
+    {
+        <div class="markazor-markdown-body">@((MarkupString)Html)</div>
+    }
+
+    <nav class="markazor-article-navigation" aria-label="Adjacent articles">
+        @if (Navigation.PreviousArticle is not null)
+        {
+            <a class="markazor-article-navigation-previous" rel="prev" href="@Navigation.PreviousArticle.Route">
+                <span>Previous</span>
+                @Navigation.PreviousArticle.Title
+            </a>
+        }
+        @if (Navigation.NextArticle is not null)
+        {
+            <a class="markazor-article-navigation-next" rel="next" href="@Navigation.NextArticle.Route">
+                <span>Next</span>
+                @Navigation.NextArticle.Title
+            </a>
+        }
+    </nav>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public ArticleMeta Article { get; set; } = default!;
+
+    [Parameter]
+    public string Html { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public bool LoadFailed { get; set; }
+
+    [Parameter]
+    public MarkazorArticleNavigation Navigation { get; set; } = new(null, null);
+
+    [Parameter]
+    public string BackLinkHref { get; set; } = "/";
+
+    [Parameter]
+    public string BackLinkText { get; set; } = "All posts";
+
+    private string ArticleKindLabel => string.Equals(Article.Kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
+        ? "Note"
+        : "Post";
+
+    private static string TaxonomyLink(string path, string parameter, string value)
+    {
+        return $"{path}?{parameter}={Uri.EscapeDataString(value)}";
+    }
+}

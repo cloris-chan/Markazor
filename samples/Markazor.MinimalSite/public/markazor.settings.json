@@ -1,0 +1,20 @@
+{
+  "site": {
+    "name": "Markazor Minimal Site",
+    "description": "Notes on building a small, repository-native publishing workflow.",
+    "baseUrls": [
+      "https://example.test"
+    ]
+  },
+  "github": {
+    "clientId": ""
+  },
+  "repository": {
+    "owner": "your-user",
+    "name": "Markazor.MinimalSite",
+    "defaultBranch": "main"
+  },
+  "theme": {
+    "name": "default"
+  }
+}

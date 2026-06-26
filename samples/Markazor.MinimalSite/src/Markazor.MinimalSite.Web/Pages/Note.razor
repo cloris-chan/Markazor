@@ -1,0 +1,72 @@
+@page "/notes/{Slug}"
+@using Markazor.Content
+@using Markazor.Reading
+@inject IMarkazorReaderService Reader
+
+<PageTitle>@PageTitle</PageTitle>
+
+@if (article is null)
+{
+    <section class="reader-empty-state">
+        <p class="reader-eyebrow">404</p>
+        <h1>Note not found</h1>
+        <p>The note may have moved or is not published.</p>
+        <a href="/notes">Return to all notes</a>
+    </section>
+}
+else
+{
+    <ArticleView Article="article"
+                 Html="@articleHtml"
+                 IsLoading="@isLoading"
+                 LoadFailed="@contentLoadFailed"
+                 Navigation="navigation"
+                 BackLinkHref="/notes"
+                 BackLinkText="All notes" />
+}
+
+@code {
+    [Parameter]
+    public string? Slug { get; set; }
+
+    private ArticleMeta? article;
+    private MarkazorArticleNavigation navigation = new(null, null);
+    private string articleHtml = string.Empty;
+    private bool contentLoadFailed;
+    private bool isLoading;
+
+    private string PageTitle => article is null
+        ? $"Note not found | {Reader.Site.Name}"
+        : $"{article.Title} | {Reader.Site.Name}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        article = string.IsNullOrWhiteSpace(Slug)
+            ? null
+            : Reader.FindArticle(Slug, MarkazorArticleKind.Note);
+        articleHtml = string.Empty;
+        contentLoadFailed = false;
+        navigation = article is null ? new(null, null) : Reader.GetNavigation(article.Slug, MarkazorArticleKind.Note);
+
+        if (article is null)
+        {
+            isLoading = false;
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            articleHtml = await Reader.LoadSafeHtmlAsync(article).ConfigureAwait(false);
+        }
+        catch (HttpRequestException)
+        {
+            contentLoadFailed = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

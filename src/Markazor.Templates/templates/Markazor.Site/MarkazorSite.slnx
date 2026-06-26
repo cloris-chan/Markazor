@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MarkazorSite.Functions/MarkazorSite.Functions.csproj" />
+    <Project Path="src/MarkazorSite.Web/MarkazorSite.Web.csproj" />
+  </Folder>
+</Solution>

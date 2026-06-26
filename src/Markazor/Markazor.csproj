@@ -1,0 +1,258 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <PackageId>Markazor</PackageId>
+    <Description>Blazor components, editor UI, and build integration for Markazor sites.</Description>
+    <MarkazorEditorBundleFileName>markazor-markdown-editor.js</MarkazorEditorBundleFileName>
+    <MarkazorEditorBundleRelativePath>$([System.IO.Path]::Combine('wwwroot', 'markazor-markdown-editor.js'))</MarkazorEditorBundleRelativePath>
+    <MarkazorEditorBundleSourcePath>$([System.IO.Path]::Combine('assets', 'markazor-markdown-editor.js'))</MarkazorEditorBundleSourcePath>
+    <MarkazorEditorBundleContentRoot>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', '$(Configuration)', '$(TargetFramework)', 'markazor-editor'))))</MarkazorEditorBundleContentRoot>
+    <MarkazorEditorBundleOutput>$([System.IO.Path]::Combine('$(MarkazorEditorBundleContentRoot)', '$(MarkazorEditorBundleFileName)'))</MarkazorEditorBundleOutput>
+    <MarkazorEditorNodeModulesPackageLock>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', 'node_modules', '.package-lock.json'))</MarkazorEditorNodeModulesPackageLock>
+    <MarkazorEditorNpmLockFile>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'markazor-editor', 'npm-ci.lock'))</MarkazorEditorNpmLockFile>
+    <MarkazorMSBuildTasksAssembly>$([System.IO.Path]::Combine('$(MSBuildToolsPath)', 'Microsoft.Build.Tasks.Core.dll'))</MarkazorMSBuildTasksAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <_MarkazorEditorRestoreInput Include="package.json" />
+    <_MarkazorEditorRestoreInput Include="package-lock.json" />
+    <_MarkazorEditorBundleInput Include="package.json" />
+    <_MarkazorEditorBundleInput Include="package-lock.json" />
+    <_MarkazorEditorBundleInput Include="$(MarkazorEditorBundleSourcePath)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HtmlSanitizer" />
+    <PackageReference Include="Markdig" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <ProjectReference Include="..\Markazor.Core\Markazor.Core.csproj" />
+    <ProjectReference Include="..\Markazor.Themes\Markazor.Themes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="buildTransitive\Markazor.targets" Pack="true" PackagePath="buildTransitive\Markazor.targets" />
+    <None Include="buildTransitive\defaults\**\*" Pack="true" PackagePath="buildTransitive\defaults\%(RecursiveDir)%(FileName)%(Extension)" />
+    <None Update="package.json;package-lock.json;assets\**\*" Pack="false" />
+    <None Include="..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\Markazor.SourceGen.dll"
+          Pack="true"
+          PackagePath="buildTransitive"
+          Visible="false" />
+  </ItemGroup>
+
+  <UsingTask TaskName="RestoreMarkazorEditorNodeModules"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MarkazorMSBuildTasksAssembly)">
+    <ParameterGroup>
+      <WorkingDirectory ParameterType="System.String" Required="true" />
+      <LockFile ParameterType="System.String" Required="true" />
+      <StampFile ParameterType="System.String" Required="true" />
+      <InputFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.Diagnostics" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Threading" />
+      <Using Namespace="Microsoft.Build.Framework" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+FileStream AcquireLockFile()
+{
+    DateTime deadline = DateTime.UtcNow.AddMinutes(5);
+    while (DateTime.UtcNow < deadline)
+    {
+        try
+        {
+            return new FileStream(LockFile, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+        catch (IOException)
+        {
+            Thread.Sleep(200);
+        }
+    }
+
+    throw new IOException("Timed out while waiting for the Markazor editor npm restore lock.");
+}
+
+bool IsUpToDate()
+{
+    if (!File.Exists(StampFile))
+    {
+        return false;
+    }
+
+    DateTime stampTime = File.GetLastWriteTimeUtc(StampFile);
+    foreach (Microsoft.Build.Framework.ITaskItem inputFile in InputFiles)
+    {
+        string inputPath = Path.Combine(WorkingDirectory, inputFile.ItemSpec);
+        if (File.Exists(inputPath) && File.GetLastWriteTimeUtc(inputPath) > stampTime)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+ProcessStartInfo CreateStartInfo()
+{
+    var startInfo = new ProcessStartInfo
+    {
+        WorkingDirectory = WorkingDirectory,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false
+    };
+
+    if (Path.DirectorySeparatorChar == '\\')
+    {
+        startInfo.FileName = "cmd.exe";
+        startInfo.Arguments = "/d /c npm ci";
+    }
+    else
+    {
+        startInfo.FileName = "/usr/bin/env";
+        startInfo.Arguments = "npm ci";
+    }
+
+    return startInfo;
+}
+
+string lockDirectory = Path.GetDirectoryName(LockFile);
+if (!string.IsNullOrEmpty(lockDirectory))
+{
+    Directory.CreateDirectory(lockDirectory);
+}
+
+using FileStream lockStream = AcquireLockFile();
+if (!IsUpToDate())
+{
+    var output = new List<string>();
+    using var process = new Process { StartInfo = CreateStartInfo() };
+    process.OutputDataReceived += (_, args) =>
+    {
+        if (args.Data is not null)
+        {
+            output.Add(args.Data);
+        }
+    };
+    process.ErrorDataReceived += (_, args) =>
+    {
+        if (args.Data is not null)
+        {
+            output.Add(args.Data);
+        }
+    };
+
+    if (!process.Start())
+    {
+        Log.LogError("Failed to start npm ci.");
+    }
+    else
+    {
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+        process.WaitForExit();
+
+        foreach (string line in output)
+        {
+            Log.LogMessage(process.ExitCode == 0 ? MessageImportance.Low : MessageImportance.High, line);
+        }
+
+        if (process.ExitCode != 0)
+        {
+            Log.LogError("npm ci failed with exit code {0}.", process.ExitCode);
+        }
+
+        if (!File.Exists(StampFile))
+        {
+            Log.LogError("npm ci completed but did not create expected stamp file '{0}'.", StampFile);
+        }
+
+        if (!Log.HasLoggedErrors)
+        {
+            File.SetLastWriteTimeUtc(StampFile, DateTime.UtcNow);
+        }
+    }
+}
+]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="BuildMarkazorSourceGenerator"
+          BeforeTargets="GenerateNuspec"
+          Condition="'$(NoBuild)' != 'true'">
+    <MSBuild Projects="..\Markazor.SourceGen\Markazor.SourceGen.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)" />
+  </Target>
+
+  <Target Name="RestoreMarkazorEditorAssets"
+          BeforeTargets="BuildMarkazorEditorAssets"
+          Inputs="@(_MarkazorEditorRestoreInput)"
+          Outputs="$(MarkazorEditorNodeModulesPackageLock)"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <RestoreMarkazorEditorNodeModules WorkingDirectory="$(MSBuildProjectDirectory)"
+                                      LockFile="$(MarkazorEditorNpmLockFile)"
+                                      StampFile="$(MarkazorEditorNodeModulesPackageLock)"
+                                      InputFiles="@(_MarkazorEditorRestoreInput)" />
+  </Target>
+
+  <Target Name="BuildMarkazorEditorAssets"
+          BeforeTargets="ResolveStaticWebAssetsInputs"
+          DependsOnTargets="RestoreMarkazorEditorAssets"
+          Inputs="@(_MarkazorEditorBundleInput)"
+          Outputs="$(MarkazorEditorBundleOutput)"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(TargetFramework)' != ''">
+    <MakeDir Directories="$(MarkazorEditorBundleContentRoot)" />
+    <Exec Command="npx esbuild assets/markazor-markdown-editor.js --bundle --format=esm --target=es2022 --outfile=&quot;$(MarkazorEditorBundleOutput)&quot; --minify" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <ItemGroup>
+      <FileWrites Include="$(MarkazorEditorBundleOutput)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="IncludeMarkazorEditorStaticWebAsset"
+          BeforeTargets="ResolveStaticWebAssetsInputs"
+          DependsOnTargets="BuildMarkazorEditorAssets"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(TargetFramework)' != '' and Exists('$(MarkazorEditorBundleOutput)')">
+    <ItemGroup>
+      <Content Remove="$(MarkazorEditorBundleRelativePath)" />
+      <_MarkazorEditorStaticWebAssetCandidate Include="$(MarkazorEditorBundleOutput)">
+        <RelativePath>$(MarkazorEditorBundleFileName)</RelativePath>
+      </_MarkazorEditorStaticWebAssetCandidate>
+    </ItemGroup>
+
+    <DefineStaticWebAssets
+      CandidateAssets="@(_MarkazorEditorStaticWebAssetCandidate)"
+      SourceType="Discovered"
+      SourceId="$(PackageId)"
+      ContentRoot="$(MarkazorEditorBundleContentRoot)"
+      BasePath="_content/$(PackageId)"
+      AssetKind="All"
+      AssetMode="All"
+      AssetRole="Primary"
+      CopyToOutputDirectory="Never"
+      CopyToPublishDirectory="PreserveNewest">
+      <Output TaskParameter="Assets" ItemName="_MarkazorEditorStaticWebAsset" />
+    </DefineStaticWebAssets>
+
+    <DefineStaticWebAssetEndpoints
+      CandidateAssets="@(_MarkazorEditorStaticWebAsset)"
+      ExistingEndpoints="@(StaticWebAssetEndpoint)"
+      ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+      <Output TaskParameter="Endpoints" ItemName="_MarkazorEditorStaticWebAssetEndpoint" />
+    </DefineStaticWebAssetEndpoints>
+
+    <ItemGroup>
+      <StaticWebAsset Include="@(_MarkazorEditorStaticWebAsset)" />
+      <StaticWebAssetEndpoint Include="@(_MarkazorEditorStaticWebAssetEndpoint)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

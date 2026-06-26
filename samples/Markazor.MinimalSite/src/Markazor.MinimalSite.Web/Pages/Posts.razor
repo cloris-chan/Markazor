@@ -1,0 +1,34 @@
+@page "/posts"
+@using System.Globalization
+@using Markazor.Reading
+@inject IMarkazorReaderService Reader
+
+<PageTitle>Posts | @Reader.Site.Name</PageTitle>
+
+<section class="reader-page-heading">
+    <p class="reader-eyebrow">Posts</p>
+    <h1>Posts</h1>
+    <p>Long-form articles and release notes.</p>
+</section>
+
+<ArticleList Page="articlePage"
+             AriaLabel="Posts"
+             EmptyMessage="No published posts were found."
+             PageLinkFactory="@CreatePageLink" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? Page { get; set; }
+
+    private MarkazorArticlePage articlePage = default!;
+
+    protected override void OnParametersSet()
+    {
+        articlePage = Reader.GetPosts(Page ?? 1);
+    }
+
+    private static string CreatePageLink(int page)
+    {
+        return page <= 1 ? "/posts" : "/posts?page=" + page.ToString(CultureInfo.InvariantCulture);
+    }
+}

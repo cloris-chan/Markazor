@@ -1,0 +1,1375 @@
+.markazor-shell {
+  background: #1e1e1e;
+  border: 1px solid #333842;
+  border-radius: 0;
+  box-sizing: border-box;
+  color: #d4d4d4;
+  color-scheme: dark;
+  display: grid;
+  gap: 1rem;
+  grid-auto-rows: max-content;
+  padding: 2rem;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-width: 0;
+  width: 100%;
+}
+
+.markazor-workbench-shell {
+  background: #1b1b1c;
+  border-color: #2b3038;
+  gap: 1rem;
+  margin: 0 auto;
+  max-width: min(104rem, calc(100vw - 1rem));
+  padding: 1rem;
+}
+
+.markazor-editor-shell {
+  min-height: calc(100vh - 7rem);
+}
+
+.markazor-manage-shell {
+  max-width: min(86rem, calc(100vw - 2rem));
+}
+
+.markazor-shell code {
+  background: #15181d;
+  border: 1px solid #343a44;
+  border-radius: 0;
+  color: #dcdcaa;
+  padding: 0.1rem 0.25rem;
+}
+
+.markazor-page-header,
+.markazor-section-header,
+.markazor-actions,
+.markazor-pane-header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.markazor-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.markazor-page-header h1,
+.markazor-panel h2,
+.markazor-pane-header h3 {
+  margin: 0;
+}
+
+.markazor-page-header h1 {
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.markazor-page-header h1:focus {
+  border-radius: 0;
+  outline: 1px solid #3794ff;
+  outline-offset: 0.2rem;
+}
+
+.markazor-page-header p,
+.markazor-muted {
+  color: #9da6b3;
+  margin: 0.25rem 0 0;
+}
+
+.markazor-workbench-header {
+  border-bottom: 1px solid #333842;
+  padding-bottom: 0.75rem;
+}
+
+.markazor-eyebrow {
+  color: #4fc1ff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+}
+
+.markazor-header-actions {
+  align-items: end;
+  display: grid;
+  gap: 0.55rem;
+  justify-items: end;
+}
+
+.markazor-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.markazor-panel {
+  background: #252526;
+  border: 1px solid #3a3f46;
+  border-radius: 0;
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.markazor-kv {
+  display: grid;
+  gap: 0.4rem 1rem;
+  grid-template-columns: max-content 1fr;
+  margin: 0;
+}
+
+.markazor-kv dt {
+  color: #9da6b3;
+}
+
+.markazor-kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.markazor-status-pill,
+.markazor-token-list li {
+  border-radius: 0;
+  display: inline-flex;
+  font-size: 0.875rem;
+  line-height: 1;
+  padding: 0.4rem 0.65rem;
+}
+
+.markazor-status-pill.is-ready {
+  background: #143d2b;
+  border: 1px solid #2f6b49;
+  color: #89d185;
+}
+
+.markazor-status-pill.is-waiting,
+.markazor-token-list li {
+  background: #473a1d;
+  border: 1px solid #725e24;
+  color: #ffcc66;
+}
+
+.markazor-token-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.markazor-checklist {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.markazor-checklist li {
+  line-height: 1.5;
+}
+
+.markazor-alert {
+  background: #4a1f25;
+  border: 1px solid #7a3038;
+  border-radius: 0;
+  color: #f48771;
+  margin: 0;
+  padding: 0.85rem;
+}
+
+.markazor-success {
+  color: #89d185;
+  margin: 0;
+}
+
+.markazor-warning {
+  background: #3d3216;
+  border: 1px solid #725e24;
+  border-radius: 0;
+  color: #ffcc66;
+  margin: 0;
+  padding: 0.85rem;
+}
+
+.markazor-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.markazor-actions button,
+.markazor-section-header button,
+.markazor-button-link {
+  background: #0e639c;
+  border: 0;
+  border-radius: 0;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+}
+
+.markazor-button-link {
+  text-decoration: none;
+}
+
+.markazor-button-link.is-secondary {
+  background: #2d2d30;
+  border: 1px solid #3e3e42;
+}
+
+.markazor-actions button:disabled,
+.markazor-section-header button:disabled {
+  background: #3b3b3b;
+  color: #858585;
+  cursor: not-allowed;
+}
+
+.markazor-editor-layout {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+}
+
+.markazor-sidebar {
+  align-self: start;
+}
+
+.markazor-content-browser {
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  position: sticky;
+  top: 1rem;
+}
+
+.markazor-sidebar-metrics {
+  border: 1px solid #343a44;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.markazor-sidebar-metrics span {
+  color: #9da6b3;
+  display: grid;
+  font-size: 0.75rem;
+  gap: 0.15rem;
+  padding: 0.6rem;
+}
+
+.markazor-sidebar-metrics span + span {
+  border-left: 1px solid #343a44;
+}
+
+.markazor-sidebar-metrics strong {
+  color: #d4d4d4;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.markazor-new-draft,
+.markazor-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.markazor-content-kind-picker {
+  background: #1b1d20;
+  border: 1px solid #3a3f46;
+  border-radius: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.55rem 0.65rem 0.65rem;
+}
+
+.markazor-content-kind-picker legend {
+  color: #9da6b3;
+  font-size: 0.9rem;
+  padding: 0 0.25rem;
+}
+
+.markazor-content-kind-picker label {
+  align-items: center;
+  color: #d4d4d4;
+  display: inline-flex;
+  font-size: 0.9rem;
+  gap: 0.35rem;
+}
+
+.markazor-new-draft label,
+.markazor-field {
+  color: #c8d0da;
+  font-size: 0.9rem;
+}
+
+.markazor-path-field {
+  align-items: center;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.markazor-new-draft input,
+.markazor-field input,
+.markazor-field select,
+.markazor-field textarea {
+  background: #15181d;
+  border: 1px solid #3c4650;
+  border-radius: 0;
+  box-sizing: border-box;
+  color: #d4d4d4;
+  font: inherit;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  width: 100%;
+}
+
+.markazor-new-draft input:focus,
+.markazor-field input:focus,
+.markazor-field select:focus,
+.markazor-field textarea:focus,
+.markazor-editor-textarea:focus,
+.markazor-conflict textarea:focus {
+  border-color: #3794ff;
+  outline: 1px solid #3794ff;
+  outline-offset: 0;
+}
+
+.markazor-content-kind-picker input[type="radio"] {
+  border: 0;
+  padding: 0;
+  width: auto;
+}
+
+.markazor-field textarea {
+  min-height: 5.75rem;
+  resize: vertical;
+}
+
+.markazor-markdown-editor {
+  background: #111316;
+  border: 1px solid #3c4650;
+  border-radius: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.markazor-authoring-pane .markazor-markdown-editor {
+  border: 0;
+  min-height: 100%;
+}
+
+.markazor-markdown-editor:focus-within {
+  border-color: #3794ff;
+  outline: 1px solid #3794ff;
+  outline-offset: 0;
+}
+
+.markazor-markdown-toolbar {
+  align-items: center;
+  background: #181b20;
+  border-bottom: 1px solid #313841;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  min-height: 2.4rem;
+  overflow: visible;
+  position: relative;
+  z-index: 3;
+}
+
+.markazor-markdown-tool-group {
+  border-right: 1px solid #313841;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.markazor-markdown-toolbar button {
+  background: transparent;
+  border: 0;
+  border-left: 1px solid #313841;
+  border-radius: 0;
+  color: #c8d0da;
+  cursor: pointer;
+  font: 0.78rem/1 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0;
+  min-height: 2.4rem;
+  min-width: 2.35rem;
+  padding: 0 0.62rem;
+  white-space: nowrap;
+}
+
+.markazor-markdown-image-menu {
+  display: inline-flex;
+  position: relative;
+}
+
+.markazor-markdown-menu-trigger::after {
+  content: " v";
+  font-size: 0.7rem;
+}
+
+.markazor-markdown-menu-backdrop {
+  background: transparent;
+  border: 0;
+  inset: 0;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  position: fixed;
+  z-index: 18;
+}
+
+.markazor-markdown-image-menu-panel {
+  background: #181b20;
+  border: 1px solid #313841;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+  display: grid;
+  left: 0;
+  min-width: 11rem;
+  position: absolute;
+  top: calc(100% + 1px);
+  z-index: 20;
+}
+
+.markazor-markdown-image-menu-panel button,
+.markazor-markdown-image-menu-panel .markazor-markdown-upload-button {
+  border-left: 0;
+  justify-content: flex-start;
+  min-width: 100%;
+  text-align: left;
+}
+
+.markazor-markdown-upload-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid #313841;
+  border-radius: 0;
+  color: #c8d0da;
+  cursor: pointer;
+  display: inline-flex;
+  font: 0.78rem/1 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0;
+  min-height: 2.4rem;
+  min-width: 2.35rem;
+  padding: 0 0.62rem;
+  position: relative;
+  white-space: nowrap;
+}
+
+.markazor-markdown-tool-group button:first-child,
+.markazor-markdown-tool-group .markazor-markdown-upload-button:first-child,
+.markazor-markdown-image-menu:first-child .markazor-markdown-menu-trigger {
+  border-left: 0;
+}
+
+.markazor-markdown-toolbar button:not(.markazor-markdown-menu-backdrop):hover:not(:disabled),
+.markazor-markdown-toolbar button:not(.markazor-markdown-menu-backdrop):focus-visible,
+.markazor-markdown-upload-button:hover,
+.markazor-markdown-upload-button:focus-within {
+  background: #252b33;
+  color: #ffffff;
+}
+
+.markazor-markdown-toolbar button:disabled,
+.markazor-markdown-upload-button.is-disabled {
+  color: #6f7780;
+  cursor: not-allowed;
+}
+
+.markazor-markdown-upload-button input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.markazor-markdown-toolbar-status {
+  color: #ffcc66;
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  padding: 0.45rem 0.75rem;
+  white-space: nowrap;
+}
+
+.markazor-codemirror-host {
+  min-height: 32rem;
+  min-width: 0;
+  overflow: auto;
+}
+
+.markazor-codemirror-host .cm-editor {
+  min-height: inherit;
+}
+
+.markazor-markdown-editor:not(.is-codemirror-ready) .markazor-codemirror-host {
+  display: none;
+}
+
+.markazor-markdown-editor.is-codemirror-ready .markazor-markdown-editor-fallback {
+  display: none;
+}
+
+.markazor-settings-form {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.markazor-field-wide {
+  grid-column: 1 / -1;
+}
+
+.markazor-site-title-field input {
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.markazor-new-draft button {
+  background: #0e639c;
+  border: 0;
+  border-radius: 0;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+}
+
+.markazor-article-list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: min(38rem, calc(100vh - 22rem));
+  overflow: auto;
+  padding-right: 0.1rem;
+}
+
+.markazor-article-row {
+  align-items: center;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr;
+}
+
+.markazor-article-row.is-selectable {
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+}
+
+.markazor-article-row input[type="checkbox"] {
+  accent-color: #3794ff;
+  justify-self: center;
+}
+
+.markazor-article-list button {
+  background: #1e1e1e;
+  border: 1px solid #343a44;
+  border-radius: 0;
+  color: #d4d4d4;
+  cursor: pointer;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.65rem;
+  text-align: left;
+}
+
+.markazor-article-title-line {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.markazor-article-title {
+  overflow-wrap: anywhere;
+}
+
+.markazor-article-kind {
+  background: #173d35;
+  border: 1px solid #2f6f5f;
+  border-radius: 0;
+  color: #7ee7c4;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.25rem 0.45rem;
+}
+
+.markazor-publish-selected {
+  background: #2d6a4f;
+  border: 0;
+  border-radius: 0;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+}
+
+.markazor-publish-selected:disabled {
+  background: #3b3b3b;
+  color: #858585;
+  cursor: not-allowed;
+}
+
+.markazor-article-list button.is-active {
+  border-color: #3794ff;
+}
+
+.markazor-article-list button.is-draft .markazor-article-title::after {
+  color: #ffcc66;
+  content: "Draft";
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+.markazor-article-list small {
+  color: #9da6b3;
+  overflow-wrap: anywhere;
+}
+
+.markazor-editor-main {
+  align-content: start;
+  container: markazor-editor-main / inline-size;
+  min-width: 0;
+}
+
+.markazor-document-header {
+  align-items: start;
+  border-bottom: 1px solid #343a44;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-content: space-between;
+  padding-bottom: 0.85rem;
+}
+
+.markazor-document-title {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.markazor-document-title h2 {
+  font-size: 1.35rem;
+  line-height: 1.2;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.markazor-document-title p:not(.markazor-eyebrow) {
+  color: #9da6b3;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.markazor-document-state {
+  align-items: center;
+  color: #9da6b3;
+  display: grid;
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  gap: 0.45rem;
+  grid-template-columns: repeat(3, max-content);
+  justify-content: flex-end;
+}
+
+.markazor-document-header-tools {
+  align-items: end;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0.55rem;
+  justify-items: end;
+  min-width: 0;
+}
+
+.markazor-document-state > span:not(.markazor-status-pill) {
+  border: 1px solid #343a44;
+  color: #c8d0da;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  padding: 0.4rem 0.55rem;
+}
+
+.markazor-metadata-toolbar {
+  background: #181b20;
+  border: 1px solid #343a44;
+  display: grid;
+  gap: 0;
+}
+
+.markazor-metadata-primary,
+.markazor-metadata-secondary {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.markazor-metadata-primary {
+  grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 0.55fr) minmax(9rem, auto);
+}
+
+.markazor-metadata-secondary {
+  grid-template-columns: minmax(11rem, 0.8fr) minmax(6rem, auto) minmax(10rem, 0.9fr) minmax(12rem, 1.1fr);
+}
+
+.markazor-metadata-toolbar .markazor-field,
+.markazor-metadata-toolbar .markazor-metadata-kind {
+  border-bottom: 1px solid #2d333b;
+  border-right: 1px solid #2d333b;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+}
+
+.markazor-metadata-toolbar .markazor-field > span,
+.markazor-metadata-toolbar .markazor-metadata-kind legend {
+  color: #8f99a6;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.markazor-metadata-toolbar .markazor-field input,
+.markazor-metadata-toolbar .markazor-field textarea {
+  background: #111316;
+  box-sizing: border-box;
+  min-height: 2.15rem;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  width: 100%;
+}
+
+.markazor-metadata-toolbar .markazor-path-field {
+  align-items: center;
+  grid-template-columns: 4rem minmax(0, 1fr);
+}
+
+.markazor-metadata-toolbar .markazor-metadata-kind {
+  background: #181b20;
+  border-left: 0;
+  border-radius: 0;
+  border-top: 0;
+  margin: 0;
+}
+
+.markazor-metadata-toolbar .markazor-metadata-kind {
+  align-content: end;
+}
+
+.markazor-metadata-toolbar .markazor-metadata-kind label {
+  font-size: 0.82rem;
+}
+
+.markazor-metadata-toolbar .markazor-checkbox-field {
+  align-content: end;
+  align-items: center;
+  grid-template-columns: auto 1fr;
+}
+
+.markazor-metadata-toolbar .markazor-checkbox-field input {
+  min-height: auto;
+  width: auto;
+}
+
+.markazor-metadata-toolbar .markazor-summary-field textarea {
+  min-height: 3.15rem;
+  resize: vertical;
+}
+
+.markazor-document-actions {
+  align-content: center;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(3, minmax(5.25rem, 1fr));
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.markazor-document-actions button {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.markazor-editor-textarea {
+  background: #111316;
+  border: 0;
+  border-radius: 0;
+  color: #d4d4d4;
+  box-sizing: border-box;
+  font: 0.95rem/1.5 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  min-height: 32rem;
+  padding: 0.75rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.markazor-authoring-grid {
+  align-items: stretch;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(22rem, 1.12fr) minmax(20rem, 0.88fr);
+  min-height: 34rem;
+}
+
+.markazor-authoring-pane,
+.markazor-preview {
+  background: #111316;
+  border: 1px solid #343a44;
+  display: grid;
+  min-width: 0;
+}
+
+.markazor-authoring-pane {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.markazor-preview {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.markazor-pane-header {
+  background: #1b1d20;
+  border-bottom: 1px solid #313841;
+  min-height: 2.4rem;
+  padding: 0 0.75rem;
+}
+
+.markazor-pane-header h3 {
+  color: #c8d0da;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.markazor-preview {
+  align-self: stretch;
+}
+
+.markazor-preview-body {
+  color: #d4d4d4;
+  font: 0.98rem/1.72 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 32rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding: 1rem;
+}
+
+.markazor-preview-body h1,
+.markazor-preview-body h2,
+.markazor-preview-body h3 {
+  color: #f2f5f8;
+  line-height: 1.2;
+  margin: 1.4em 0 0.6em;
+}
+
+.markazor-preview-body h1:first-child,
+.markazor-preview-body h2:first-child,
+.markazor-preview-body h3:first-child,
+.markazor-preview-body p:first-child {
+  margin-top: 0;
+}
+
+.markazor-preview-body p,
+.markazor-preview-body ul,
+.markazor-preview-body ol,
+.markazor-preview-body blockquote {
+  margin: 0 0 1rem;
+}
+
+.markazor-preview-body a {
+  color: #4fc1ff;
+}
+
+.markazor-preview-body blockquote {
+  border-left: 0.2rem solid #ffcc66;
+  color: #c8d0da;
+  padding-left: 0.85rem;
+}
+
+.markazor-preview-body pre {
+  background: #0d1117;
+  border: 1px solid #343a44;
+  overflow-x: auto;
+  padding: 0.85rem;
+}
+
+.markazor-preview-body code {
+  color: #dcdcaa;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.markazor-preview-body img {
+  height: auto;
+  max-width: 100%;
+}
+
+.markazor-conflict {
+  border-top: 1px solid #3a3f46;
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 1rem;
+}
+
+.markazor-conflict h2 {
+  margin: 0;
+}
+
+.markazor-conflict-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.markazor-conflict textarea {
+  background: #111316;
+  border: 1px solid #3c4650;
+  border-radius: 0;
+  box-sizing: border-box;
+  color: #d4d4d4;
+  font: 0.85rem/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  min-height: 12rem;
+  padding: 0.65rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.markazor-authoring-pane:focus-within,
+.markazor-preview:focus-within {
+  border-color: #3794ff;
+}
+
+@container markazor-editor-main (max-width: 72rem) {
+  .markazor-authoring-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .markazor-codemirror-host,
+  .markazor-editor-textarea,
+  .markazor-preview-body {
+    min-height: 24rem;
+  }
+}
+
+@container markazor-editor-main (max-width: 62rem) {
+  .markazor-metadata-secondary {
+    grid-template-columns: minmax(12rem, 1fr) minmax(6rem, auto) minmax(12rem, 1fr);
+  }
+
+  .markazor-tags-field {
+    grid-column: 1 / -1;
+  }
+}
+
+@container markazor-editor-main (max-width: 54rem) {
+  .markazor-document-header {
+    grid-template-columns: 1fr;
+  }
+
+  .markazor-document-header-tools {
+    align-items: start;
+    justify-items: start;
+    width: 100%;
+  }
+
+  .markazor-document-state,
+  .markazor-document-actions {
+    justify-content: start;
+  }
+
+  .markazor-metadata-primary {
+    grid-template-columns: minmax(0, 1fr) minmax(9rem, 0.6fr);
+  }
+
+  .markazor-metadata-kind {
+    grid-column: 1 / -1;
+  }
+
+  .markazor-metadata-secondary {
+    grid-template-columns: minmax(12rem, 1fr) minmax(6rem, auto);
+  }
+
+  .markazor-category-field,
+  .markazor-tags-field {
+    grid-column: 1 / -1;
+  }
+}
+
+@container markazor-editor-main (max-width: 40rem) {
+  .markazor-document-state,
+  .markazor-document-actions,
+  .markazor-metadata-primary,
+  .markazor-metadata-secondary,
+  .markazor-metadata-toolbar .markazor-path-field {
+    grid-template-columns: 1fr;
+  }
+
+  .markazor-document-header-tools,
+  .markazor-document-state,
+  .markazor-document-actions {
+    width: 100%;
+  }
+
+  .markazor-document-actions button {
+    width: 100%;
+  }
+
+  .markazor-metadata-toolbar .markazor-metadata-kind {
+    align-content: start;
+  }
+
+  .markazor-metadata-toolbar .markazor-checkbox-field {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
+.markazor-reader-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.markazor-reader-card {
+  border-bottom: 1px solid #d7dde2;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.35rem 0 1.35rem;
+}
+
+.markazor-reader-card h2,
+.markazor-reader-card p {
+  margin: 0;
+}
+
+.markazor-reader-card h2 {
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.markazor-reader-card h2 a,
+.markazor-archive a,
+.markazor-reader-article h1 {
+  color: #172026;
+}
+
+.markazor-reader-card p {
+  color: #47535e;
+  line-height: 1.65;
+  max-width: 68ch;
+}
+
+.markazor-reader-meta {
+  align-items: center;
+  color: #68747e;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  gap: 0.75rem;
+}
+
+.markazor-reader-kind {
+  border: 1px solid #c5d8d3;
+  border-radius: 999px;
+  color: #245c53;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.28rem 0.5rem;
+}
+
+.markazor-reader-meta a,
+.markazor-reader-tags a {
+  color: #245c53;
+}
+
+.markazor-reader-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.markazor-reader-tags a {
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.markazor-reader-tags a:hover {
+  text-decoration: underline;
+}
+
+.markazor-reader-more {
+  color: #245c53;
+  font-weight: 700;
+  justify-self: start;
+  text-decoration: none;
+}
+
+.markazor-reader-more:hover {
+  text-decoration: underline;
+}
+
+.markazor-pagination {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr auto 1fr;
+  margin-top: 2rem;
+}
+
+.markazor-pagination a:last-child {
+  justify-self: end;
+}
+
+.markazor-pagination span {
+  color: #68747e;
+  font-size: 0.875rem;
+}
+
+.markazor-reader-article {
+  display: grid;
+  gap: 2rem;
+  max-width: 72ch;
+}
+
+.markazor-reader-article header {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.markazor-reader-article h1 {
+  font-size: 3rem;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.markazor-reader-dek {
+  color: #52606a;
+  font-size: 1.1rem;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.markazor-back-link {
+  font-size: 0.9rem;
+}
+
+.markazor-markdown-body {
+  color: #27323a;
+  font: 1rem/1.75 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.markazor-markdown-body h2,
+.markazor-markdown-body h3 {
+  color: #172026;
+  line-height: 1.25;
+  margin: 2em 0 0.6em;
+}
+
+.markazor-markdown-body p,
+.markazor-markdown-body ul,
+.markazor-markdown-body ol,
+.markazor-markdown-body blockquote {
+  margin: 0 0 1.15rem;
+}
+
+.markazor-markdown-body pre {
+  background: #f3f5f6;
+  border: 1px solid #d7dde2;
+  border-radius: 6px;
+  overflow-x: auto;
+  padding: 1rem;
+}
+
+.markazor-markdown-body code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.markazor-markdown-body img {
+  height: auto;
+  max-width: 100%;
+}
+
+.markazor-reader-error,
+.markazor-reader-empty {
+  border: 1px solid #d7dde2;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.markazor-reader-error h2,
+.markazor-reader-error p {
+  margin: 0;
+}
+
+.markazor-reader-error {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.markazor-article-navigation {
+  border-top: 1px solid #d7dde2;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-top: 1.25rem;
+}
+
+.markazor-article-navigation a {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.markazor-article-navigation-next {
+  grid-column: 2;
+  text-align: right;
+}
+
+.markazor-article-navigation span {
+  color: #68747e;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.markazor-update-prompt {
+  align-items: center;
+  background: #172026;
+  border: 1px solid #34414a;
+  border-radius: 8px;
+  bottom: 1rem;
+  box-shadow: 0 12px 32px rgba(23, 32, 38, 0.22);
+  color: white;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+  left: 50%;
+  max-width: min(34rem, calc(100vw - 2rem));
+  padding: 0.8rem 0.9rem 0.8rem 1rem;
+  position: fixed;
+  transform: translateX(-50%);
+  width: max-content;
+  z-index: 1100;
+}
+
+.markazor-update-prompt div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.markazor-update-prompt span {
+  color: #d7dde2;
+  font-size: 0.85rem;
+}
+
+.markazor-update-prompt button {
+  align-items: center;
+  background: #f7f8f8;
+  border: 0;
+  border-radius: 6px;
+  color: #172026;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 700;
+  gap: 0.45rem;
+  min-width: 6.75rem;
+  padding: 0.55rem 0.8rem;
+}
+
+.markazor-update-prompt button:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.markazor-update-spinner {
+  animation: markazor-update-spin 720ms linear infinite;
+  border: 0.14rem solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999rem;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 0.86rem;
+  width: 0.86rem;
+}
+
+@keyframes markazor-update-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (max-width: 1120px) {
+  .markazor-editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .markazor-content-browser {
+    max-height: none;
+    position: static;
+  }
+
+  .markazor-article-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .markazor-workbench-shell {
+    max-width: calc(100vw - 1rem);
+    padding: 0.75rem;
+  }
+
+  .markazor-header-actions {
+    align-items: stretch;
+  }
+
+  .markazor-header-actions {
+    justify-items: start;
+  }
+
+  .markazor-conflict-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .markazor-settings-form {
+    grid-template-columns: 1fr;
+  }
+
+  .markazor-page-header,
+  .markazor-section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .markazor-article-navigation {
+    grid-template-columns: 1fr;
+  }
+
+  .markazor-article-navigation-next {
+    grid-column: 1;
+    text-align: left;
+  }
+
+  .markazor-update-prompt {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: calc(100vw - 2rem);
+  }
+
+  .markazor-reader-article h1 {
+    font-size: 2.15rem;
+  }
+
+  .markazor-reader-card h2 {
+    font-size: 1.2rem;
+  }
+}

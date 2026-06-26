@@ -1,0 +1,97 @@
+@implements IDisposable
+@inject Markazor.Pwa.IMarkazorPwaUpdateService PwaUpdates
+
+@if (updateAvailable)
+{
+    <aside class="markazor-update-prompt" role="status" aria-live="polite">
+        <div>
+            <strong>A new version is ready</strong>
+            <span>Reload to use the latest published site.</span>
+        </div>
+        <button type="button" class="@ButtonClass" disabled="@IsActivating" aria-busy="@AriaBusy" @onclick="ActivateAsync">
+            @if (IsActivating)
+            {
+                <span class="markazor-update-spinner" aria-hidden="true"></span>
+            }
+            @(IsActivating ? "Reloading..." : "Reload")
+        </button>
+    </aside>
+}
+
+@code {
+    private readonly CancellationTokenSource disposalTokenSource = new();
+    private bool updateAvailable;
+    private PwaUpdatePromptState state;
+
+    private static readonly TimeSpan ActivationPaintDelay = TimeSpan.FromMilliseconds(160);
+
+    private bool IsActivating => state == PwaUpdatePromptState.Activating;
+
+    private string AriaBusy => IsActivating ? "true" : "false";
+
+    private string ButtonClass => IsActivating ? "is-loading" : string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            updateAvailable = await PwaUpdates.WaitForUpdateAsync(
+                disposalTokenSource.Token).ConfigureAwait(false);
+
+            if (updateAvailable)
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        disposalTokenSource.Cancel();
+        disposalTokenSource.Dispose();
+    }
+
+    private async Task ActivateAsync()
+    {
+        if (IsActivating)
+        {
+            return;
+        }
+
+        state = PwaUpdatePromptState.Activating;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await Task.Delay(ActivationPaintDelay, disposalTokenSource.Token).ConfigureAwait(false);
+            await PwaUpdates.ActivateUpdateAsync(disposalTokenSource.Token).ConfigureAwait(false);
+            state = PwaUpdatePromptState.Ready;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (JSException)
+        {
+            state = PwaUpdatePromptState.Ready;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private enum PwaUpdatePromptState
+    {
+        Ready,
+        Activating,
+    }
+}

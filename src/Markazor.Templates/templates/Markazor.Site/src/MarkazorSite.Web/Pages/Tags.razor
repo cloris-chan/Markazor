@@ -1,0 +1,65 @@
+@page "/tags"
+@using System.Globalization
+@using Markazor.Reading
+@inject IMarkazorReaderService Reader
+
+<PageTitle>@Title | @Reader.Site.Name</PageTitle>
+
+<section class="reader-page-heading">
+    <p class="reader-eyebrow">Browse</p>
+    <h1>@Title</h1>
+    @if (!string.IsNullOrWhiteSpace(Tag))
+    {
+        <a href="/tags">View all tags</a>
+    }
+</section>
+
+@if (string.IsNullOrWhiteSpace(Tag))
+{
+    <ul class="reader-taxonomy-list" aria-label="Tags">
+        @foreach (MarkazorTaxonomyItem item in Reader.GetTags())
+        {
+            <li>
+                <a href="@TagLink(item.Name)">#@item.Name</a>
+                <span>@item.Count</span>
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <ArticleList Page="articlePage"
+                 AriaLabel="@($"Articles tagged {Tag}")"
+                 EmptyMessage="No published articles use this tag."
+                 PageLinkFactory="@CreatePageLink" />
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "tag")]
+    public string? Tag { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? Page { get; set; }
+
+    private MarkazorArticlePage articlePage = new([], 1, 10, 0, 1);
+
+    private string Title => string.IsNullOrWhiteSpace(Tag) ? "Tags" : $"#{Tag}";
+
+    protected override void OnParametersSet()
+    {
+        articlePage = string.IsNullOrWhiteSpace(Tag)
+            ? new([], 1, Reader.Site.PageSize, 0, 1)
+            : Reader.GetTag(Tag, Page ?? 1);
+    }
+
+    private static string TagLink(string tag)
+    {
+        return "/tags?tag=" + Uri.EscapeDataString(tag);
+    }
+
+    private string CreatePageLink(int page)
+    {
+        string root = TagLink(Tag!);
+        return page <= 1 ? root : root + "&page=" + page.ToString(CultureInfo.InvariantCulture);
+    }
+}

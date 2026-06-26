@@ -1,0 +1,64 @@
+name: verify
+
+run-name: verify ${{ github.ref_name }}
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: 10.0.x
+  NODE_VERSION: 24
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.3.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: src/Markazor/package-lock.json
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = ./build/Get-MarkazorVersion.ps1
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore Markazor.slnx
+
+      - name: Build
+        run: dotnet build Markazor.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Markazor.slnx --configuration Release --no-build
+
+      - name: Pack
+        shell: pwsh
+        run: ./build/Pack-Markazor.ps1 -Version '${{ steps.version.outputs.value }}'
+
+      - name: Template smoke
+        shell: pwsh
+        run: ./build/Test-MarkazorTemplate.ps1 -Version '${{ steps.version.outputs.value }}' -PackageSource artifacts/packages

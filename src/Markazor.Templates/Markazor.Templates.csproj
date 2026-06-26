@@ -1,0 +1,85 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <MarkazorDisableAotCompatibility>true</MarkazorDisableAotCompatibility>
+    <PackageId>Markazor.Templates</PackageId>
+    <Description>Template package for creating Markazor site repositories.</Description>
+    <PackageType>Template</PackageType>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <MarkazorTemplatePackageRoot>$(MSBuildProjectDirectory)/obj/$(Configuration)/$(TargetFramework)/template-package/</MarkazorTemplatePackageRoot>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);GetMarkazorTemplatePackageContent</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <MarkazorTemplateSource Include="templates/**/*"
+                            Exclude="templates/**/.vs/**;templates/**/bin/**;templates/**/obj/**;templates/**/Properties/launchSettings.json" />
+  </ItemGroup>
+
+  <UsingTask TaskName="StampMarkazorTemplateContent"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <SourceFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <SourceRoot ParameterType="System.String" Required="true" />
+      <DestinationRoot ParameterType="System.String" Required="true" />
+      <PackageVersion ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+foreach (var sourceFile in SourceFiles)
+{
+    var sourcePath = sourceFile.GetMetadata("FullPath");
+    var relativeDirectory = sourceFile.GetMetadata("RecursiveDir");
+    var fileName = sourceFile.GetMetadata("Filename") + sourceFile.GetMetadata("Extension");
+    var destinationPath = Path.GetFullPath(Path.Combine(DestinationRoot, relativeDirectory, fileName));
+    var destinationDirectory = Path.GetDirectoryName(destinationPath);
+    if (!string.IsNullOrEmpty(destinationDirectory))
+    {
+        Directory.CreateDirectory(destinationDirectory);
+    }
+
+    var bytes = File.ReadAllBytes(sourcePath);
+    try
+    {
+        var text = new UTF8Encoding(false, true).GetString(bytes);
+        if (text.IndexOf("MARKAZOR_PACKAGE_VERSION", StringComparison.Ordinal) >= 0)
+        {
+            text = text.Replace("MARKAZOR_PACKAGE_VERSION", PackageVersion);
+            File.WriteAllText(destinationPath, text, new UTF8Encoding(false));
+        }
+        else
+        {
+            File.WriteAllBytes(destinationPath, bytes);
+        }
+    }
+    catch (DecoderFallbackException)
+    {
+        File.WriteAllBytes(destinationPath, bytes);
+    }
+}
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="GetMarkazorTemplatePackageContent">
+    <RemoveDir Directories="$(MarkazorTemplatePackageRoot)" />
+    <StampMarkazorTemplateContent SourceFiles="@(MarkazorTemplateSource)"
+                                  SourceRoot="$(MSBuildProjectDirectory)/templates"
+                                  DestinationRoot="$(MarkazorTemplatePackageRoot)templates"
+                                  PackageVersion="$(PackageVersion)" />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(MarkazorTemplatePackageRoot)templates/**/*">
+        <PackagePath>content/templates/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
+
+</Project>

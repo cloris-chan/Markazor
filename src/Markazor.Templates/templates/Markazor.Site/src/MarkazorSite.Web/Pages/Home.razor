@@ -1,0 +1,40 @@
+@page "/"
+@using System.Globalization
+@using Markazor.Reading
+@inject IMarkazorReaderService Reader
+
+<PageTitle>@Reader.Site.Name</PageTitle>
+
+<section class="reader-intro">
+    <div>
+        <p class="reader-eyebrow">Latest writing</p>
+        <h1>@Reader.Site.Name</h1>
+        <p>@Reader.Site.Description</p>
+    </div>
+    <nav class="reader-mode-links" aria-label="Content types">
+        <a href="/posts">Posts</a>
+        <a href="/notes">Notes</a>
+        <a href="/archive">Archive</a>
+    </nav>
+</section>
+
+<ArticleList Page="articlePage"
+             AriaLabel="Latest writing"
+             PageLinkFactory="@CreatePageLink" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? Page { get; set; }
+
+    private MarkazorArticlePage articlePage = default!;
+
+    protected override void OnParametersSet()
+    {
+        articlePage = Reader.GetArticles(Page ?? 1);
+    }
+
+    private static string CreatePageLink(int page)
+    {
+        return page <= 1 ? "/" : "/?page=" + page.ToString(CultureInfo.InvariantCulture);
+    }
+}

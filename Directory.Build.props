@@ -1,0 +1,46 @@
+<Project>
+  <PropertyGroup>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.SourceGen'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Templates'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Themes'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Tests'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Components.Tests'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Core.Tests'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Api.Tests'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.SourceGen.Tests'">true</MarkazorDisableAotCompatibility>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <Authors>Markazor contributors</Authors>
+    <Company>Markazor</Company>
+    <PackageProjectUrl>https://github.com/cloris-chan/Markazor</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/cloris-chan/Markazor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>package-readme.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="('$(TargetFramework)' == 'net9.0' or '$(TargetFramework)' == 'net10.0') and '$(MarkazorDisableAotCompatibility)' != 'true'">
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)docs\package-readme.md"
+          Pack="true"
+          PackagePath="package-readme.md"
+          Visible="false" />
+  </ItemGroup>
+</Project>

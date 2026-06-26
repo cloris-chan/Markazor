@@ -1,0 +1,34 @@
+@page "/notes"
+@using System.Globalization
+@using Markazor.Reading
+@inject IMarkazorReaderService Reader
+
+<PageTitle>Notes | @Reader.Site.Name</PageTitle>
+
+<section class="reader-page-heading">
+    <p class="reader-eyebrow">Notes</p>
+    <h1>Notes</h1>
+    <p>Short updates, field notes, and working thoughts.</p>
+</section>
+
+<ArticleList Page="articlePage"
+             AriaLabel="Notes"
+             EmptyMessage="No published notes were found."
+             PageLinkFactory="@CreatePageLink" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? Page { get; set; }
+
+    private MarkazorArticlePage articlePage = default!;
+
+    protected override void OnParametersSet()
+    {
+        articlePage = Reader.GetNotes(Page ?? 1);
+    }
+
+    private static string CreatePageLink(int page)
+    {
+        return page <= 1 ? "/notes" : "/notes?page=" + page.ToString(CultureInfo.InvariantCulture);
+    }
+}

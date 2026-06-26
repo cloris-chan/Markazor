@@ -1,0 +1,12 @@
+@page "/not-found"
+@layout MainLayout
+@inject Markazor.Reading.IMarkazorReaderService Reader
+
+<PageTitle>Not found | @Reader.Site.Name</PageTitle>
+
+<section class="reader-empty-state">
+    <p class="reader-eyebrow">404</p>
+    <h1>Page not found</h1>
+    <p>The page may have moved, or the address may be incorrect.</p>
+    <a href="/">Return home</a>
+</section>

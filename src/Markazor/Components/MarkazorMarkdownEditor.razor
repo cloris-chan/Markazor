@@ -1,0 +1,304 @@
+@inject IJSRuntime JavaScript
+@using Microsoft.AspNetCore.Components.Forms
+@implements IAsyncDisposable
+
+<div class="markazor-markdown-editor" @ref="rootElement">
+    <div class="markazor-markdown-toolbar" role="toolbar" aria-label="Markdown tools">
+        <span class="markazor-markdown-tool-group">
+            <button type="button" title="Undo" aria-label="Undo" @onclick='() => FormatAsync("undo")' disabled="@ToolbarDisabled">Undo</button>
+            <button type="button" title="Redo" aria-label="Redo" @onclick='() => FormatAsync("redo")' disabled="@ToolbarDisabled">Redo</button>
+        </span>
+        <span class="markazor-markdown-tool-group">
+            <button type="button" title="Heading 1" aria-label="Heading 1" @onclick='() => FormatAsync("heading1")' disabled="@ToolbarDisabled">H1</button>
+            <button type="button" title="Heading 2" aria-label="Heading 2" @onclick='() => FormatAsync("heading2")' disabled="@ToolbarDisabled">H2</button>
+            <button type="button" title="Heading 3" aria-label="Heading 3" @onclick='() => FormatAsync("heading3")' disabled="@ToolbarDisabled">H3</button>
+        </span>
+        <span class="markazor-markdown-tool-group">
+            <button type="button" title="Bold" aria-label="Bold" @onclick='() => FormatAsync("bold")' disabled="@ToolbarDisabled"><strong>B</strong></button>
+            <button type="button" title="Italic" aria-label="Italic" @onclick='() => FormatAsync("italic")' disabled="@ToolbarDisabled"><em>I</em></button>
+            <button type="button" title="Inline code" aria-label="Inline code" @onclick='() => FormatAsync("code")' disabled="@ToolbarDisabled">`</button>
+        </span>
+        <span class="markazor-markdown-tool-group">
+            <button type="button" title="Link" aria-label="Link" @onclick='() => FormatAsync("link")' disabled="@ToolbarDisabled">Link</button>
+            @if (UsesImageAssetToolbar)
+            {
+                <span class="markazor-markdown-image-menu">
+                    <button type="button"
+                            class="markazor-markdown-menu-trigger"
+                            title="Insert image"
+                            aria-label="Insert image"
+                            aria-haspopup="menu"
+                            aria-expanded="@imageMenuOpen"
+                            @onclick="ToggleImageMenu"
+                            disabled="@ImageToolbarDisabled">Image</button>
+                    @if (imageMenuOpen)
+                    {
+                        <button type="button"
+                                class="markazor-markdown-menu-backdrop"
+                                aria-label="Close image menu"
+                                @onclick="CloseImageMenu"></button>
+                        <span class="markazor-markdown-image-menu-panel" role="menu" aria-label="Image source">
+                            @if (ExternalImageRequested.HasDelegate)
+                            {
+                                <button type="button" role="menuitem" @onclick="RequestExternalImageAsync">From URL</button>
+                            }
+                            @if (ImageUploadRequested.HasDelegate)
+                            {
+                                <label class="@UploadButtonClass" role="menuitem" title="Upload local image" aria-label="Upload local image">
+                                    <span>Upload local image</span>
+                                    <InputFile OnChange="RequestImageUploadAsync"
+                                               accept="@AcceptedImageTypes"
+                                               disabled="@ImageToolbarDisabled" />
+                                </label>
+                            }
+                        </span>
+                    }
+                </span>
+            }
+            else
+            {
+                <button type="button" title="Image" aria-label="Image" @onclick='() => FormatAsync("image")' disabled="@ToolbarDisabled">Img</button>
+            }
+        </span>
+        <span class="markazor-markdown-tool-group">
+            <button type="button" title="Bulleted list" aria-label="Bulleted list" @onclick='() => FormatAsync("unordered-list")' disabled="@ToolbarDisabled">-</button>
+            <button type="button" title="Numbered list" aria-label="Numbered list" @onclick='() => FormatAsync("ordered-list")' disabled="@ToolbarDisabled">1.</button>
+            <button type="button" title="Quote" aria-label="Quote" @onclick='() => FormatAsync("quote")' disabled="@ToolbarDisabled">&gt;</button>
+            <button type="button" title="Divider" aria-label="Divider" @onclick='() => FormatAsync("divider")' disabled="@ToolbarDisabled">HR</button>
+        </span>
+        <span class="markazor-markdown-tool-group">
+            <button type="button" title="Table" aria-label="Table" @onclick='() => FormatAsync("table")' disabled="@ToolbarDisabled">Tbl</button>
+            <button type="button" title="Code block" aria-label="Code block" @onclick='() => FormatAsync("code-block")' disabled="@ToolbarDisabled">&#96;&#96;&#96;</button>
+        </span>
+        @if (editorUnavailable)
+        {
+            <span class="markazor-markdown-toolbar-status">Enhanced editor unavailable. Textarea fallback is active.</span>
+        }
+        @if (PendingAssetCount > 0)
+        {
+            <span class="markazor-markdown-toolbar-status">@PendingAssetCount pending asset(s)</span>
+        }
+    </div>
+    <div class="markazor-codemirror-host" @ref="hostElement"></div>
+    <textarea class="markazor-editor-textarea markazor-markdown-editor-fallback"
+              value="@Value"
+              @oninput="OnFallbackInputAsync"
+              disabled="@Disabled"
+              spellcheck="true"></textarea>
+</div>
+
+@code {
+    private readonly string editorId = "markazor-editor-" + Guid.NewGuid().ToString("N");
+    private DotNetObjectReference<MarkazorMarkdownEditor>? dotNetReference;
+    private ElementReference rootElement;
+    private ElementReference hostElement;
+    private IJSObjectReference? module;
+    private bool initialized;
+    private bool isEditorReady;
+    private bool editorUnavailable;
+    private bool lastDisabled;
+    private bool imageMenuOpen;
+    private string lastValue = string.Empty;
+
+    private bool ToolbarDisabled => Disabled || !isEditorReady;
+    private bool ImageToolbarDisabled => Disabled;
+    private bool UsesImageAssetToolbar => ExternalImageRequested.HasDelegate || ImageUploadRequested.HasDelegate;
+    private string UploadButtonClass => ImageToolbarDisabled ? "markazor-markdown-upload-button is-disabled" : "markazor-markdown-upload-button";
+
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback SaveRequested { get; set; }
+
+    [Parameter]
+    public EventCallback ExternalImageRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<InputFileChangeEventArgs> ImageUploadRequested { get; set; }
+
+    [Parameter]
+    public string AcceptedImageTypes { get; set; } = string.Empty;
+
+    [Parameter]
+    public int PendingAssetCount { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!initialized)
+        {
+            await InitializeEditorAsync().ConfigureAwait(false);
+            return;
+        }
+
+        await SynchronizeEditorAsync().ConfigureAwait(false);
+    }
+
+    private async Task InitializeEditorAsync()
+    {
+        try
+        {
+            module = await JavaScript.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Markazor/markazor-markdown-editor.js").ConfigureAwait(false);
+            if (module is null)
+            {
+                initialized = true;
+                editorUnavailable = true;
+                await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+                return;
+            }
+
+            dotNetReference = DotNetObjectReference.Create(this);
+            lastValue = Value ?? string.Empty;
+            lastDisabled = Disabled;
+
+            await module.InvokeVoidAsync(
+                "initialize",
+                editorId,
+                rootElement,
+                hostElement,
+                dotNetReference,
+                lastValue,
+                lastDisabled).ConfigureAwait(false);
+
+            initialized = true;
+            isEditorReady = true;
+            editorUnavailable = false;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSException)
+        {
+            initialized = true;
+            isEditorReady = false;
+            editorUnavailable = true;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+        }
+    }
+
+    private async Task SynchronizeEditorAsync()
+    {
+        if (module is null)
+        {
+            return;
+        }
+
+        string currentValue = Value ?? string.Empty;
+        if (!string.Equals(currentValue, lastValue, StringComparison.Ordinal))
+        {
+            lastValue = currentValue;
+            await module.InvokeVoidAsync("setValue", editorId, currentValue).ConfigureAwait(false);
+        }
+
+        if (Disabled != lastDisabled)
+        {
+            lastDisabled = Disabled;
+            await module.InvokeVoidAsync("setDisabled", editorId, Disabled).ConfigureAwait(false);
+        }
+    }
+
+    private async Task OnFallbackInputAsync(ChangeEventArgs args)
+    {
+        string value = args.Value?.ToString() ?? string.Empty;
+        lastValue = value;
+        await ValueChanged.InvokeAsync(value).ConfigureAwait(false);
+    }
+
+    private async Task FormatAsync(string command)
+    {
+        if (Disabled || module is null || !isEditorReady)
+        {
+            return;
+        }
+
+        await module.InvokeVoidAsync("format", editorId, command).ConfigureAwait(false);
+    }
+
+    private void ToggleImageMenu()
+    {
+        if (!ImageToolbarDisabled)
+        {
+            imageMenuOpen = !imageMenuOpen;
+        }
+    }
+
+    private void CloseImageMenu()
+    {
+        imageMenuOpen = false;
+    }
+
+    private async Task RequestExternalImageAsync()
+    {
+        if (!ImageToolbarDisabled && ExternalImageRequested.HasDelegate)
+        {
+            imageMenuOpen = false;
+            await ExternalImageRequested.InvokeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task RequestImageUploadAsync(InputFileChangeEventArgs args)
+    {
+        if (!ImageToolbarDisabled && ImageUploadRequested.HasDelegate)
+        {
+            imageMenuOpen = false;
+            await ImageUploadRequested.InvokeAsync(args).ConfigureAwait(false);
+        }
+    }
+
+    public async Task InsertMarkdownAsync(string markdown)
+    {
+        ArgumentNullException.ThrowIfNull(markdown);
+
+        if (Disabled)
+        {
+            return;
+        }
+
+        if (module is not null && isEditorReady)
+        {
+            await module.InvokeVoidAsync("insertText", editorId, markdown).ConfigureAwait(false);
+
+            return;
+        }
+
+        string nextValue = (Value ?? string.Empty) + markdown;
+        lastValue = nextValue;
+        await ValueChanged.InvokeAsync(nextValue).ConfigureAwait(false);
+    }
+
+    [JSInvokable]
+    public async Task NotifyEditorChanged(string value)
+    {
+        lastValue = value;
+        await ValueChanged.InvokeAsync(value).ConfigureAwait(false);
+    }
+
+    [JSInvokable]
+    public async Task NotifySaveRequested()
+    {
+        if (!Disabled)
+        {
+            await SaveRequested.InvokeAsync().ConfigureAwait(false);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            await module.InvokeVoidAsync("dispose", editorId).ConfigureAwait(false);
+            await module.DisposeAsync().ConfigureAwait(false);
+        }
+
+        dotNetReference?.Dispose();
+    }
+}

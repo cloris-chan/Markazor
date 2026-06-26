@@ -1,0 +1,135 @@
+@page "/setup/github-callback"
+@using Markazor.Core.Auth
+@using Markazor.Client
+@inject IMarkazorClientSession Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JavaScript
+@implements IAsyncDisposable
+
+<PageTitle>GitHub Authorization</PageTitle>
+
+<main class="markazor-shell">
+    <section class="markazor-panel">
+        <h1>GitHub Authorization</h1>
+        <p class="@MessageClass">@message</p>
+    </section>
+</main>
+
+@code {
+    private string message = "Completing GitHub authorization...";
+    private bool failed;
+    private IJSObjectReference? setupModule;
+
+    private string MessageClass => failed ? "markazor-alert" : "markazor-muted";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Dictionary<string, string> query = ParseQuery(new Uri(Navigation.Uri));
+
+        if (!query.TryGetValue("code", out string? code) || !query.TryGetValue("state", out string? state))
+        {
+            failed = true;
+            message = "GitHub did not return an authorization code and state.";
+
+            return;
+        }
+
+        try
+        {
+            bool completed = await Session.CompleteGitHubAuthorizationAsync(
+                new MarkazorGitHubCallbackRequest(code, state)).ConfigureAwait(false);
+
+            if (!completed)
+            {
+                failed = true;
+                message = "GitHub authorization could not be completed.";
+
+                return;
+            }
+
+            Navigation.NavigateTo(await GetReturnPathAsync().ConfigureAwait(false), replace: true);
+        }
+        catch (HttpRequestException ex)
+        {
+            failed = true;
+            message = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            failed = true;
+            message = ex.Message;
+        }
+        catch (FormatException ex)
+        {
+            failed = true;
+            message = ex.Message;
+        }
+    }
+
+    private static Dictionary<string, string> ParseQuery(Uri uri)
+    {
+        Dictionary<string, string> query = new(StringComparer.Ordinal);
+        string trimmedQuery = uri.Query.TrimStart('?');
+
+        if (trimmedQuery.Length == 0)
+        {
+            return query;
+        }
+
+        foreach (string pair in trimmedQuery.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] parts = pair.Split('=', 2);
+            string key = Uri.UnescapeDataString(parts[0]);
+            string value = parts.Length == 2 ? Uri.UnescapeDataString(parts[1]) : string.Empty;
+            query[key] = value;
+        }
+
+        return query;
+    }
+
+    private async Task<string> GetReturnPathAsync()
+    {
+        const string fallback = "/setup?auth=github";
+
+        try
+        {
+            setupModule = await JavaScript.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Markazor/markazor-setup.js").ConfigureAwait(false);
+            string? returnPath =
+                await MarkazorSetupStorage.LoadAuthorizationReturnPathAsync(setupModule).ConfigureAwait(false);
+            await MarkazorSetupStorage.ClearAuthorizationReturnPathAsync(setupModule).ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(returnPath)
+                && IsSafeLocalReturnPath(returnPath))
+            {
+                return returnPath;
+            }
+
+            return fallback;
+        }
+        catch (InvalidOperationException)
+        {
+            return fallback;
+        }
+        catch (JSException)
+        {
+            return fallback;
+        }
+    }
+
+    private static bool IsSafeLocalReturnPath(string returnPath)
+    {
+        return returnPath.StartsWith("/", StringComparison.Ordinal)
+            && !returnPath.StartsWith("//", StringComparison.Ordinal)
+            && !returnPath.StartsWith("/\\", StringComparison.Ordinal);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (setupModule is not null)
+        {
+            await setupModule.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+}

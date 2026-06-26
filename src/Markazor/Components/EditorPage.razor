@@ -1,0 +1,1585 @@
+@page "/editor"
+@using Markazor.Core.GitHub
+@using Markazor.Core.Security
+@using Markazor.Core.Setup
+@using Markazor.Client
+@using Markazor.Content
+@using Markazor.Editing
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Globalization
+@using System.Security.Cryptography
+@using System.Text
+@using System.Text.Encodings.Web
+@inject IMarkazorClientSession Session
+@inject IMarkazorSetupDiagnosticsService DiagnosticsService
+@inject IMarkazorContentCatalog Catalog
+@inject IMarkazorMarkdownRenderer MarkdownRenderer
+@inject IMarkazorEditorService Editor
+@inject NavigationManager Navigation
+@inject Microsoft.JSInterop.IJSRuntime JavaScript
+@implements IAsyncDisposable
+
+<PageTitle>Editor</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@IsDirty"
+                OnBeforeInternalNavigation="ConfirmNavigationAsync" />
+
+<main class="markazor-shell markazor-workbench-shell markazor-editor-shell">
+    <header class="markazor-page-header markazor-workbench-header">
+        <div>
+            <p class="markazor-eyebrow">Author workspace</p>
+            <h1>Editor</h1>
+            <p>@StatusLine</p>
+        </div>
+        <div class="markazor-header-actions">
+            <span class="markazor-status-pill @ContentSourceClass">@ContentSourceText</span>
+            <div class="markazor-actions">
+                <button type="button" @onclick="ReloadSetupAsync" disabled="@isBusy">Refresh</button>
+                <button type="button" @onclick="OpenSetup" disabled="@isBusy">Setup</button>
+            </div>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Catalog.Warning))
+    {
+        <p class="markazor-alert">@Catalog.Warning</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <p class="@MessageClass">@message</p>
+    }
+
+    <section class="markazor-editor-layout" aria-label="Editor workspace">
+        <aside class="markazor-panel markazor-sidebar markazor-content-browser">
+            <div class="markazor-section-header">
+                <h2>Content</h2>
+                <span class="markazor-status-pill @ContentSourceClass">@ContentSourceText</span>
+            </div>
+
+            <div class="markazor-sidebar-metrics" aria-label="Content summary">
+                <span><strong>@EditorEntries.Count</strong> files</span>
+                <span><strong>@DraftCount</strong> drafts</span>
+                <span><strong>@PublishedCount</strong> public</span>
+            </div>
+
+            <div class="markazor-new-draft">
+                <fieldset class="markazor-content-kind-picker">
+                    <legend>Type</legend>
+                    <label>
+                        <input type="radio"
+                               name="new-draft-kind"
+                               value="@MarkazorArticleKind.Post"
+                               checked="@IsNewDraftKind(MarkazorArticleKind.Post)"
+                               @onchange="args => ChangeNewDraftKind(args)" />
+                        <span>Post</span>
+                    </label>
+                    <label>
+                        <input type="radio"
+                               name="new-draft-kind"
+                               value="@MarkazorArticleKind.Note"
+                               checked="@IsNewDraftKind(MarkazorArticleKind.Note)"
+                               @onchange="args => ChangeNewDraftKind(args)" />
+                        <span>Note</span>
+                    </label>
+                </fieldset>
+                <label>
+                    <span>Title</span>
+                    <input value="@newDraftTitle" @oninput="OnNewDraftTitleInput" />
+                </label>
+                <label>
+                    <span>Slug</span>
+                    <input value="@newDraftSlug" @oninput="OnNewDraftSlugInput" />
+                </label>
+                <button type="button" @onclick="CreateDraftAsync" disabled="@isBusy">New Draft</button>
+            </div>
+
+            <div class="markazor-article-list">
+                @foreach (MarkazorContentEntry entry in EditorEntries)
+                {
+                    <div class="@GetArticleRowClass(entry)">
+                        @if (entry.IsDraft)
+                        {
+                            <input aria-label="@($"Select {entry.Title}")"
+                                   type="checkbox"
+                                   checked="@IsSelected(entry.RelativePath)"
+                                   @onchange="args => ToggleDraftSelection(entry.RelativePath, args)"
+                                   disabled="@isBusy" />
+                        }
+                        <button class="@GetArticleButtonClass(entry)"
+                                type="button"
+                                @onclick="() => LoadArticleAsync(entry)"
+                                disabled="@isBusy">
+                            <span class="markazor-article-title-line">
+                                <span class="markazor-article-title">@entry.Title</span>
+                                <span class="markazor-article-kind">@GetArticleKindLabel(entry.Article.Kind)</span>
+                            </span>
+                            <small>@entry.RelativePath</small>
+                        </button>
+                    </div>
+                }
+                @if (EditorEntries.Count == 0)
+                {
+                    <p class="markazor-muted">@EmptyContentText</p>
+                }
+            </div>
+
+            <button class="markazor-publish-selected"
+                    type="button"
+                    @onclick="PublishSelectedAsync"
+                    disabled="@(!CanPublishSelected)">
+                Publish selected (@selectedDraftPaths.Count)
+            </button>
+            @if (SelectedDraftIsDirty)
+            {
+                <p class="markazor-muted">Save the selected open draft before batch publishing.</p>
+            }
+        </aside>
+
+        <section class="markazor-panel markazor-editor-main">
+            <div class="markazor-document-header">
+                <div class="markazor-document-title">
+                    <p class="markazor-eyebrow">Current file</p>
+                    <h2>@DocumentHeading</h2>
+                    <p>@DocumentTitle</p>
+                </div>
+                <div class="markazor-document-header-tools">
+                    <div class="markazor-document-state">
+                        <span class="markazor-status-pill @(IsDirty ? "is-waiting" : "is-ready")">@DirtyText</span>
+                        <span>@WordCount words</span>
+                        <span>@CharacterCount chars</span>
+                    </div>
+                    <div class="markazor-actions markazor-document-actions">
+                        <button type="button" @onclick="SaveAsync" disabled="@(!CanSave)">Save</button>
+                        <button type="button" @onclick="DeleteAsync" disabled="@(!CanDelete)">@DeleteText</button>
+                        <button type="button" @onclick="PublishAsync" disabled="@(!CanPublish)">Publish</button>
+                    </div>
+                </div>
+            </div>
+
+            <section class="markazor-metadata-toolbar" aria-label="Document metadata">
+                <div class="markazor-metadata-primary">
+                    <label class="markazor-field markazor-title-field">
+                        <span>Title</span>
+                        <input value="@metadata.Title" @oninput="OnMetadataTitleInput" disabled="@isBusy" />
+                    </label>
+                    <label class="markazor-field markazor-slug-field">
+                        <span>Slug</span>
+                        <input value="@metadata.Slug" @oninput="OnMetadataSlugInput" disabled="@isBusy" />
+                    </label>
+                    <fieldset class="markazor-content-kind-picker markazor-metadata-kind">
+                        <legend>Type</legend>
+                        <label>
+                            <input type="radio"
+                                   name="document-kind"
+                                   value="@MarkazorArticleKind.Post"
+                                   checked="@IsMetadataKind(MarkazorArticleKind.Post)"
+                                   @onchange="args => ChangeMetadataKind(args)"
+                                   disabled="@isBusy" />
+                            <span>Post</span>
+                        </label>
+                        <label>
+                            <input type="radio"
+                                   name="document-kind"
+                                   value="@MarkazorArticleKind.Note"
+                                   checked="@IsMetadataKind(MarkazorArticleKind.Note)"
+                                   @onchange="args => ChangeMetadataKind(args)"
+                                   disabled="@isBusy" />
+                            <span>Note</span>
+                        </label>
+                    </fieldset>
+                </div>
+                <label class="markazor-field markazor-path-field">
+                    <span>Path</span>
+                    <input value="@documentPath" @oninput="OnDocumentPathInput" disabled="@(!isNewDocument || isBusy)" />
+                </label>
+                <div class="markazor-metadata-secondary">
+                    <label class="markazor-field markazor-date-field">
+                        <span>Published</span>
+                        <input type="datetime-local" @bind="metadata.PublishedAt" @bind:format="yyyy-MM-ddTHH:mm:ss" disabled="@isBusy" />
+                    </label>
+                    <label class="markazor-field markazor-checkbox-field">
+                        <input type="checkbox" @bind="metadata.IsDraft" disabled="@isBusy" />
+                        <span>Draft</span>
+                    </label>
+                    <label class="markazor-field markazor-category-field">
+                        <span>Category</span>
+                        <input @bind="metadata.Category" disabled="@isBusy" />
+                    </label>
+                    <label class="markazor-field markazor-tags-field">
+                        <span>Tags</span>
+                        <input @bind="metadata.Tags" placeholder="dotnet, blazor, notes" disabled="@isBusy" />
+                    </label>
+                </div>
+                <label class="markazor-field markazor-summary-field">
+                    <span>Summary</span>
+                    <textarea @bind="metadata.Summary" disabled="@isBusy"></textarea>
+                </label>
+            </section>
+
+            <div class="markazor-authoring-grid">
+                <section class="markazor-authoring-pane" aria-label="Markdown editor">
+                    <div class="markazor-pane-header">
+                        <h3>Markdown</h3>
+                    </div>
+                    <MarkazorMarkdownEditor Value="@bodyMarkdown"
+                                            @ref="markdownEditor"
+                                            ValueChanged="OnMarkdownChanged"
+                                            Disabled="@isBusy"
+                                            SaveRequested="SaveRequestedAsync"
+                                            ExternalImageRequested="InsertExternalImageAsync"
+                                            ImageUploadRequested="UploadImageAsync"
+                                            AcceptedImageTypes="@AcceptedImageTypes"
+                                            PendingAssetCount="@ReferencedPendingAssetCount" />
+                </section>
+
+                <section class="markazor-preview" aria-label="Markdown preview">
+                    <div class="markazor-pane-header">
+                        <h3>Preview</h3>
+                    </div>
+                    <article class="markazor-preview-body">@((MarkupString)RenderPreviewHtml())</article>
+                </section>
+            </div>
+
+            @if (conflict is not null)
+            {
+                <section class="markazor-conflict">
+                    <div class="markazor-section-header">
+                        <h2>GitHub changed this file</h2>
+                        <span class="markazor-status-pill is-waiting">Conflict</span>
+                    </div>
+                    <p class="markazor-muted">Choose the remote version, or save the current editor text over the latest GitHub revision.</p>
+                    <div class="markazor-conflict-grid">
+                        <label class="markazor-field">
+                            <span>Current editor</span>
+                            <textarea readonly>@CurrentMarkdown</textarea>
+                        </label>
+                        <label class="markazor-field">
+                            <span>GitHub version</span>
+                            <textarea readonly>@conflict.RemoteMarkdown</textarea>
+                        </label>
+                    </div>
+                    <div class="markazor-actions">
+                        <button type="button" @onclick="UseRemoteAsync" disabled="@isBusy">Use GitHub version</button>
+                        <button type="button" @onclick="SaveLocalOverLatestAsync" disabled="@isBusy">Save editor over latest</button>
+                    </div>
+                </section>
+            }
+
+        </section>
+    </section>
+</main>
+
+@code {
+    private const long MaxImageAssetBytes = 8L * 1024 * 1024;
+    private const string AcceptedImageTypes = "image/png,image/jpeg,image/webp,image/gif";
+    private MarkazorSetupStatus? status;
+    private MarkazorRepositoryDiagnostics? diagnostics;
+    private MarkazorEditorConflict? conflict;
+    private MarkazorMarkdownEditor? markdownEditor;
+    private IJSObjectReference? assetModule;
+    private string documentPath = string.Empty;
+    private string bodyMarkdown = string.Empty;
+    private string baseBodyMarkdown = string.Empty;
+    private EditorMetadataState metadata = EditorMetadataState.CreateDefault();
+    private EditorMetadataState baseMetadata = EditorMetadataState.CreateDefault();
+    private string? sha;
+    private string? pendingDeleteSha;
+    private string? message;
+    private bool isBusy;
+    private bool isNewDocument;
+    private bool isSuccessMessage;
+    private bool isLocalPreview;
+    private string newDraftTitle = "New Draft";
+    private string newDraftTimestamp = CreateDraftTimestamp(DateTimeOffset.Now);
+    private string newDraftSlug = string.Empty;
+    private string newDraftKind = MarkazorArticleKind.Post;
+    private bool newDraftSlugFollowsTitle = true;
+    private bool documentSlugFollowsTitle = true;
+    private bool documentPathFollowsSlug = true;
+    private string? documentSlugTimestamp;
+    private readonly HashSet<string> selectedDraftPaths = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, PendingEditorAsset> pendingAssets = new(StringComparer.Ordinal);
+
+    private bool CanSave => !isLocalPreview
+        && !isBusy
+        && Session.IsAuthenticated
+        && diagnostics?.Ready == true
+        && !string.IsNullOrWhiteSpace(documentPath)
+        && metadata.HasRequiredValues
+        && !string.IsNullOrWhiteSpace(bodyMarkdown);
+
+    private bool CanDelete => !isLocalPreview
+        && !isBusy
+        && Session.IsAuthenticated
+        && diagnostics?.Ready == true
+        && !isNewDocument
+        && !string.IsNullOrWhiteSpace(documentPath)
+        && (!string.IsNullOrWhiteSpace(sha) || !string.IsNullOrWhiteSpace(pendingDeleteSha));
+
+    private bool CanPublish => !isLocalPreview
+        && !isBusy
+        && Session.IsAuthenticated
+        && diagnostics?.Ready == true
+        && !string.IsNullOrWhiteSpace(documentPath)
+        && metadata.HasRequiredValues
+        && !string.IsNullOrWhiteSpace(bodyMarkdown)
+        && IsDraftPath(documentPath);
+
+    private bool CanPublishSelected => !isLocalPreview
+        && !isBusy
+        && Session.IsAuthenticated
+        && diagnostics?.Ready == true
+        && selectedDraftPaths.Count > 0
+        && !SelectedDraftIsDirty;
+
+    private bool SelectedDraftIsDirty => IsDirty && selectedDraftPaths.Contains(documentPath);
+
+    private bool IsDirty => isNewDocument
+        || !string.Equals(bodyMarkdown, baseBodyMarkdown, StringComparison.Ordinal)
+        || !metadata.Equals(baseMetadata)
+        || ReferencedPendingAssetCount > 0;
+
+    private string CurrentMarkdown => MarkdownContent.ComposeDocument(metadata.ToDocumentMetadata(), bodyMarkdown);
+
+    private string DirtyText => IsDirty ? "Unsaved" : "Saved";
+
+    private string DeleteText => pendingDeleteSha is null ? "Delete" : "Delete latest version";
+
+    private string DocumentTitle => string.IsNullOrWhiteSpace(documentPath) ? "No file selected" : documentPath;
+
+    private string DocumentHeading => string.IsNullOrWhiteSpace(documentPath)
+        ? "No file selected"
+        : string.IsNullOrWhiteSpace(metadata.Title) ? GetFileName(documentPath) : metadata.Title;
+
+    private int CharacterCount => bodyMarkdown.Length;
+
+    private int WordCount => CountWords(bodyMarkdown);
+
+    private int ReferencedPendingAssetCount => GetReferencedPendingAssets()
+        .Count(static asset => asset.RequiresUpload);
+
+    private IReadOnlyList<MarkazorContentEntry> PreviewEntries { get; set; } = [];
+
+    private IReadOnlyList<MarkazorContentEntry> EditorEntries =>
+        isLocalPreview
+            ? PreviewEntries
+            : Catalog.Entries.Where(static entry => entry.ExistsOnGitHub).ToArray();
+
+    private int DraftCount => EditorEntries.Count(static entry => entry.IsDraft);
+
+    private int PublishedCount => EditorEntries.Count(static entry => !entry.IsDraft);
+
+    private string ContentSourceText => isLocalPreview
+        ? "Local preview"
+        : diagnostics?.Ready == true
+        ? Catalog.IsBuildIndexFallback ? "GitHub pending" : "GitHub live"
+        : "GitHub required";
+
+    private string ContentSourceClass => isLocalPreview || diagnostics?.Ready == true && !Catalog.IsBuildIndexFallback
+        ? "is-ready"
+        : "is-waiting";
+
+    private string EmptyContentText => diagnostics?.Ready == true
+        ? "No GitHub content files are available under the configured roots."
+        : "Authorize GitHub and pass repository diagnostics to load the live content tree.";
+
+    private string MessageClass => isSuccessMessage ? "markazor-success" : "markazor-alert";
+
+    private string StatusLine => isLocalPreview
+        ? "Local preview mode for theme tuning."
+        : status is null
+        ? "Loading setup status."
+        : status.Ready
+            ? Session.IsAuthenticated
+                ? diagnostics?.Ready == true
+                    ? "Connected to GitHub."
+                    : "Repository diagnostics must pass before editing."
+                : "GitHub authorization is required."
+            : "Setup is incomplete.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        ResetNewDraftDefaults();
+        isLocalPreview = MarkazorLocalPreview.IsEnabled(Navigation);
+        if (isLocalPreview)
+        {
+            PreviewEntries = MarkazorLocalPreview.CreateEditorEntries();
+        }
+
+        await ReloadSetupAsync().ConfigureAwait(false);
+    }
+
+    private async Task ReloadSetupAsync()
+    {
+        isBusy = true;
+        message = null;
+
+        try
+        {
+            status = isLocalPreview
+                ? MarkazorLocalPreview.CreateSetupStatus(Navigation.BaseUri)
+                : await Session.LoadSetupStatusAsync().ConfigureAwait(false);
+            if (status?.Ready == true && !isLocalPreview)
+            {
+                _ = await Session.GetAccessTokenAsync().ConfigureAwait(false);
+            }
+
+            diagnostics = isLocalPreview
+                ? MarkazorLocalPreview.CreateDiagnostics()
+                : Session.IsAuthenticated
+                ? await DiagnosticsService.RunAsync().ConfigureAwait(false)
+                : null;
+
+            if (diagnostics?.Ready == true && !isLocalPreview)
+            {
+                _ = await RefreshEditorCatalogAsync().ConfigureAwait(false);
+            }
+            PruneDraftSelection();
+            IReadOnlyList<MarkazorContentEntry> editorEntries = EditorEntries;
+            if (diagnostics?.Ready == true
+                && editorEntries.Count > 0
+                && string.IsNullOrWhiteSpace(documentPath))
+            {
+                await LoadArticleCoreAsync(editorEntries[0]).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            SetError(DescribeSetupFailure(ex));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task LoadArticleAsync(MarkazorContentEntry entry)
+    {
+        if (!await ConfirmDiscardAsync().ConfigureAwait(false))
+        {
+            return;
+        }
+
+        isBusy = true;
+        message = null;
+
+        try
+        {
+            await LoadArticleCoreAsync(entry).ConfigureAwait(false);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task LoadArticleCoreAsync(MarkazorContentEntry entry)
+    {
+        if (isLocalPreview && MarkazorLocalPreview.TryCreateEditorDocument(entry.RelativePath, out MarkazorEditorDocument document))
+        {
+            await ApplyDocumentAsync(document, isNew: false).ConfigureAwait(false);
+            SetSuccess("Loaded local preview.");
+
+            return;
+        }
+
+        MarkazorEditorOperationResult<MarkazorEditorDocument> result = await Editor.LoadAsync(
+            entry.RelativePath).ConfigureAwait(false);
+
+        if (result.Succeeded && result.Value is not null)
+        {
+            await ApplyDocumentAsync(result.Value, isNew: false).ConfigureAwait(false);
+            SetSuccess("Loaded.");
+        }
+        else
+        {
+            if (result.Kind == MarkazorGitHubClientResultKind.NotFound)
+            {
+                Catalog.Remove(entry.RelativePath);
+                selectedDraftPaths.Remove(entry.RelativePath);
+                _ = await RefreshEditorCatalogAsync().ConfigureAwait(false);
+                SetError("This file no longer exists on GitHub. The content list was refreshed.");
+            }
+            else
+            {
+                SetError(result.Message ?? "Unable to load file.");
+            }
+        }
+    }
+
+    private async Task CreateDraftAsync()
+    {
+        if (!await ConfirmDiscardAsync().ConfigureAwait(false))
+        {
+            return;
+        }
+
+        string slug = NormalizeSlug(newDraftSlug);
+        string title = string.IsNullOrWhiteSpace(newDraftTitle) ? slug : newDraftTitle.Trim();
+        string kind = MarkazorArticleKind.Normalize(newDraftKind);
+
+        await ApplyDocumentAsync(
+            new MarkazorEditorDocument(
+                MarkazorRepositoryPaths.DraftsRoot + slug + ".md",
+                CreateDraftMarkdown(title, slug, kind),
+                null),
+            isNew: true).ConfigureAwait(false);
+
+        SetSuccess($"{GetArticleKindLabel(kind)} draft ready.");
+        ResetNewDraftDefaults();
+    }
+
+    private async Task SaveAsync()
+    {
+        isBusy = true;
+        message = null;
+        pendingDeleteSha = null;
+
+        try
+        {
+            MarkazorEditorOperationResult<MarkazorEditorDocument> result = await Editor.SaveAsync(
+                documentPath,
+                CurrentMarkdown,
+                sha,
+                GetReferencedPendingEditorAssets()).ConfigureAwait(false);
+
+            await HandleSaveResultAsync(result).ConfigureAwait(false);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task SaveLocalOverLatestAsync()
+    {
+        if (conflict is null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        message = null;
+
+        try
+        {
+            MarkazorEditorOperationResult<MarkazorEditorDocument> result = await Editor.SaveAsync(
+                documentPath,
+                CurrentMarkdown,
+                conflict.RemoteSha,
+                GetReferencedPendingEditorAssets()).ConfigureAwait(false);
+
+            await HandleSaveResultAsync(result).ConfigureAwait(false);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task HandleSaveResultAsync(MarkazorEditorOperationResult<MarkazorEditorDocument> result)
+    {
+        if (result.Succeeded && result.Value is not null)
+        {
+            MarkReferencedPendingAssetsUploaded();
+            await ApplyDocumentAsync(result.Value, isNew: false, clearPendingAssets: false).ConfigureAwait(false);
+            Catalog.UpsertDocument(result.Value.Path, result.Value.Markdown, result.Value.Sha);
+            _ = await RefreshEditorCatalogAsync().ConfigureAwait(false);
+            SetSuccess("Saved to GitHub.");
+        }
+        else
+        {
+            conflict = result.Conflict;
+            SetError(result.Message ?? "Unable to save file.");
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        isBusy = true;
+        message = null;
+        string deletedPath = documentPath;
+
+        try
+        {
+            MarkazorEditorOperationResult result = await Editor.DeleteAsync(
+                documentPath,
+                pendingDeleteSha ?? sha).ConfigureAwait(false);
+
+            if (result.Succeeded)
+            {
+                selectedDraftPaths.Remove(deletedPath);
+                await ApplyDocumentAsync(new MarkazorEditorDocument(string.Empty, string.Empty, null), isNew: false).ConfigureAwait(false);
+                _ = await RefreshEditorCatalogAsync().ConfigureAwait(false);
+                SetSuccess("Deleted from GitHub.");
+            }
+            else
+            {
+                pendingDeleteSha = result.Conflict?.RemoteSha;
+                SetError(result.Conflict is null
+                    ? result.Message ?? "Unable to delete file."
+                    : "The file changed on GitHub. Delete again to remove the latest version.");
+            }
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task PublishAsync()
+    {
+        isBusy = true;
+        message = null;
+        string draftPath = documentPath;
+
+        try
+        {
+            MarkazorEditorOperationResult<MarkazorEditorDocument> result = await Editor.PublishDraftAsync(
+                draftPath,
+                CurrentMarkdown,
+                sha,
+                GetReferencedPendingEditorAssets()).ConfigureAwait(false);
+
+            if (result.Succeeded && result.Value is not null)
+            {
+                MarkReferencedPendingAssetsUploaded();
+                selectedDraftPaths.Remove(draftPath);
+                await ApplyDocumentAsync(result.Value, isNew: false, clearPendingAssets: false).ConfigureAwait(false);
+                _ = await RefreshEditorCatalogAsync().ConfigureAwait(false);
+                SetSuccess($"Published to {GetArticleKindLabel(ParseDocumentKind(result.Value)).ToLowerInvariant()}s. Static Web Apps deployment is pending.");
+            }
+            else
+            {
+                SetError(result.Message ?? "Unable to publish draft.");
+            }
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task PublishSelectedAsync()
+    {
+        if (!CanPublishSelected)
+        {
+            return;
+        }
+
+        isBusy = true;
+        message = null;
+
+        try
+        {
+            string[] orderedDraftPaths = [.. selectedDraftPaths.Order(StringComparer.Ordinal)];
+            int currentDraftIndex = Array.FindIndex(
+                orderedDraftPaths,
+                path => string.Equals(path, documentPath, StringComparison.Ordinal));
+            MarkazorBatchPublishResult result = await Editor.PublishDraftsAsync(
+                orderedDraftPaths).ConfigureAwait(false);
+
+            if (result.Succeeded)
+            {
+                selectedDraftPaths.Clear();
+                if (currentDraftIndex >= 0 && currentDraftIndex < result.PublishedDocuments.Count)
+                {
+                    await ApplyDocumentAsync(result.PublishedDocuments[currentDraftIndex], isNew: false).ConfigureAwait(false);
+                }
+                _ = await RefreshEditorCatalogAsync().ConfigureAwait(false);
+
+                string commit = string.IsNullOrWhiteSpace(result.CommitSha)
+                    ? "the new commit"
+                    : result.CommitSha[..Math.Min(7, result.CommitSha.Length)];
+                SetSuccess(
+                    $"Published {result.PublishedDocuments.Count} drafts in {commit}. Static Web Apps deployment is pending.");
+            }
+            else
+            {
+                SetError(result.Message ?? "Unable to publish the selected drafts.");
+            }
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task UseRemoteAsync()
+    {
+        if (conflict is null)
+        {
+            return;
+        }
+
+        await ApplyDocumentAsync(
+            new MarkazorEditorDocument(conflict.Path, conflict.RemoteMarkdown, conflict.RemoteSha),
+            isNew: false).ConfigureAwait(false);
+        SetSuccess("Using the GitHub version.");
+    }
+
+    private async Task ApplyDocumentAsync(
+        MarkazorEditorDocument document,
+        bool isNew,
+        bool clearPendingAssets = true)
+    {
+        if (clearPendingAssets)
+        {
+            await ClearAllPendingAssetsAsync().ConfigureAwait(false);
+        }
+
+        documentPath = document.Path;
+        sha = document.Sha;
+        isNewDocument = isNew;
+        conflict = null;
+        pendingDeleteSha = null;
+
+        if (string.IsNullOrWhiteSpace(document.Path))
+        {
+            bodyMarkdown = string.Empty;
+            baseBodyMarkdown = string.Empty;
+            metadata = EditorMetadataState.CreateDefault();
+            baseMetadata = metadata.Clone();
+            documentSlugFollowsTitle = true;
+            documentPathFollowsSlug = true;
+            documentSlugTimestamp = null;
+
+            return;
+        }
+
+        MarkdownDocument split = MarkdownContent.SplitDocument(document.Path, document.Markdown);
+        metadata = EditorMetadataState.FromDocument(split);
+        baseMetadata = metadata.Clone();
+        bodyMarkdown = split.Body;
+        baseBodyMarkdown = split.Body;
+        documentSlugTimestamp = isNew ? TryGetGeneratedSlugTimestamp(metadata.Slug) : null;
+        documentSlugFollowsTitle = isNew && IsSameSlug(metadata.Slug, CreateDocumentDefaultSlug(metadata.Title));
+        documentPathFollowsSlug = isNew && string.Equals(NormalizePathOrEmpty(documentPath), CreateDraftPath(metadata.Slug), StringComparison.Ordinal);
+    }
+
+    private void OnMarkdownChanged(string value)
+    {
+        bodyMarkdown = value;
+    }
+
+    private void OnNewDraftTitleInput(ChangeEventArgs args)
+    {
+        string previousDefaultSlug = CreateDefaultDraftSlug(newDraftTitle, newDraftTimestamp);
+        newDraftTitle = args.Value?.ToString() ?? string.Empty;
+        if (newDraftSlugFollowsTitle || IsSameSlug(newDraftSlug, previousDefaultSlug))
+        {
+            newDraftSlugFollowsTitle = true;
+            newDraftSlug = CreateDefaultDraftSlug(newDraftTitle, newDraftTimestamp);
+        }
+    }
+
+    private void OnNewDraftSlugInput(ChangeEventArgs args)
+    {
+        newDraftSlug = args.Value?.ToString() ?? string.Empty;
+        newDraftSlugFollowsTitle = IsSameSlug(newDraftSlug, CreateDefaultDraftSlug(newDraftTitle, newDraftTimestamp));
+    }
+
+    private void OnMetadataTitleInput(ChangeEventArgs args)
+    {
+        string previousDefaultSlug = CreateDocumentDefaultSlug(metadata.Title);
+        string previousDefaultPath = CreateDraftPath(previousDefaultSlug);
+        metadata.Title = args.Value?.ToString() ?? string.Empty;
+
+        if (documentSlugFollowsTitle || IsSameSlug(metadata.Slug, previousDefaultSlug))
+        {
+            documentSlugFollowsTitle = true;
+            string nextSlug = CreateDocumentDefaultSlug(metadata.Title);
+            metadata.Slug = nextSlug;
+
+            if (isNewDocument && (documentPathFollowsSlug || string.Equals(NormalizePathOrEmpty(documentPath), previousDefaultPath, StringComparison.Ordinal)))
+            {
+                documentPathFollowsSlug = true;
+                documentPath = CreateDraftPath(nextSlug);
+            }
+        }
+    }
+
+    private void OnMetadataSlugInput(ChangeEventArgs args)
+    {
+        metadata.Slug = args.Value?.ToString() ?? string.Empty;
+        documentSlugFollowsTitle = IsSameSlug(metadata.Slug, CreateDocumentDefaultSlug(metadata.Title));
+
+        if (isNewDocument && documentPathFollowsSlug)
+        {
+            documentPath = CreateDraftPath(metadata.Slug);
+        }
+    }
+
+    private void OnDocumentPathInput(ChangeEventArgs args)
+    {
+        documentPath = args.Value?.ToString() ?? string.Empty;
+        documentPathFollowsSlug = string.Equals(
+            NormalizePathOrEmpty(documentPath),
+            CreateDraftPath(metadata.Slug),
+            StringComparison.Ordinal);
+    }
+
+    private async Task SaveRequestedAsync()
+    {
+        if (CanSave)
+        {
+            await SaveAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task InsertExternalImageAsync()
+    {
+        string altText = string.IsNullOrWhiteSpace(metadata.Title) ? "image" : metadata.Title.Trim();
+        await InsertMarkdownAsync($"![{EscapeMarkdownAltText(altText)}](https://)").ConfigureAwait(false);
+    }
+
+    private async Task UploadImageAsync(InputFileChangeEventArgs args)
+    {
+        if (args.FileCount == 0)
+        {
+            return;
+        }
+
+        IBrowserFile file = args.File;
+        string? extension = GetImageExtension(file);
+        if (extension is null)
+        {
+            SetError("Only PNG, JPEG, WebP, and GIF images can be uploaded.");
+
+            return;
+        }
+
+        if (file.Size > MaxImageAssetBytes)
+        {
+            SetError("Image uploads are limited to 8 MB.");
+
+            return;
+        }
+
+        byte[] content = new byte[file.Size];
+        await using Stream stream = file.OpenReadStream(MaxImageAssetBytes);
+        int offset = 0;
+        while (offset < content.Length)
+        {
+            int read = await stream.ReadAsync(content.AsMemory(offset), CancellationToken.None).ConfigureAwait(false);
+            if (read == 0)
+            {
+                break;
+            }
+
+            offset += read;
+        }
+
+        if (offset != content.Length)
+        {
+            Array.Resize(ref content, offset);
+        }
+
+        string hash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+        string fileName = hash + extension;
+        string repositoryPath = CreateAssetRepositoryPath(fileName);
+        string markdownPath = CreateAssetMarkdownPath(repositoryPath);
+        string webPath = CreateAssetWebPath(repositoryPath);
+        string contentType = NormalizeImageContentType(file.ContentType, extension);
+        IJSObjectReference? module = await EnsureAssetModuleAsync().ConfigureAwait(false);
+        string? previewUrl = module is null
+            ? null
+            : await module.InvokeAsync<string>(
+                "createObjectUrl",
+                webPath,
+                contentType,
+                content).ConfigureAwait(false);
+
+        pendingAssets[markdownPath] = new PendingEditorAsset(
+            repositoryPath,
+            markdownPath,
+            webPath,
+            contentType,
+            content,
+            previewUrl,
+            RequiresUpload: true);
+
+        string altText = string.IsNullOrWhiteSpace(Path.GetFileNameWithoutExtension(file.Name))
+            ? "image"
+            : Path.GetFileNameWithoutExtension(file.Name);
+        await InsertMarkdownAsync($"![{EscapeMarkdownAltText(altText)}]({markdownPath})").ConfigureAwait(false);
+        SetSuccess($"Image ready: {fileName}");
+    }
+
+    private async Task InsertMarkdownAsync(string markdown)
+    {
+        if (markdownEditor is not null)
+        {
+            await markdownEditor.InsertMarkdownAsync(markdown).ConfigureAwait(false);
+
+            return;
+        }
+
+        bodyMarkdown += markdown;
+    }
+
+    private string RenderPreviewHtml()
+    {
+        string html = MarkdownRenderer.ToSafeHtml(bodyMarkdown);
+
+        foreach (PendingEditorAsset asset in GetReferencedPendingAssets())
+        {
+            if (string.IsNullOrWhiteSpace(asset.PreviewUrl))
+            {
+                continue;
+            }
+
+            string encodedMarkdownPath = HtmlEncoder.Default.Encode(asset.MarkdownPath);
+            string encodedPreviewUrl = HtmlEncoder.Default.Encode(asset.PreviewUrl);
+            html = html.Replace(
+                $"src=\"{encodedMarkdownPath}\"",
+                $"src=\"{encodedPreviewUrl}\"",
+                StringComparison.Ordinal);
+            html = html.Replace(
+                $"href=\"{encodedMarkdownPath}\"",
+                $"href=\"{encodedPreviewUrl}\"",
+                StringComparison.Ordinal);
+        }
+
+        return html;
+    }
+
+    private IReadOnlyList<PendingEditorAsset> GetReferencedPendingAssets()
+    {
+        return
+        [
+            .. pendingAssets.Values
+                .Where(asset => bodyMarkdown.Contains(asset.MarkdownPath, StringComparison.Ordinal))
+                .OrderBy(static asset => asset.MarkdownPath, StringComparer.Ordinal),
+        ];
+    }
+
+    private IReadOnlyList<MarkazorEditorAsset> GetReferencedPendingEditorAssets()
+    {
+        return
+        [
+            .. GetReferencedPendingAssets()
+                .Where(static asset => asset.RequiresUpload)
+                .Select(static asset => new MarkazorEditorAsset(
+                    asset.RepositoryPath,
+                    asset.MarkdownPath,
+                    asset.ContentType,
+                    asset.Content)),
+        ];
+    }
+
+    private void MarkReferencedPendingAssetsUploaded()
+    {
+        string[] keys =
+        [
+            .. pendingAssets
+                .Where(pair => bodyMarkdown.Contains(pair.Value.MarkdownPath, StringComparison.Ordinal))
+                .Select(static pair => pair.Key),
+        ];
+
+        foreach (string key in keys)
+        {
+            if (pendingAssets.TryGetValue(key, out PendingEditorAsset? asset))
+            {
+                pendingAssets[key] = asset with { RequiresUpload = false };
+            }
+        }
+    }
+
+    private async Task ClearAllPendingAssetsAsync()
+    {
+        foreach (string key in pendingAssets.Keys.ToArray())
+        {
+            await RevokePendingAssetAsync(key).ConfigureAwait(false);
+        }
+    }
+
+    private async Task RevokePendingAssetAsync(string key)
+    {
+        if (!pendingAssets.Remove(key, out PendingEditorAsset? asset)
+            || string.IsNullOrWhiteSpace(asset.PreviewUrl))
+        {
+            return;
+        }
+
+        IJSObjectReference? module = await EnsureAssetModuleAsync().ConfigureAwait(false);
+        if (module is not null)
+        {
+            await module.InvokeVoidAsync("revokeObjectUrl", key).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<IJSObjectReference?> EnsureAssetModuleAsync()
+    {
+        if (assetModule is not null)
+        {
+            return assetModule;
+        }
+
+        try
+        {
+            assetModule = await JavaScript.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Markazor/markazor-editor-assets.js").ConfigureAwait(false);
+
+            return assetModule;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<IReadOnlyList<MarkazorContentEntry>> RefreshEditorCatalogAsync()
+    {
+        IReadOnlyList<MarkazorContentEntry> entries = await Catalog.RefreshAsync().ConfigureAwait(false);
+        PruneDraftSelection();
+
+        return entries;
+    }
+
+    private void PruneDraftSelection()
+    {
+        selectedDraftPaths.RemoveWhere(path => !Catalog.Entries.Any(entry =>
+            entry.ExistsOnGitHub
+            && entry.IsDraft
+            && string.Equals(entry.RelativePath, path, StringComparison.Ordinal)));
+    }
+
+    private void OpenSetup()
+    {
+        Navigation.NavigateTo("/setup");
+    }
+
+    private static string DescribeSetupFailure(Exception exception)
+    {
+        return exception is TaskCanceledException
+            ? "The Markazor API did not respond before the request timed out. Check the Static Web Apps Functions deployment."
+            : exception.Message;
+    }
+
+    private async Task ConfirmNavigationAsync(LocationChangingContext context)
+    {
+        if (IsDirty && !await ConfirmDiscardAsync().ConfigureAwait(false))
+        {
+            context.PreventNavigation();
+        }
+    }
+
+    private async Task<bool> ConfirmDiscardAsync()
+    {
+        return !IsDirty
+            || await JavaScript.InvokeAsync<bool>(
+                "confirm",
+                ["Discard the unsaved editor changes?"]).ConfigureAwait(false);
+    }
+
+    private string GetArticleButtonClass(MarkazorContentEntry entry)
+    {
+        string cssClass = string.Equals(entry.RelativePath, documentPath, StringComparison.Ordinal)
+            ? "is-active"
+            : string.Empty;
+
+        return entry.IsDraft ? $"{cssClass} is-draft" : cssClass;
+    }
+
+    private static string GetArticleRowClass(MarkazorContentEntry entry)
+    {
+        return entry.IsDraft ? "markazor-article-row is-selectable" : "markazor-article-row";
+    }
+
+    private bool IsNewDraftKind(string kind)
+    {
+        return string.Equals(newDraftKind, kind, StringComparison.Ordinal);
+    }
+
+    private void ChangeNewDraftKind(ChangeEventArgs args)
+    {
+        newDraftKind = MarkazorArticleKind.Normalize(args.Value?.ToString());
+    }
+
+    private bool IsMetadataKind(string kind)
+    {
+        return string.Equals(metadata.Kind, kind, StringComparison.Ordinal);
+    }
+
+    private void ChangeMetadataKind(ChangeEventArgs args)
+    {
+        metadata.Kind = MarkazorArticleKind.Normalize(args.Value?.ToString());
+    }
+
+    private bool IsSelected(string path)
+    {
+        return selectedDraftPaths.Contains(path);
+    }
+
+    private void ToggleDraftSelection(string path, ChangeEventArgs args)
+    {
+        if (args.Value is true)
+        {
+            _ = selectedDraftPaths.Add(path);
+        }
+        else
+        {
+            _ = selectedDraftPaths.Remove(path);
+        }
+    }
+
+    private void SetSuccess(string value)
+    {
+        isSuccessMessage = true;
+        message = value;
+    }
+
+    private void SetError(string value)
+    {
+        isSuccessMessage = false;
+        message = value;
+    }
+
+    private bool IsDraftPath(string path)
+    {
+        try
+        {
+            return ContentPathPolicy.NormalizeGitHubPath(path).StartsWith(MarkazorRepositoryPaths.DraftsRoot, StringComparison.Ordinal);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static string CreateDraftMarkdown(string title, string slug, string kind)
+    {
+        string today = DateTimeOffset.UtcNow.ToString(
+            "yyyy-MM-dd",
+            System.Globalization.CultureInfo.InvariantCulture);
+
+        string escapedTitle = title.Replace("\"", "\\\"", StringComparison.Ordinal);
+
+        return string.Join(
+            '\n',
+            "---",
+            $"slug: {slug}",
+            $"title: \"{escapedTitle}\"",
+            $"kind: {kind}",
+            "summary: \"\"",
+            $"publishedAt: {today}",
+            "draft: true",
+            "tags: []",
+            "---",
+            string.Empty,
+            "Start writing.");
+    }
+
+    private void ResetNewDraftDefaults()
+    {
+        newDraftTitle = "New Draft";
+        newDraftTimestamp = CreateDraftTimestamp(DateTimeOffset.Now);
+        newDraftSlug = CreateDefaultDraftSlug(newDraftTitle, newDraftTimestamp);
+        newDraftSlugFollowsTitle = true;
+    }
+
+    private static string CreateDraftTimestamp(DateTimeOffset timestamp)
+    {
+        return timestamp.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+    }
+
+    private static string CreateDefaultDraftSlug(string title, string timestamp)
+    {
+        string titleSlug = NormalizeSlug(title);
+
+        return titleSlug + "-" + timestamp;
+    }
+
+    private string CreateDocumentDefaultSlug(string title)
+    {
+        return string.IsNullOrWhiteSpace(documentSlugTimestamp)
+            ? NormalizeSlug(title)
+            : CreateDefaultDraftSlug(title, documentSlugTimestamp);
+    }
+
+    private static string? TryGetGeneratedSlugTimestamp(string slug)
+    {
+        string normalizedSlug = NormalizeSlug(slug);
+        if (normalizedSlug.Length < 17)
+        {
+            return null;
+        }
+
+        int timestampStart = normalizedSlug.Length - 15;
+        if (timestampStart <= 0
+            || normalizedSlug[timestampStart - 1] != '-'
+            || normalizedSlug[timestampStart + 8] != '-')
+        {
+            return null;
+        }
+
+        for (int index = timestampStart; index < normalizedSlug.Length; index++)
+        {
+            if (index == timestampStart + 8)
+            {
+                continue;
+            }
+
+            if (!char.IsAsciiDigit(normalizedSlug[index]))
+            {
+                return null;
+            }
+        }
+
+        return normalizedSlug[timestampStart..];
+    }
+
+    private static string CreateDraftPath(string slug)
+    {
+        return MarkazorRepositoryPaths.DraftsRoot + NormalizeSlug(slug) + ".md";
+    }
+
+    private static string GetArticleKindLabel(string kind)
+    {
+        return string.Equals(MarkazorArticleKind.Normalize(kind), MarkazorArticleKind.Note, StringComparison.Ordinal)
+            ? "Note"
+            : "Post";
+    }
+
+    private static string ParseDocumentKind(MarkazorEditorDocument document)
+    {
+        return MarkdownContent.ParseArticleMeta(document.Path, document.Markdown).Kind;
+    }
+
+    private static string NormalizeSlug(string value)
+    {
+        StringBuilder builder = new(value.Length);
+        bool pendingDash = false;
+        foreach (char character in value.Trim().ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                if (pendingDash && builder.Length > 0)
+                {
+                    _ = builder.Append('-');
+                }
+
+                _ = builder.Append(character);
+                pendingDash = false;
+            }
+            else if (character is ' ' or '_' or '-' or '/' or '\\' or '.')
+            {
+                pendingDash = true;
+            }
+        }
+
+        return builder.Length == 0 ? "new-draft" : builder.ToString();
+    }
+
+    private static bool IsSameSlug(string value, string slug)
+    {
+        return string.Equals(NormalizeSlug(value), NormalizeSlug(slug), StringComparison.Ordinal);
+    }
+
+    private static string NormalizePathOrEmpty(string value)
+    {
+        try
+        {
+            return ContentPathPolicy.NormalizeGitHubPath(value);
+        }
+        catch (ArgumentException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string EnsureTrailingSlash(string value)
+    {
+        return value.EndsWith('/') ? value : value + "/";
+    }
+
+    private static string GetFileName(string path)
+    {
+        string normalizedPath;
+        try
+        {
+            normalizedPath = ContentPathPolicy.NormalizeGitHubPath(path);
+        }
+        catch (ArgumentException)
+        {
+            return path;
+        }
+
+        string fileName = System.IO.Path.GetFileName(normalizedPath);
+
+        return string.IsNullOrWhiteSpace(fileName) ? normalizedPath : fileName;
+    }
+
+    private string CreateAssetRepositoryPath(string fileName)
+    {
+        return MarkazorRepositoryPaths.AssetsRoot + fileName;
+    }
+
+    private static string CreateAssetMarkdownPath(string repositoryPath)
+    {
+        string normalizedPath = ContentPathPolicy.NormalizeGitHubPath(repositoryPath);
+
+        return "../" + normalizedPath;
+    }
+
+    private static string CreateAssetWebPath(string repositoryPath)
+    {
+        string normalizedPath = ContentPathPolicy.NormalizeGitHubPath(repositoryPath);
+
+        return "/" + normalizedPath;
+    }
+
+    private static string? GetImageExtension(IBrowserFile file)
+    {
+        string contentType = file.ContentType.Trim().ToLowerInvariant();
+        string extension = Path.GetExtension(file.Name).Trim().ToLowerInvariant();
+
+        return contentType switch
+        {
+            "image/png" => ".png",
+            "image/jpeg" => extension == ".jpeg" ? ".jpeg" : ".jpg",
+            "image/webp" => ".webp",
+            "image/gif" => ".gif",
+            _ => extension switch
+            {
+                ".png" => ".png",
+                ".jpg" => ".jpg",
+                ".jpeg" => ".jpeg",
+                ".webp" => ".webp",
+                ".gif" => ".gif",
+                _ => null,
+            },
+        };
+    }
+
+    private static string NormalizeImageContentType(string contentType, string extension)
+    {
+        string normalizedContentType = contentType.Trim().ToLowerInvariant();
+
+        return normalizedContentType switch
+        {
+            "image/png" or "image/jpeg" or "image/webp" or "image/gif" => normalizedContentType,
+            _ => extension switch
+            {
+                ".png" => "image/png",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".webp" => "image/webp",
+                ".gif" => "image/gif",
+                _ => "application/octet-stream",
+            },
+        };
+    }
+
+    private static string EscapeMarkdownAltText(string value)
+    {
+        return value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("[", "\\[", StringComparison.Ordinal)
+            .Replace("]", "\\]", StringComparison.Ordinal)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal);
+    }
+
+    private static int CountWords(string value)
+    {
+        int count = 0;
+        bool inWord = false;
+
+        foreach (char character in value)
+        {
+            if (char.IsWhiteSpace(character))
+            {
+                inWord = false;
+            }
+            else if (!inWord)
+            {
+                count++;
+                inWord = true;
+            }
+        }
+
+        return count;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await ClearAllPendingAssetsAsync().ConfigureAwait(false);
+            if (assetModule is not null)
+            {
+                await assetModule.InvokeVoidAsync("revokeAllObjectUrls").ConfigureAwait(false);
+                await assetModule.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private sealed class EditorMetadataState : IEquatable<EditorMetadataState>
+    {
+        public string Slug { get; set; } = string.Empty;
+
+        public string Title { get; set; } = string.Empty;
+
+        public string Kind { get; set; } = MarkazorArticleKind.Post;
+
+        public string Summary { get; set; } = string.Empty;
+
+        public DateTime PublishedAt { get; set; } = DateTimeOffset.UnixEpoch.UtcDateTime;
+
+        public bool IsDraft { get; set; }
+
+        public string Tags { get; set; } = string.Empty;
+
+        public string Category { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> AdditionalFrontMatterLines { get; private init; } = [];
+
+        public bool HasRequiredValues =>
+            !string.IsNullOrWhiteSpace(Slug)
+            && !string.IsNullOrWhiteSpace(Title);
+
+        public static EditorMetadataState CreateDefault()
+        {
+            return new EditorMetadataState();
+        }
+
+        public static EditorMetadataState FromDocument(MarkdownDocument document)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+
+            MarkdownDocumentMetadata source = document.Metadata;
+
+            return new EditorMetadataState
+            {
+                Slug = source.Slug,
+                Title = source.Title,
+                Kind = MarkazorArticleKind.Normalize(source.Kind),
+                Summary = source.Summary,
+                PublishedAt = source.PublishedAtUtc.UtcDateTime,
+                IsDraft = source.IsDraft,
+                Tags = string.Join(", ", source.Tags),
+                Category = source.Category ?? string.Empty,
+                AdditionalFrontMatterLines = [.. source.AdditionalFrontMatterLines],
+            };
+        }
+
+        public EditorMetadataState Clone()
+        {
+            return new EditorMetadataState
+            {
+                Slug = Slug,
+                Title = Title,
+                Kind = Kind,
+                Summary = Summary,
+                PublishedAt = PublishedAt,
+                IsDraft = IsDraft,
+                Tags = Tags,
+                Category = Category,
+                AdditionalFrontMatterLines = [.. AdditionalFrontMatterLines],
+            };
+        }
+
+        public MarkdownDocumentMetadata ToDocumentMetadata()
+        {
+            return new MarkdownDocumentMetadata(
+                NormalizeRequiredText(Slug),
+                NormalizeRequiredText(Title),
+                MarkazorArticleKind.Normalize(Kind),
+                NormalizeOptionalText(Summary) ?? string.Empty,
+                ToPublishedAtUtc(),
+                IsDraft,
+                ParseTags(Tags),
+                NormalizeOptionalText(Category),
+                AdditionalFrontMatterLines);
+        }
+
+        public bool Equals(EditorMetadataState? other)
+        {
+            return other is not null
+                && string.Equals(NormalizeRequiredText(Slug), NormalizeRequiredText(other.Slug), StringComparison.Ordinal)
+                && string.Equals(NormalizeRequiredText(Title), NormalizeRequiredText(other.Title), StringComparison.Ordinal)
+                && string.Equals(MarkazorArticleKind.Normalize(Kind), MarkazorArticleKind.Normalize(other.Kind), StringComparison.Ordinal)
+                && string.Equals(NormalizeOptionalText(Summary), NormalizeOptionalText(other.Summary), StringComparison.Ordinal)
+                && ToPublishedAtUtc().Equals(other.ToPublishedAtUtc())
+                && IsDraft == other.IsDraft
+                && ParseTags(Tags).SequenceEqual(ParseTags(other.Tags), StringComparer.Ordinal)
+                && string.Equals(NormalizeOptionalText(Category), NormalizeOptionalText(other.Category), StringComparison.Ordinal)
+                && AdditionalFrontMatterLines.SequenceEqual(other.AdditionalFrontMatterLines, StringComparer.Ordinal);
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is EditorMetadataState other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            HashCode hash = new();
+            hash.Add(NormalizeRequiredText(Slug), StringComparer.Ordinal);
+            hash.Add(NormalizeRequiredText(Title), StringComparer.Ordinal);
+            hash.Add(MarkazorArticleKind.Normalize(Kind), StringComparer.Ordinal);
+            hash.Add(NormalizeOptionalText(Summary), StringComparer.Ordinal);
+            hash.Add(ToPublishedAtUtc());
+            hash.Add(IsDraft);
+            foreach (string tag in ParseTags(Tags))
+            {
+                hash.Add(tag, StringComparer.Ordinal);
+            }
+
+            hash.Add(NormalizeOptionalText(Category), StringComparer.Ordinal);
+            foreach (string line in AdditionalFrontMatterLines)
+            {
+                hash.Add(line, StringComparer.Ordinal);
+            }
+
+            return hash.ToHashCode();
+        }
+
+        private DateTimeOffset ToPublishedAtUtc()
+        {
+            DateTime utcValue = DateTime.SpecifyKind(PublishedAt, DateTimeKind.Utc);
+
+            return new DateTimeOffset(utcValue);
+        }
+
+        private static string NormalizeRequiredText(string value)
+        {
+            return value.Trim();
+        }
+
+        private static string? NormalizeOptionalText(string? value)
+        {
+            string? normalized = value?.Trim();
+
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+        }
+
+        private static string[] ParseTags(string value)
+        {
+            return
+            [
+                .. value.Split([','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(static tag => tag.Trim('"', '\''))
+                    .Where(static tag => tag.Length > 0),
+            ];
+        }
+    }
+
+    private sealed record PendingEditorAsset(
+        string RepositoryPath,
+        string MarkdownPath,
+        string WebPath,
+        string ContentType,
+        byte[] Content,
+        string? PreviewUrl,
+        bool RequiresUpload);
+}

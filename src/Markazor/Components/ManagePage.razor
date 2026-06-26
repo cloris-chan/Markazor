@@ -1,0 +1,792 @@
+@page "/manage"
+@using Markazor.Core.Auth
+@using Markazor.Core.Setup
+@using Markazor.Client
+@using Markazor.Themes
+@using Microsoft.AspNetCore.Components.Forms
+@inject IMarkazorClientSession Session
+@inject IMarkazorSetupDiagnosticsService DiagnosticsService
+@inject IMarkazorSettingsSyncService SettingsSync
+@inject NavigationManager Navigation
+@inject IJSRuntime JavaScript
+@implements IAsyncDisposable
+
+<PageTitle>Manage</PageTitle>
+
+<main class="markazor-shell markazor-workbench-shell markazor-manage-shell">
+    <header class="markazor-page-header markazor-workbench-header">
+        <div>
+            <p class="markazor-eyebrow">Site operations</p>
+            <h1>Manage</h1>
+            <p>Authenticated configuration and maintenance workspace.</p>
+        </div>
+        <div class="markazor-header-actions">
+            <span class="markazor-status-pill @ReadyClass">@ReadyText</span>
+        </div>
+    </header>
+
+    @if (isLoading)
+    {
+        <p class="markazor-muted">Loading management status...</p>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <p class="markazor-alert">@errorMessage</p>
+    }
+
+    @if (status is not null && !IsWorkspaceVisible)
+    {
+        <section class="markazor-panel">
+            <div class="markazor-section-header">
+                <h2>@ManagementGateTitle</h2>
+                <span class="markazor-status-pill is-waiting">@ManagementGateStatus</span>
+            </div>
+
+            <p class="markazor-muted">@ManagementGateDescription</p>
+
+            <div class="markazor-actions">
+                @if (NeedsSetupBeforeAuthorization)
+                {
+                    <button type="button" @onclick="OpenSetup" disabled="@isBusy">Open Setup</button>
+                }
+                else
+                {
+                    <button type="button" @onclick="AuthorizeAsync" disabled="@(!CanAuthorize)">Authorize GitHub</button>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(AuthorizationDisabledReason))
+            {
+                <p class="markazor-warning">@AuthorizationDisabledReason</p>
+            }
+        </section>
+    }
+    else if (status is not null)
+    {
+        <section class="markazor-panel">
+            <div class="markazor-section-header">
+                <h2>Session</h2>
+                <span class="markazor-status-pill @(IsWorkspaceVisible ? "is-ready" : "is-waiting")">@AuthText</span>
+            </div>
+
+            @if (Session.AccessTokenExpiresAtUtc is not null)
+            {
+                <p class="markazor-muted">Access expires at @Session.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.CurrentCulture).</p>
+            }
+            else
+            {
+                <p class="markazor-muted">Authorize GitHub from Setup before changing repository configuration.</p>
+            }
+
+            <div class="markazor-actions">
+                <button type="button" @onclick="RefreshAsync" disabled="@isBusy">Refresh</button>
+                <button type="button" @onclick="OpenSetup" disabled="@isBusy">Setup</button>
+                <button type="button" @onclick="OpenEditor" disabled="@(!CanOpenEditor)">Editor</button>
+            </div>
+        </section>
+
+        <section class="markazor-panel">
+            <div class="markazor-section-header">
+                <h2>Public Settings</h2>
+                <span class="markazor-status-pill @(settingsDraftDirty ? "is-waiting" : "is-ready")">@SettingsDraftText</span>
+            </div>
+
+            <p class="markazor-muted"><code>markazor.settings.json</code> stores public, non-secret values. Saving here commits the canonical settings through the authorized GitHub App.</p>
+
+            <div class="markazor-settings-form">
+                <label class="markazor-field markazor-field-wide">
+                    <span>Site Base URLs</span>
+                    <textarea value="@settingsDraft.SiteBaseUrls"
+                              @oninput="OnSiteBaseUrlsInput"
+                              rows="3"
+                              autocomplete="url"
+                              spellcheck="false"></textarea>
+                    <small>One absolute URL per line. Put the primary Static Web Apps URL first, then any custom domains.</small>
+                </label>
+
+                <label class="markazor-field markazor-site-title-field">
+                    <span>Site Title</span>
+                    <input value="@settingsDraft.SiteName"
+                           @oninput="OnSiteNameInput"
+                           autocomplete="off"
+                           spellcheck="false" />
+                </label>
+
+                <label class="markazor-field markazor-field-wide">
+                    <span>Site Description</span>
+                    <textarea value="@settingsDraft.SiteDescription"
+                              @oninput="OnSiteDescriptionInput"
+                              rows="2"
+                              spellcheck="false"></textarea>
+                </label>
+
+                <label class="markazor-field markazor-site-icon-field">
+                    <span>Site Icon</span>
+                    <InputFile OnChange="SelectSiteIconAsync" accept="image/png" />
+                    <small>@SiteIconText</small>
+                </label>
+
+                <label class="markazor-field">
+                    <span>GitHub App Client ID</span>
+                    <input value="@settingsDraft.GitHubClientId"
+                           @oninput="OnGitHubClientIdInput"
+                           autocomplete="off"
+                           spellcheck="false" />
+                </label>
+
+                <label class="markazor-field">
+                    <span>Repository Owner</span>
+                    <input value="@settingsDraft.RepositoryOwner"
+                           @oninput="OnRepositoryOwnerInput"
+                           autocomplete="off"
+                           spellcheck="false" />
+                </label>
+
+                <label class="markazor-field">
+                    <span>Repository Name</span>
+                    <input value="@settingsDraft.RepositoryName"
+                           @oninput="OnRepositoryNameInput"
+                           autocomplete="off"
+                           spellcheck="false" />
+                </label>
+
+                <label class="markazor-field">
+                    <span>Default Branch</span>
+                    <input value="@settingsDraft.DefaultBranch"
+                           @oninput="OnDefaultBranchInput"
+                           autocomplete="off"
+                           spellcheck="false" />
+                </label>
+
+                <label class="markazor-field">
+                    <span>Theme</span>
+                    <select value="@settingsDraft.ThemeName" @onchange="OnThemeNameInput">
+                        @foreach (MarkazorThemeDescriptor theme in MarkazorThemes.All)
+                        {
+                            <option value="@theme.Name">@theme.DisplayName</option>
+                        }
+                    </select>
+                </label>
+            </div>
+
+            <div class="markazor-actions">
+                <button type="button" @onclick="UseCurrentDeploymentAsync" disabled="@isBusy">Use Current Deployment</button>
+                <button type="button" @onclick="RestoreRepositorySettingsAsync" disabled="@(isBusy || status is null)">Restore Repository Settings</button>
+                <button type="button" @onclick="ResetSettingsDraftAsync" disabled="@isBusy">Reset Defaults</button>
+                <button type="button" @onclick="SaveSettingsAsync" disabled="@(!CanSaveSettings)">Save Settings</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(SettingsDisabledReason))
+            {
+                <p class="markazor-warning">@SettingsDisabledReason</p>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(settingsMessage))
+            {
+                <p class="@SettingsMessageClass">@settingsMessage</p>
+            }
+        </section>
+
+        <section class="markazor-panel">
+            <div class="markazor-section-header">
+                <h2>Repository Diagnostics</h2>
+                <span class="markazor-status-pill @(diagnostics?.Ready == true ? "is-ready" : "is-waiting")">@DiagnosticsText</span>
+            </div>
+
+            @if (diagnostics is null)
+            {
+                <p class="markazor-muted">Refresh after authorization to verify repository access.</p>
+            }
+            else
+            {
+                <dl class="markazor-kv">
+                    <dt>Repository</dt>
+                    <dd>@CheckText(diagnostics.RepositoryAccessible)</dd>
+                    <dt>Read permission</dt>
+                    <dd>@CheckText(diagnostics.CanPull)</dd>
+                    <dt>Push permission</dt>
+                    <dd>@CheckText(diagnostics.CanPush)</dd>
+                    <dt>Branch</dt>
+                    <dd>@CheckText(diagnostics.BranchAccessible)</dd>
+                    <dt>Tree</dt>
+                    <dd>@CheckText(diagnostics.TreeReadable)</dd>
+                </dl>
+
+                @foreach (string error in diagnostics.Errors)
+                {
+                    <p class="markazor-alert">@error</p>
+                }
+
+                @foreach (string warning in diagnostics.Warnings)
+                {
+                    <p class="markazor-warning">@warning</p>
+                }
+            }
+        </section>
+
+        <section class="markazor-panel">
+            <div class="markazor-section-header">
+                <h2>Deployment Workflow</h2>
+                <span class="markazor-status-pill is-waiting">Planned</span>
+            </div>
+
+            <p class="markazor-muted">Markazor can later manage a dedicated Static Web Apps deployment workflow instead of the Azure-generated Oryx workflow. The planned workflow should build with the repository SDK, bypass the .NET 9 Oryx ceiling, and skip SWA deployment when a change cannot affect the published app.</p>
+
+            <dl class="markazor-kv">
+                <dt>Dedicated deploy</dt>
+                <dd>Install or update a Markazor-owned GitHub Actions workflow.</dd>
+                <dt>Path filters</dt>
+                <dd>Skip Static Web Apps deployment for docs, drafts-only, or maintenance-only changes.</dd>
+                <dt>Scheduled jobs</dt>
+                <dd>Run daily maintenance jobs such as future unreferenced asset cleanup.</dd>
+            </dl>
+        </section>
+
+        <section class="markazor-panel">
+            <div class="markazor-section-header">
+                <h2>Resource Maintenance</h2>
+                <span class="markazor-status-pill is-waiting">Planned</span>
+            </div>
+
+            <p class="markazor-muted">Future media management can live here: inventory uploaded assets, find files that are not referenced by any post or note, and clean them through a scheduled workflow.</p>
+        </section>
+    }
+</main>
+
+@code {
+    private MarkazorSetupStatus? status;
+    private MarkazorRepositoryDiagnostics? diagnostics;
+    private bool isBusy;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? settingsMessage;
+    private MarkazorSettingsDraft settingsDraft = MarkazorSettingsDraft.Empty;
+    private bool settingsDraftDirty;
+    private bool settingsSaved;
+    private bool settingsMessageIsSuccess;
+    private string localClientId = string.Empty;
+    private IJSObjectReference? setupModule;
+    private MarkazorSettingsAsset? selectedSiteIcon;
+    private string? selectedSiteIconName;
+    private string? siteIconError;
+    private const long MaxSiteIconBytes = 512L * 1024;
+    private bool isLocalPreview;
+
+    private bool IsWorkspaceVisible => Session.IsAuthenticated || isLocalPreview;
+
+    private string AuthText => Session.IsAuthenticated ? "Authorized" : isLocalPreview ? "Local preview" : "Signed out";
+
+    private string ReadyText => IsWorkspaceVisible
+        ? (diagnostics?.Ready == true ? "Ready" : "Needs attention")
+        : "Authorization required";
+
+    private string ReadyClass => IsWorkspaceVisible && diagnostics?.Ready == true ? "is-ready" : "is-waiting";
+
+    private string DiagnosticsText => diagnostics?.Ready == true ? "Passed" : "Not passed";
+
+    private string SettingsDraftText => settingsDraftDirty ? "Local draft" : "Repository";
+
+    private string SettingsMessageClass => settingsMessageIsSuccess ? "markazor-success" : "markazor-alert";
+
+    private string SiteIconText => string.IsNullOrWhiteSpace(siteIconError)
+        ? string.IsNullOrWhiteSpace(selectedSiteIconName)
+            ? $"Optional PNG. Saved to {MarkazorRepositoryPaths.SiteIconPath} and served from {MarkazorRepositoryPaths.SiteIconWebPath}."
+            : $"{selectedSiteIconName} will replace {MarkazorRepositoryPaths.SiteIconPath}."
+        : siteIconError;
+
+    private bool CanAuthorize => string.IsNullOrWhiteSpace(AuthorizationDisabledReason);
+
+    private bool NeedsSetupBeforeAuthorization => status is null
+        || !MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
+        || (MarkazorSetupReadiness.IsPersistedGitHubClientIdMissing(status)
+            && string.IsNullOrWhiteSpace(EffectiveClientId));
+
+    private string ManagementGateTitle => NeedsSetupBeforeAuthorization ? "Setup Required" : "GitHub Authorization";
+
+    private string ManagementGateStatus => NeedsSetupBeforeAuthorization ? "Setup first" : "Required";
+
+    private string ManagementGateDescription => NeedsSetupBeforeAuthorization
+        ? "Open Setup to enter the GitHub App Client ID and configure the Static Web Apps secret before authorizing this browser."
+        : "Authorize the GitHub App before opening repository settings, diagnostics, and maintenance tools.";
+
+    private string SiteBaseUrl => MarkazorSettingsDraft.ParseBaseUrls(settingsDraft.SiteBaseUrls).FirstOrDefault()?.ToString()
+        ?? status?.Site.PrimaryBaseUrl?.ToString()
+        ?? Navigation.BaseUri;
+
+    private string EffectiveClientId
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(settingsDraft.GitHubClientId))
+            {
+                return settingsDraft.GitHubClientId.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(localClientId))
+            {
+                return localClientId.Trim();
+            }
+
+            return status?.GitHub.ClientId.Trim() ?? string.Empty;
+        }
+    }
+
+    private string? AuthorizationDisabledReason
+    {
+        get
+        {
+            if (isBusy)
+            {
+                return "Management is busy.";
+            }
+
+            if (status is null)
+            {
+                return "Setup status has not loaded yet.";
+            }
+
+            if (!MarkazorSetupReadiness.HasAuthorizationConfiguration(status))
+            {
+                return "GITHUB_APP_CLIENT_SECRET must be configured in Static Web Apps before authorization.";
+            }
+
+            if (MarkazorSetupReadiness.IsPersistedGitHubClientIdMissing(status)
+                && string.IsNullOrWhiteSpace(EffectiveClientId))
+            {
+                return "Paste the GitHub App Client ID in Setup before starting authorization.";
+            }
+
+            return null;
+        }
+    }
+
+    private bool CanOpenEditor => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
+        && IsWorkspaceVisible
+        && diagnostics?.Ready == true
+        && !isBusy;
+
+    private bool CanSaveSettings => MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
+        && !isLocalPreview
+        && Session.IsAuthenticated
+        && !isBusy
+        && !settingsSaved
+        && string.IsNullOrWhiteSpace(SettingsDisabledReason);
+
+    private string? SettingsDisabledReason
+    {
+        get
+        {
+            if (isBusy)
+            {
+                return "Management is busy.";
+            }
+
+            if (status is null)
+            {
+                return "Setup status has not loaded yet.";
+            }
+
+            if (!MarkazorSetupReadiness.HasAuthorizationConfiguration(status))
+            {
+                return "GITHUB_APP_CLIENT_SECRET must be configured in Static Web Apps before settings can be saved.";
+            }
+
+            if (isLocalPreview)
+            {
+                return "Local preview mode does not write repository settings.";
+            }
+
+            if (!IsWorkspaceVisible)
+            {
+                return "Authorize GitHub from Setup before saving settings.";
+            }
+
+            if (settingsSaved)
+            {
+                return "Settings are already saved for this management session.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(siteIconError))
+            {
+                return siteIconError;
+            }
+
+            return settingsDraft.Validate();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLocalPreview = MarkazorLocalPreview.IsEnabled(Navigation);
+        await ReloadAsync().ConfigureAwait(false);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            setupModule = await EnsureSetupModuleAsync().ConfigureAwait(false);
+            MarkazorSettingsDraft? localDraft =
+                await MarkazorSetupStorage.LoadSettingsDraftAsync(setupModule).ConfigureAwait(false);
+            if (localDraft is not null)
+            {
+                settingsDraft = localDraft;
+                settingsDraftDirty = true;
+            }
+            else
+            {
+                string? storedClientId =
+                    await MarkazorSetupStorage.LoadClientIdAsync(setupModule).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(settingsDraft.GitHubClientId)
+                    && !string.IsNullOrWhiteSpace(storedClientId))
+                {
+                    localClientId = storedClientId;
+                    settingsDraft = settingsDraft with { GitHubClientId = storedClientId };
+                    settingsDraftDirty = true;
+                }
+            }
+
+            StateHasChanged();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private async Task<IJSObjectReference?> EnsureSetupModuleAsync()
+    {
+        if (setupModule is not null)
+        {
+            return setupModule;
+        }
+
+        try
+        {
+            setupModule = await JavaScript.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Markazor/markazor-setup.js").ConfigureAwait(false);
+
+            return setupModule;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        await ReloadAsync().ConfigureAwait(false);
+    }
+
+    private async Task ReloadAsync()
+    {
+        isBusy = true;
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            status = isLocalPreview
+                ? MarkazorLocalPreview.CreateSetupStatus(Navigation.BaseUri)
+                : await Session.LoadSetupStatusAsync().ConfigureAwait(false);
+            if (!settingsDraftDirty)
+            {
+                settingsDraft = CreateRepositorySettingsDraft();
+            }
+
+            diagnostics = null;
+
+            if (isLocalPreview)
+            {
+                diagnostics = MarkazorLocalPreview.CreateDiagnostics();
+            }
+            else if (MarkazorSetupReadiness.HasRepositoryConfiguration(status)
+                && await Session.GetAccessTokenAsync().ConfigureAwait(false) is not null)
+            {
+                diagnostics = await DiagnosticsService.RunAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            errorMessage = DescribeLoadFailure(ex);
+        }
+        finally
+        {
+            isBusy = false;
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        isBusy = true;
+        errorMessage = null;
+        settingsMessage = null;
+
+        try
+        {
+            string? validationError = settingsDraft.Validate();
+            if (!string.IsNullOrWhiteSpace(validationError))
+            {
+                settingsMessageIsSuccess = false;
+                settingsMessage = validationError;
+
+                return;
+            }
+
+            MarkazorSettingsSyncResult result =
+                await SettingsSync.SaveAsync(settingsDraft.ToSettings(), selectedSiteIcon).ConfigureAwait(false);
+
+            settingsMessageIsSuccess = result.Succeeded;
+            settingsSaved = result.Succeeded;
+            if (result.Succeeded)
+            {
+                settingsDraftDirty = false;
+                await MarkazorSetupStorage.ClearSettingsDraftAsync(setupModule).ConfigureAwait(false);
+                await MarkazorSetupStorage.SaveClientIdAsync(
+                    setupModule,
+                    settingsDraft.GitHubClientId).ConfigureAwait(false);
+                selectedSiteIcon = null;
+                selectedSiteIconName = null;
+                siteIconError = null;
+            }
+
+            settingsMessage = result.Succeeded
+                ? string.IsNullOrWhiteSpace(result.CommitSha)
+                    ? result.Message ?? "Settings already match the repository."
+                    : $"Saved settings in commit {result.CommitSha[..Math.Min(7, result.CommitSha.Length)]}. Static Web Apps will redeploy the updated site configuration."
+                : result.Message ?? "Unable to save settings.";
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task AuthorizeAsync()
+    {
+        isBusy = true;
+        errorMessage = null;
+
+        try
+        {
+            IJSObjectReference? module = await EnsureSetupModuleAsync().ConfigureAwait(false);
+            await MarkazorSetupStorage.SaveAuthorizationReturnPathAsync(
+                module,
+                "/manage?auth=github").ConfigureAwait(false);
+
+            MarkazorGitHubAuthorizationRequest request = new(
+                string.IsNullOrWhiteSpace(EffectiveClientId) ? null : EffectiveClientId,
+                new Uri(SiteBaseUrl));
+            Uri authorizationUrl = (await Session.StartGitHubAuthorizationAsync(request).ConfigureAwait(false)).AuthorizationUrl;
+            Navigation.NavigateTo(authorizationUrl.ToString(), forceLoad: true);
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = ex.Message;
+            isBusy = false;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+            isBusy = false;
+        }
+    }
+
+    private Task OnSiteBaseUrlsInput(ChangeEventArgs args)
+    {
+        return UpdateSettingsDraftAsync(settingsDraft with { SiteBaseUrls = ToInputValue(args) });
+    }
+
+    private Task OnSiteNameInput(ChangeEventArgs args)
+    {
+        return UpdateSettingsDraftAsync(settingsDraft with { SiteName = ToInputValue(args) });
+    }
+
+    private Task OnSiteDescriptionInput(ChangeEventArgs args)
+    {
+        return UpdateSettingsDraftAsync(settingsDraft with { SiteDescription = ToInputValue(args) });
+    }
+
+    private async Task SelectSiteIconAsync(InputFileChangeEventArgs args)
+    {
+        siteIconError = null;
+        IBrowserFile file = args.File;
+        if (!string.Equals(file.ContentType, "image/png", StringComparison.OrdinalIgnoreCase)
+            && !file.Name.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+        {
+            selectedSiteIcon = null;
+            selectedSiteIconName = null;
+            siteIconError = "Site icon must be a PNG file.";
+            settingsDraftDirty = true;
+            settingsSaved = false;
+
+            return;
+        }
+
+        if (file.Size > MaxSiteIconBytes)
+        {
+            selectedSiteIcon = null;
+            selectedSiteIconName = null;
+            siteIconError = "Site icon must be 512 KB or smaller.";
+            settingsDraftDirty = true;
+            settingsSaved = false;
+
+            return;
+        }
+
+        byte[] content = new byte[file.Size];
+        await using Stream stream = file.OpenReadStream(MaxSiteIconBytes);
+        int offset = 0;
+        while (offset < content.Length)
+        {
+            int read = await stream.ReadAsync(content.AsMemory(offset)).ConfigureAwait(false);
+            if (read == 0)
+            {
+                break;
+            }
+
+            offset += read;
+        }
+
+        ReadOnlyMemory<byte> iconContent = content.AsMemory(0, offset);
+        if (!MarkazorPngSignature.Matches(iconContent))
+        {
+            selectedSiteIcon = null;
+            selectedSiteIconName = null;
+            siteIconError = "Site icon must be a valid PNG file.";
+            settingsDraftDirty = true;
+            settingsSaved = false;
+
+            return;
+        }
+
+        selectedSiteIcon = new MarkazorSettingsAsset(
+            MarkazorRepositoryPaths.SiteIconPath,
+            "image/png",
+            iconContent.ToArray());
+        selectedSiteIconName = file.Name;
+        settingsDraftDirty = true;
+        settingsSaved = false;
+        settingsMessage = null;
+    }
+
+    private Task OnGitHubClientIdInput(ChangeEventArgs args)
+    {
+        return UpdateSettingsDraftAsync(settingsDraft with { GitHubClientId = ToInputValue(args) });
+    }
+
+    private Task OnRepositoryOwnerInput(ChangeEventArgs args)
+    {
+        return UpdateSettingsDraftAsync(settingsDraft with { RepositoryOwner = ToInputValue(args) });
+    }
+
+    private Task OnRepositoryNameInput(ChangeEventArgs args)
+    {
+        return UpdateSettingsDraftAsync(settingsDraft with { RepositoryName = ToInputValue(args) });
+    }
+
+    private Task OnDefaultBranchInput(ChangeEventArgs args)
+    {
+        return UpdateSettingsDraftAsync(settingsDraft with { DefaultBranch = ToInputValue(args) });
+    }
+
+    private Task OnThemeNameInput(ChangeEventArgs args)
+    {
+        return UpdateSettingsDraftAsync(settingsDraft with { ThemeName = ToInputValue(args) });
+    }
+
+    private Task UseCurrentDeploymentAsync()
+    {
+        MarkazorSettingsDraft next = settingsDraft with
+        {
+            SiteBaseUrls = Navigation.BaseUri,
+        };
+
+        return UpdateSettingsDraftAsync(next);
+    }
+
+    private Task RestoreRepositorySettingsAsync()
+    {
+        settingsDraft = CreateRepositorySettingsDraft();
+        settingsDraftDirty = false;
+        settingsSaved = false;
+        settingsMessage = null;
+
+        return MarkazorSetupStorage.ClearSettingsDraftAsync(setupModule);
+    }
+
+    private Task ResetSettingsDraftAsync()
+    {
+        settingsDraft = MarkazorSettingsDraft.CreateDefaults(Navigation.BaseUri);
+        settingsDraftDirty = true;
+        settingsSaved = false;
+        settingsMessage = null;
+
+        return MarkazorSetupStorage.SaveSettingsDraftAsync(setupModule, settingsDraft);
+    }
+
+    private async Task UpdateSettingsDraftAsync(MarkazorSettingsDraft next)
+    {
+        settingsDraft = next;
+        settingsDraftDirty = true;
+        settingsSaved = false;
+        settingsMessage = null;
+        await MarkazorSetupStorage.SaveSettingsDraftAsync(setupModule, settingsDraft).ConfigureAwait(false);
+    }
+
+    private MarkazorSettingsDraft CreateRepositorySettingsDraft()
+    {
+        return status is null
+            ? MarkazorSettingsDraft.CreateDefaults(Navigation.BaseUri)
+            : MarkazorSettingsDraft.FromStatus(status, Navigation.BaseUri);
+    }
+
+    private void OpenSetup()
+    {
+        Navigation.NavigateTo("/setup");
+    }
+
+    private void OpenEditor()
+    {
+        Navigation.NavigateTo("/editor");
+    }
+
+    private static string ToInputValue(ChangeEventArgs args)
+    {
+        return args.Value?.ToString() ?? string.Empty;
+    }
+
+    private static string CheckText(bool value)
+    {
+        return value ? "Passed" : "Failed";
+    }
+
+    private static string DescribeLoadFailure(Exception exception)
+    {
+        return exception is TaskCanceledException
+            ? "The Markazor API did not respond before the request timed out. Check the Static Web Apps Functions deployment."
+            : exception.Message;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (setupModule is not null)
+        {
+            await setupModule.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+}

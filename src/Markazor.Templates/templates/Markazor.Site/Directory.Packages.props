@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Markazor" Version="MARKAZOR_PACKAGE_VERSION" />
+    <PackageVersion Include="Markazor.Api" Version="MARKAZOR_PACKAGE_VERSION" />
+    <PackageVersion Include="Markazor.Core" Version="MARKAZOR_PACKAGE_VERSION" />
+    <PackageVersion Include="Markazor.Themes" Version="MARKAZOR_PACKAGE_VERSION" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.16" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.16" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker" Version="2.52.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.3.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.7" />
+  </ItemGroup>
+</Project>

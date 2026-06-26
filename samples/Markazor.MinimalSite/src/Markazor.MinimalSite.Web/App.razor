@@ -1,0 +1,15 @@
+@using System.Reflection
+@using Markazor.Components
+
+<Router AppAssembly="@typeof(App).Assembly"
+        AdditionalAssemblies="MarkazorAssemblies"
+        NotFoundPage="@typeof(Markazor.MinimalSite.Web.Pages.NotFound)">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+</Router>
+
+@code {
+    private static readonly Assembly[] MarkazorAssemblies = [typeof(SetupPage).Assembly];
+}

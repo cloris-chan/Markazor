@@ -1,0 +1,52 @@
+<Project>
+  <PropertyGroup>
+    <MarkazorThemesRoot Condition="'$(MarkazorThemesRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Themes')">$(MSBuildThisFileDirectory)Themes</MarkazorThemesRoot>
+    <MarkazorThemesRoot Condition="'$(MarkazorThemesRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Themes')">$(MSBuildThisFileDirectory)..\Themes</MarkazorThemesRoot>
+  </PropertyGroup>
+
+  <Target Name="PrepareMarkazorThemeGeneratedWebRoot"
+          BeforeTargets="ResolveMarkazorGeneratedStaticWebAssets"
+          DependsOnTargets="PrepareMarkazorGeneratedWebRoot"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true'">
+    <PropertyGroup>
+      <MarkazorThemeOutputRoot Condition="'$(MarkazorThemeOutputRoot)' == ''">$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(MarkazorGeneratedWebRoot)', '_content', 'Markazor.Themes'))))</MarkazorThemeOutputRoot>
+      <MarkazorGeneratedThemeCss Condition="'$(MarkazorGeneratedThemeCss)' == ''">$(MarkazorThemeOutputRoot)theme.css</MarkazorGeneratedThemeCss>
+      <MarkazorGeneratedThemeJs Condition="'$(MarkazorGeneratedThemeJs)' == ''">$(MarkazorThemeOutputRoot)theme.js</MarkazorGeneratedThemeJs>
+      <_MarkazorThemeName Condition="'$(MarkazorThemeName)' != ''">$(MarkazorThemeName)</_MarkazorThemeName>
+      <_MarkazorThemeName Condition="'$(_MarkazorThemeName)' == ''">default</_MarkazorThemeName>
+      <_MarkazorThemeName Condition="'$(_MarkazorSettingsFile)' != '' and Exists('$(_MarkazorSettingsFile)')">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(_MarkazorSettingsFile)')), '&quot;theme&quot;\s*:\s*\{[\s\S]*?&quot;name&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_MarkazorThemeName>
+      <_MarkazorThemeName Condition="'$(_MarkazorThemeName)' == ''">default</_MarkazorThemeName>
+      <_MarkazorThemeNameNormalized>$([System.String]::Copy('$(_MarkazorThemeName)').Trim().ToLowerInvariant())</_MarkazorThemeNameNormalized>
+      <_MarkazorSelectedThemeSourceRoot Condition="'$(_MarkazorThemeNameNormalized)' != 'none'">$(MarkazorThemesRoot)\$(_MarkazorThemeNameNormalized)</_MarkazorSelectedThemeSourceRoot>
+    </PropertyGroup>
+
+    <Error
+      Condition="'$(_MarkazorThemeNameNormalized)' != 'none' and !Exists('$(_MarkazorSelectedThemeSourceRoot)')"
+      Text="Unknown Markazor theme '$(_MarkazorThemeName)'. Use one of: default, none." />
+
+    <MakeDir Directories="$(MarkazorThemeOutputRoot)" />
+
+    <Copy SourceFiles="$(_MarkazorSelectedThemeSourceRoot)\theme.css"
+          DestinationFiles="$(MarkazorGeneratedThemeCss)"
+          SkipUnchangedFiles="true"
+          Condition="'$(_MarkazorThemeNameNormalized)' != 'none'" />
+    <Copy SourceFiles="$(_MarkazorSelectedThemeSourceRoot)\theme.js"
+          DestinationFiles="$(MarkazorGeneratedThemeJs)"
+          SkipUnchangedFiles="true"
+          Condition="'$(_MarkazorThemeNameNormalized)' != 'none'" />
+
+    <WriteLinesToFile File="$(MarkazorGeneratedThemeCss)"
+                      Lines=""
+                      Overwrite="true"
+                      Condition="'$(_MarkazorThemeNameNormalized)' == 'none'" />
+    <WriteLinesToFile File="$(MarkazorGeneratedThemeJs)"
+                      Lines=""
+                      Overwrite="true"
+                      Condition="'$(_MarkazorThemeNameNormalized)' == 'none'" />
+
+    <ItemGroup>
+      <FileWrites Include="$(MarkazorGeneratedThemeCss)" />
+      <FileWrites Include="$(MarkazorGeneratedThemeJs)" />
+    </ItemGroup>
+  </Target>
+</Project>

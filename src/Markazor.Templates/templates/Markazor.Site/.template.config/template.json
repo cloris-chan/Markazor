@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Markazor contributors",
+  "classifications": [
+    "Web",
+    "Blazor",
+    "WebAssembly",
+    "Site",
+    "Publishing",
+    "Posts",
+    "Notes",
+    "Static Web Apps"
+  ],
+  "description": "Creates a self-owned Markazor site with Blazor WebAssembly, Azure Functions, GitHub, and Azure Static Web Apps.",
+  "groupIdentity": "Markazor.Templates.Site",
+  "tags": {
+    "language": "C#",
+    "type": "solution",
+    "editorTreatAs": "solution"
+  },
+  "identity": "Markazor.Templates.Site",
+  "name": "Markazor Site",
+  "shortName": "markazor-site",
+  "defaultName": "MarkazorSite",
+  "sourceName": "MarkazorSite",
+  "preferNameDirectory": true,
+  "primaryOutputs": [
+    {
+      "path": "src/MarkazorSite.Web/MarkazorSite.Web.csproj"
+    },
+    {
+      "path": "src/MarkazorSite.Functions/MarkazorSite.Functions.csproj"
+    }
+  ],
+  "symbols": {
+    "MarkazorPackageVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "MARKAZOR_PACKAGE_VERSION",
+      "replaces": "MARKAZOR_PACKAGE_VERSION"
+    },
+    "HostIdentifier": {
+      "type": "bind",
+      "binding": "HostIdentifier"
+    }
+  },
+  "postActions": [
+    {
+      "id": "editor",
+      "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
+      "description": "Opens the generated Markazor projects in the editor",
+      "manualInstructions": [],
+      "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6",
+      "args": {
+        "files": "0;1"
+      },
+      "continueOnError": true
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+@using System.Globalization
+
+<section class="markazor-reader-list" aria-label="@AriaLabel">
+    @if (Page.TotalItems == 0)
+    {
+        <p class="markazor-reader-empty">@EmptyMessage</p>
+    }
+    else
+    {
+        @foreach (ArticleMeta article in Page.Articles)
+        {
+            <article class="markazor-reader-card @ArticleKindClass(article)">
+                <div class="markazor-reader-meta">
+                    <span class="markazor-reader-kind">@ArticleKindLabel(article)</span>
+                    <time datetime="@article.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">
+                        @article.PublishedAtUtc.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)
+                    </time>
+                    @if (!string.IsNullOrWhiteSpace(article.Category))
+                    {
+                        <a href="@TaxonomyLink("/categories", "category", article.Category)">
+                            @article.Category
+                        </a>
+                    }
+                </div>
+                <h2><a href="@article.Route">@article.Title</a></h2>
+                @if (!string.IsNullOrWhiteSpace(article.Summary))
+                {
+                    <p>@article.Summary</p>
+                }
+                @if (article.Tags.Count > 0)
+                {
+                    <ul class="markazor-reader-tags" aria-label="Tags">
+                        @foreach (string tag in article.Tags)
+                        {
+                            <li><a href="@TaxonomyLink("/tags", "tag", tag)">#@tag</a></li>
+                        }
+                    </ul>
+                }
+                <a class="markazor-reader-more" href="@article.Route" aria-label="@($"Read {article.Title}")">
+                    Read
+                </a>
+            </article>
+        }
+    }
+</section>
+
+@if (Page.TotalPages > 1)
+{
+    <nav class="markazor-pagination" aria-label="Pagination">
+        @if (Page.HasPreviousPage)
+        {
+            <a rel="prev" href="@PageLinkFactory(Page.PageNumber - 1)">Previous</a>
+        }
+        <span>Page @Page.PageNumber of @Page.TotalPages</span>
+        @if (Page.HasNextPage)
+        {
+            <a rel="next" href="@PageLinkFactory(Page.PageNumber + 1)">Next</a>
+        }
+    </nav>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public MarkazorArticlePage Page { get; set; } = default!;
+
+    [Parameter]
+    public string AriaLabel { get; set; } = "Articles";
+
+    [Parameter]
+    public string EmptyMessage { get; set; } = "No published articles were found.";
+
+    [Parameter, EditorRequired]
+    public Func<int, string> PageLinkFactory { get; set; } =
+        static page => "/?page=" + page.ToString(CultureInfo.InvariantCulture);
+
+    private static string TaxonomyLink(string path, string parameter, string value)
+    {
+        return $"{path}?{parameter}={Uri.EscapeDataString(value)}";
+    }
+
+    private static string ArticleKindClass(ArticleMeta article)
+    {
+        return string.Equals(article.Kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
+            ? "is-note"
+            : "is-post";
+    }
+
+    private static string ArticleKindLabel(ArticleMeta article)
+    {
+        return string.Equals(article.Kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
+            ? "Note"
+            : "Post";
+    }
+}

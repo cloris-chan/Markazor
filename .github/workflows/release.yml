@@ -1,0 +1,117 @@
+name: release
+
+run-name: release ${{ inputs.version || github.ref_name }}
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version. Defaults to the tag version or Directory.Build.props VersionPrefix.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  DOTNET_VERSION: 10.0.x
+  NODE_VERSION: 24
+  NUGET_SOURCE: https://api.nuget.org/v3/index.json
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      HAS_TEMPLATE_REPO_TOKEN: ${{ secrets.MARKAZOR_TEMPLATE_REPO_TOKEN != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.3.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: src/Markazor/package-lock.json
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = ./build/Get-MarkazorVersion.ps1 -Version '${{ inputs.version }}' -RefName '${{ github.ref_name }}'
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore Markazor.slnx
+
+      - name: Build
+        run: dotnet build Markazor.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Markazor.slnx --configuration Release --no-build
+
+      - name: Pack
+        shell: pwsh
+        run: ./build/Pack-Markazor.ps1 -Version '${{ steps.version.outputs.value }}'
+
+      - name: Template smoke
+        shell: pwsh
+        run: ./build/Test-MarkazorTemplate.ps1 -Version '${{ steps.version.outputs.value }}' -PackageSource artifacts/packages
+
+      - name: Materialize template repo
+        shell: pwsh
+        run: ./build/New-MarkazorTemplateRepo.ps1 -Version '${{ steps.version.outputs.value }}' -PackageSource artifacts/packages
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: markazor-packages-${{ steps.version.outputs.value }}
+          path: artifacts/packages
+
+      - name: Upload template repo
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: markazor-template-repo-${{ steps.version.outputs.value }}
+          path: artifacts/template-repo
+
+      - name: Login to NuGet.org
+        id: nuget_login
+        uses: NuGet/login@v1
+        with:
+          user: clorischan
+
+      - name: Publish NuGet packages
+        shell: pwsh
+        env:
+          NUGET_TRUSTED_PUBLISHING_TOKEN: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "artifacts/packages/*.nupkg" --api-key "$env:NUGET_TRUSTED_PUBLISHING_TOKEN" --source "$env:NUGET_SOURCE" --skip-duplicate
+
+      - name: Wait for NuGet packages
+        shell: pwsh
+        run: ./build/Wait-MarkazorNuGetPackages.ps1 -Version '${{ steps.version.outputs.value }}'
+
+      - name: Sync template repo
+        if: ${{ env.HAS_TEMPLATE_REPO_TOKEN == 'true' }}
+        shell: pwsh
+        env:
+          TEMPLATE_REPO_TOKEN: ${{ secrets.MARKAZOR_TEMPLATE_REPO_TOKEN }}
+        run: |
+          try {
+            ./build/Sync-MarkazorTemplateRepository.ps1 `
+              -Version '${{ steps.version.outputs.value }}' `
+              -PackageSource artifacts/packages `
+              -Repository 'cloris-chan/Markazor.Template' `
+              -Token "$env:TEMPLATE_REPO_TOKEN"
+          }
+          catch {
+            Write-Warning "Template repository sync failed. NuGet packages and template-repo artifact remain valid. $($_.Exception.Message)"
+          }

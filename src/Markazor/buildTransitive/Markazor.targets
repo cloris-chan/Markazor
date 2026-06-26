@@ -1,0 +1,586 @@
+<Project>
+  <PropertyGroup>
+    <_MarkazorRepositoryRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '..', '..'))</_MarkazorRepositoryRoot>
+    <_MarkazorContentRoot>$(_MarkazorRepositoryRoot)</_MarkazorContentRoot>
+    <_MarkazorAssetRoot>$([MSBuild]::NormalizeDirectory('$(_MarkazorRepositoryRoot)', 'assets'))</_MarkazorAssetRoot>
+    <_MarkazorPublicRoot>$([MSBuild]::NormalizeDirectory('$(_MarkazorRepositoryRoot)', 'public'))</_MarkazorPublicRoot>
+    <_MarkazorSettingsFile>$([System.IO.Path]::Combine('$(_MarkazorPublicRoot)', 'markazor.settings.json'))</_MarkazorSettingsFile>
+    <MarkazorEnableSiteBuild Condition="'$(MarkazorEnableSiteBuild)' == ''">false</MarkazorEnableSiteBuild>
+    <MarkazorEnableSourceGenerator Condition="'$(MarkazorEnableSourceGenerator)' == ''">$(MarkazorEnableSiteBuild)</MarkazorEnableSourceGenerator>
+    <ServiceWorkerAssetsManifest Condition="'$(MarkazorEnableSiteBuild)' == 'true' and '$(ServiceWorkerAssetsManifest)' == ''">service-worker-assets.js</ServiceWorkerAssetsManifest>
+    <MarkazorPublishContent Condition="'$(MarkazorPublishContent)' == ''">true</MarkazorPublishContent>
+    <MarkazorPublishAssets Condition="'$(MarkazorPublishAssets)' == ''">true</MarkazorPublishAssets>
+    <MarkazorPublishPublic Condition="'$(MarkazorPublishPublic)' == ''">true</MarkazorPublishPublic>
+    <MarkazorPublishShell Condition="'$(MarkazorPublishShell)' == ''">$(MarkazorEnableSiteBuild)</MarkazorPublishShell>
+    <MarkazorDefaultShellRoot>$([MSBuild]::EnsureTrailingSlash('$(MSBuildThisFileDirectory)defaults\wwwroot'))</MarkazorDefaultShellRoot>
+    <MarkazorSourceWebRoot>$([MSBuild]::EnsureTrailingSlash($([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', 'wwwroot'))))</MarkazorSourceWebRoot>
+    <MarkazorGeneratedWebRoot Condition="'$(MarkazorGeneratedWebRoot)' == ''">$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', '$(Configuration)', '$(TargetFramework)', 'markazor', 'site'))))</MarkazorGeneratedWebRoot>
+    <MarkazorGenerateWebRoot Condition="'$(MarkazorGenerateWebRoot)' == ''">$(MarkazorPublishShell)</MarkazorGenerateWebRoot>
+    <MarkazorCleanGeneratedWebRoot Condition="'$(MarkazorCleanGeneratedWebRoot)' == ''">true</MarkazorCleanGeneratedWebRoot>
+    <MarkazorEffectiveServiceWorkerSource Condition="'$(MarkazorServiceWorkerSource)' == ''">$(MarkazorDefaultShellRoot)service-worker.js</MarkazorEffectiveServiceWorkerSource>
+    <MarkazorEffectiveServiceWorkerSource Condition="'$(MarkazorServiceWorkerSource)' != ''">$(MarkazorServiceWorkerSource)</MarkazorEffectiveServiceWorkerSource>
+    <MarkazorEffectivePublishedServiceWorkerSource Condition="'$(MarkazorPublishedServiceWorkerSource)' == ''">$(MarkazorDefaultShellRoot)service-worker.published.js</MarkazorEffectivePublishedServiceWorkerSource>
+    <MarkazorEffectivePublishedServiceWorkerSource Condition="'$(MarkazorPublishedServiceWorkerSource)' != ''">$(MarkazorPublishedServiceWorkerSource)</MarkazorEffectivePublishedServiceWorkerSource>
+    <MarkazorServiceWorkerIntermediateRoot Condition="'$(MarkazorServiceWorkerIntermediateRoot)' == ''">$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', '$(Configuration)', '$(TargetFramework)', 'markazor', 'service-worker'))))</MarkazorServiceWorkerIntermediateRoot>
+    <_MarkazorMSBuildTasksAssembly>$([System.IO.Path]::Combine('$(MSBuildToolsPath)', 'Microsoft.Build.Tasks.Core.dll'))</_MarkazorMSBuildTasksAssembly>
+  </PropertyGroup>
+
+  <UsingTask TaskName="MarkazorGenerateWebManifest"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(_MarkazorMSBuildTasksAssembly)">
+    <ParameterGroup>
+      <SettingsFile ParameterType="System.String" Required="false" />
+      <OutputFile ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Globalization" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+static string NormalizeSiteName(string value)
+{
+    return string.IsNullOrWhiteSpace(value) ? "Markazor" : value.Trim();
+}
+
+static string NormalizeSiteDescription(string value)
+{
+    return string.IsNullOrWhiteSpace(value) ? "A repository-native site powered by Markazor." : value.Trim();
+}
+
+static string ReadSiteProperty(string settingsFile, string propertyName, Func<string, string> normalize, string defaultValue)
+{
+    if (string.IsNullOrWhiteSpace(settingsFile) || !File.Exists(settingsFile))
+    {
+        return defaultValue;
+    }
+
+    string settingsJson = File.ReadAllText(settingsFile);
+    Match match = Regex.Match(
+        settingsJson,
+        @"""site""\s*:\s*\{[\s\S]*?""" + Regex.Escape(propertyName) + @"""\s*:\s*""((?:\\.|[^""\\])*)""");
+
+    return match.Success ? normalize(UnescapeJsonString(match.Groups[1].Value)) : defaultValue;
+}
+
+static string UnescapeJsonString(string value)
+{
+    var builder = new StringBuilder(value.Length);
+    for (var index = 0; index < value.Length; index++)
+    {
+        char current = value[index];
+        if (current != '\\' || index == value.Length - 1)
+        {
+            builder.Append(current);
+            continue;
+        }
+
+        char escaped = value[++index];
+        switch (escaped)
+        {
+            case '"':
+                builder.Append('"');
+                break;
+            case '\\':
+                builder.Append('\\');
+                break;
+            case '/':
+                builder.Append('/');
+                break;
+            case 'b':
+                builder.Append('\b');
+                break;
+            case 'f':
+                builder.Append('\f');
+                break;
+            case 'n':
+                builder.Append('\n');
+                break;
+            case 'r':
+                builder.Append('\r');
+                break;
+            case 't':
+                builder.Append('\t');
+                break;
+            case 'u' when index + 4 < value.Length && ushort.TryParse(value.Substring(index + 1, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ushort codePoint):
+                builder.Append((char)codePoint);
+                index += 4;
+                break;
+            default:
+                builder.Append(escaped);
+                break;
+        }
+    }
+
+    return builder.ToString();
+}
+
+static string ToJsonString(string value)
+{
+    var builder = new StringBuilder(value.Length + 2);
+    builder.Append('"');
+    foreach (char current in value)
+    {
+        switch (current)
+        {
+            case '"':
+                builder.Append("\\\"");
+                break;
+            case '\\':
+                builder.Append("\\\\");
+                break;
+            case '\b':
+                builder.Append("\\b");
+                break;
+            case '\f':
+                builder.Append("\\f");
+                break;
+            case '\n':
+                builder.Append("\\n");
+                break;
+            case '\r':
+                builder.Append("\\r");
+                break;
+            case '\t':
+                builder.Append("\\t");
+                break;
+            default:
+                if (char.IsControl(current))
+                {
+                    builder.Append("\\u").Append(((int)current).ToString("x4", CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    builder.Append(current);
+                }
+
+                break;
+        }
+    }
+
+    builder.Append('"');
+    return builder.ToString();
+}
+
+string siteNameJson = ToJsonString(ReadSiteProperty(SettingsFile, "name", NormalizeSiteName, "Markazor"));
+string siteDescriptionJson = ToJsonString(ReadSiteProperty(SettingsFile, "description", NormalizeSiteDescription, "A repository-native site powered by Markazor."));
+string outputDirectory = Path.GetDirectoryName(OutputFile);
+if (!string.IsNullOrEmpty(outputDirectory))
+{
+    Directory.CreateDirectory(outputDirectory);
+}
+
+var manifest = new StringBuilder(512);
+manifest.AppendLine("{");
+manifest.Append("  \"name\": ").Append(siteNameJson).AppendLine(",");
+manifest.Append("  \"short_name\": ").Append(siteNameJson).AppendLine(",");
+manifest.Append("  \"description\": ").Append(siteDescriptionJson).AppendLine(",");
+manifest.AppendLine("  \"lang\": \"en\",");
+manifest.AppendLine("  \"id\": \"/\",");
+manifest.AppendLine("  \"start_url\": \"/\",");
+manifest.AppendLine("  \"scope\": \"/\",");
+manifest.AppendLine("  \"display\": \"standalone\",");
+manifest.AppendLine("  \"background_color\": \"#f7f8f4\",");
+manifest.AppendLine("  \"theme_color\": \"#0aa882\",");
+manifest.AppendLine("  \"prefer_related_applications\": false,");
+manifest.AppendLine("  \"icons\": [");
+manifest.AppendLine("    {");
+manifest.AppendLine("      \"src\": \"/assets/site-icon.png\",");
+manifest.AppendLine("      \"sizes\": \"512x512\",");
+manifest.AppendLine("      \"type\": \"image/png\",");
+manifest.AppendLine("      \"purpose\": \"any maskable\"");
+manifest.AppendLine("    }");
+manifest.AppendLine("  ]");
+manifest.AppendLine("}");
+
+File.WriteAllText(OutputFile, manifest.ToString(), new UTF8Encoding(false));
+]]></Code>
+    </Task>
+  </UsingTask>
+
+  <UsingTask TaskName="MarkazorRemoveServiceWorkerAsset"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(_MarkazorMSBuildTasksAssembly)">
+    <ParameterGroup>
+      <ManifestFile ParameterType="System.String" Required="true" />
+      <AssetUrl ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+if (!File.Exists(ManifestFile) || string.IsNullOrWhiteSpace(AssetUrl))
+{
+    return true;
+}
+
+string manifest = File.ReadAllText(ManifestFile);
+string pattern = @"(?s)(?<leading>,?)\s*\{\s*""hash""\s*:\s*""[^""]*""\s*,\s*""url""\s*:\s*""" + Regex.Escape(AssetUrl) + @"""\s*\}\s*(?<trailing>,?)";
+Match match = Regex.Match(manifest, pattern);
+if (match.Success)
+{
+    string replacement = string.Equals(match.Groups["leading"].Value, ",", StringComparison.Ordinal)
+        && string.Equals(match.Groups["trailing"].Value, ",", StringComparison.Ordinal)
+            ? ","
+            : string.Empty;
+    string updated = manifest.Substring(0, match.Index) + replacement + manifest.Substring(match.Index + match.Length);
+    File.WriteAllText(ManifestFile, updated);
+}
+]]></Code>
+    </Task>
+  </UsingTask>
+
+  <ItemGroup Condition="'$(MarkazorEnableSourceGenerator)' == 'true' and Exists('$(MSBuildThisFileDirectory)Markazor.SourceGen.dll')">
+    <Analyzer Include="$(MSBuildThisFileDirectory)Markazor.SourceGen.dll" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MarkazorEnableSourceGenerator)' == 'true' and Exists('$(_MarkazorContentRoot)\posts')">
+    <AdditionalFiles Include="$(_MarkazorContentRoot)\posts\**\*.md" Link="posts\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MarkazorEnableSourceGenerator)' == 'true' and Exists('$(_MarkazorContentRoot)\notes')">
+    <AdditionalFiles Include="$(_MarkazorContentRoot)\notes\**\*.md" Link="notes\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MarkazorEnableSourceGenerator)' == 'true' and Exists('$(_MarkazorSettingsFile)')">
+    <AdditionalFiles Include="$(_MarkazorSettingsFile)" Link="public\markazor.settings.json" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MarkazorGenerateWebRoot)' == 'true' and Exists('$(_MarkazorPublicRoot)')">
+    <Watch Include="$(_MarkazorPublicRoot)\**\*" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MarkazorGenerateWebRoot)' == 'true' and Exists('$(_MarkazorContentRoot)\posts')">
+    <Watch Include="$(_MarkazorContentRoot)\posts\**\*.md" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MarkazorGenerateWebRoot)' == 'true' and Exists('$(_MarkazorContentRoot)\notes')">
+    <Watch Include="$(_MarkazorContentRoot)\notes\**\*.md" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MarkazorGenerateWebRoot)' == 'true' and Exists('$(_MarkazorContentRoot)\drafts')">
+    <Watch Include="$(_MarkazorContentRoot)\drafts\**\*.md" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MarkazorGenerateWebRoot)' == 'true' and Exists('$(_MarkazorAssetRoot)')">
+    <Watch Include="$(_MarkazorAssetRoot)\**\*" />
+  </ItemGroup>
+
+  <Target Name="ValidateMarkazorSiteBuildInputs"
+          BeforeTargets="PrepareMarkazorGeneratedWebRoot"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true'">
+    <ItemGroup>
+      <_MarkazorSourceWebRootAsset Include="$(MarkazorSourceWebRoot)**\*"
+                                   Condition="Exists('$(MarkazorSourceWebRoot)')" />
+      <_MarkazorUnsupportedRootOverride Include="MarkazorRepositoryRoot"
+                                        Condition="'$(MarkazorRepositoryRoot)' != ''" />
+      <_MarkazorUnsupportedRootOverride Include="MarkazorContentRoot"
+                                        Condition="'$(MarkazorContentRoot)' != ''" />
+      <_MarkazorUnsupportedRootOverride Include="MarkazorAssetRoot"
+                                        Condition="'$(MarkazorAssetRoot)' != ''" />
+      <_MarkazorUnsupportedRootOverride Include="MarkazorPublicRoot"
+                                        Condition="'$(MarkazorPublicRoot)' != ''" />
+      <_MarkazorUnsupportedRootOverride Include="MarkazorSettingsFile"
+                                        Condition="'$(MarkazorSettingsFile)' != ''" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\_framework\**\*"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\_framework')" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\_framework"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\_framework')" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\_content\**\*"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\_content')" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\_content"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\_content')" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\_markazor\**\*"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\_markazor')" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\_markazor"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\_markazor')" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\assets\**\*"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\assets')" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\assets"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\assets')" />
+      <_MarkazorForbiddenPublicAsset Include="$(_MarkazorPublicRoot)\service-worker-assets.js"
+                                     Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)\service-worker-assets.js')" />
+    </ItemGroup>
+
+    <Error
+      Condition="'@(_MarkazorUnsupportedRootOverride)' != ''"
+      Text="Markazor 0.1 uses fixed repository-root paths and does not support root override properties: @(_MarkazorUnsupportedRootOverride->'%(Identity)', ', ')." />
+    <Error
+      Condition="'@(_MarkazorSourceWebRootAsset)' != ''"
+      Text="Markazor site build owns the final web root and cannot merge source files from '$(MarkazorSourceWebRoot)'. Move user-owned files to '$(_MarkazorPublicRoot)' and remove the source wwwroot directory." />
+    <Error
+      Condition="'@(_MarkazorForbiddenPublicAsset)' != ''"
+      Text="Markazor public overlay cannot contain reserved paths: @(_MarkazorForbiddenPublicAsset->'%(Identity)', ', ')." />
+  </Target>
+
+  <Target Name="PrepareMarkazorGeneratedWebRoot"
+          BeforeTargets="ResolveMarkazorGeneratedStaticWebAssets"
+          DependsOnTargets="ValidateMarkazorSiteBuildInputs"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true'">
+    <RemoveDir Directories="$(MarkazorGeneratedWebRoot)"
+               Condition="'$(MarkazorCleanGeneratedWebRoot)' == 'true' and Exists('$(MarkazorGeneratedWebRoot)')" />
+    <MakeDir Directories="$(MarkazorGeneratedWebRoot)" />
+
+    <ItemGroup Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)')">
+      <_MarkazorPublicAsset Include="$(_MarkazorPublicRoot)\**\*" />
+      <_MarkazorPublicAssetWithPath Include="@(_MarkazorPublicAsset)"
+                                    Condition="'@(_MarkazorPublicAsset)' != ''">
+        <RelativePath>$([MSBuild]::MakeRelative('$(_MarkazorPublicRoot)', '%(_MarkazorPublicAsset.Identity)'))</RelativePath>
+      </_MarkazorPublicAssetWithPath>
+      <_MarkazorStagedPublicAsset Include="@(_MarkazorPublicAssetWithPath->'$(MarkazorGeneratedWebRoot)%(RelativePath)')"
+                                  Condition="'@(_MarkazorPublicAssetWithPath)' != ''">
+        <SourcePath>%(_MarkazorPublicAssetWithPath.Identity)</SourcePath>
+      </_MarkazorStagedPublicAsset>
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_MarkazorStagedPublicAsset->'%(SourcePath)')"
+          DestinationFiles="@(_MarkazorStagedPublicAsset)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_MarkazorStagedPublicAsset)' != ''" />
+
+    <ItemGroup Condition="'$(MarkazorPublishContent)' == 'true' and Exists('$(_MarkazorContentRoot)\posts')">
+      <_MarkazorPostContent Include="$(_MarkazorContentRoot)\posts\**\*" />
+      <_MarkazorPostContentWithPath Include="@(_MarkazorPostContent)"
+                                    Condition="'@(_MarkazorPostContent)' != ''">
+        <RelativePath>$([MSBuild]::MakeRelative('$(_MarkazorContentRoot)', '%(_MarkazorPostContent.Identity)'))</RelativePath>
+      </_MarkazorPostContentWithPath>
+      <_MarkazorStagedPostContent Include="@(_MarkazorPostContentWithPath->'$(MarkazorGeneratedWebRoot)_markazor\content\%(RelativePath)')"
+                                  Condition="'@(_MarkazorPostContentWithPath)' != ''">
+        <SourcePath>%(_MarkazorPostContentWithPath.Identity)</SourcePath>
+      </_MarkazorStagedPostContent>
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(MarkazorPublishContent)' == 'true' and Exists('$(_MarkazorContentRoot)\notes')">
+      <_MarkazorNoteContent Include="$(_MarkazorContentRoot)\notes\**\*" />
+      <_MarkazorNoteContentWithPath Include="@(_MarkazorNoteContent)"
+                                    Condition="'@(_MarkazorNoteContent)' != ''">
+        <RelativePath>$([MSBuild]::MakeRelative('$(_MarkazorContentRoot)', '%(_MarkazorNoteContent.Identity)'))</RelativePath>
+      </_MarkazorNoteContentWithPath>
+      <_MarkazorStagedNoteContent Include="@(_MarkazorNoteContentWithPath->'$(MarkazorGeneratedWebRoot)_markazor\content\%(RelativePath)')"
+                                  Condition="'@(_MarkazorNoteContentWithPath)' != ''">
+        <SourcePath>%(_MarkazorNoteContentWithPath.Identity)</SourcePath>
+      </_MarkazorStagedNoteContent>
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_MarkazorStagedPostContent->'%(SourcePath)');@(_MarkazorStagedNoteContent->'%(SourcePath)')"
+          DestinationFiles="@(_MarkazorStagedPostContent);@(_MarkazorStagedNoteContent)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_MarkazorStagedPostContent);@(_MarkazorStagedNoteContent)' != ';'" />
+
+    <ItemGroup Condition="'$(MarkazorPublishAssets)' == 'true' and Exists('$(_MarkazorAssetRoot)')">
+      <_MarkazorAsset Include="$(_MarkazorAssetRoot)\**\*" />
+      <_MarkazorAssetWithPath Include="@(_MarkazorAsset)"
+                              Condition="'@(_MarkazorAsset)' != ''">
+        <RelativePath>$([MSBuild]::MakeRelative('$(_MarkazorAssetRoot)', '%(_MarkazorAsset.Identity)'))</RelativePath>
+      </_MarkazorAssetWithPath>
+      <_MarkazorStagedAsset Include="@(_MarkazorAssetWithPath->'$(MarkazorGeneratedWebRoot)assets\%(RelativePath)')"
+                            Condition="'@(_MarkazorAssetWithPath)' != ''">
+        <SourcePath>%(_MarkazorAssetWithPath.Identity)</SourcePath>
+      </_MarkazorStagedAsset>
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_MarkazorStagedAsset->'%(SourcePath)')"
+          DestinationFiles="@(_MarkazorStagedAsset)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_MarkazorStagedAsset)' != ''" />
+
+    <Copy SourceFiles="$(MarkazorDefaultShellRoot)assets\site-icon.png"
+          DestinationFiles="$(MarkazorGeneratedWebRoot)assets\site-icon.png"
+          SkipUnchangedFiles="true"
+          Condition="!Exists('$(MarkazorGeneratedWebRoot)assets\site-icon.png')" />
+
+    <Copy SourceFiles="$(MarkazorDefaultShellRoot)index.html"
+          DestinationFiles="$(MarkazorGeneratedWebRoot)index.html"
+          SkipUnchangedFiles="true"
+          Condition="!Exists('$(MarkazorGeneratedWebRoot)index.html')" />
+    <Copy SourceFiles="$(MarkazorDefaultShellRoot)404.html"
+          DestinationFiles="$(MarkazorGeneratedWebRoot)404.html"
+          SkipUnchangedFiles="true"
+          Condition="!Exists('$(MarkazorGeneratedWebRoot)404.html')" />
+    <MarkazorGenerateWebManifest SettingsFile="$(_MarkazorSettingsFile)"
+                                 OutputFile="$(MarkazorGeneratedWebRoot)manifest.webmanifest"
+                                 Condition="!Exists('$(MarkazorGeneratedWebRoot)manifest.webmanifest')" />
+    <Copy SourceFiles="$(MarkazorDefaultShellRoot)staticwebapp.config.json"
+          DestinationFiles="$(MarkazorGeneratedWebRoot)staticwebapp.config.json"
+          SkipUnchangedFiles="true"
+          Condition="!Exists('$(MarkazorGeneratedWebRoot)staticwebapp.config.json')" />
+    <Copy SourceFiles="$(MarkazorEffectiveServiceWorkerSource)"
+          DestinationFiles="$(MarkazorGeneratedWebRoot)service-worker.js"
+          SkipUnchangedFiles="true"
+          Condition="!Exists('$(MarkazorGeneratedWebRoot)service-worker.js')" />
+    <Copy SourceFiles="$(MarkazorEffectivePublishedServiceWorkerSource)"
+          DestinationFiles="$(MarkazorGeneratedWebRoot)service-worker.published.js"
+          SkipUnchangedFiles="true"
+          Condition="!Exists('$(MarkazorGeneratedWebRoot)service-worker.published.js')" />
+
+    <MakeDir Directories="$(MarkazorGeneratedWebRoot)styles;$(MarkazorGeneratedWebRoot)scripts" />
+    <Copy SourceFiles="$(MarkazorDefaultShellRoot)styles\site.css"
+          DestinationFiles="$(MarkazorGeneratedWebRoot)styles\site.css"
+          SkipUnchangedFiles="true"
+          Condition="!Exists('$(MarkazorGeneratedWebRoot)styles\site.css')" />
+    <Copy SourceFiles="$(MarkazorDefaultShellRoot)scripts\site.js"
+          DestinationFiles="$(MarkazorGeneratedWebRoot)scripts\site.js"
+          SkipUnchangedFiles="true"
+          Condition="!Exists('$(MarkazorGeneratedWebRoot)scripts\site.js')" />
+
+    <ItemGroup>
+      <FileWrites Include="$(MarkazorGeneratedWebRoot)**\*" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="ResolveMarkazorGeneratedStaticWebAssets"
+          BeforeTargets="ResolveProjectStaticWebAssets"
+          DependsOnTargets="PrepareMarkazorGeneratedWebRoot"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true'">
+    <ItemGroup>
+      <_MarkazorGeneratedStaticWebAssetSource Include="$(MarkazorGeneratedWebRoot)**\*"
+                                               Exclude="$(MarkazorGeneratedWebRoot)service-worker.js;$(MarkazorGeneratedWebRoot)service-worker.published.js" />
+      <_MarkazorGeneratedStaticWebAssetCandidate Include="@(_MarkazorGeneratedStaticWebAssetSource)">
+        <RelativePath>$([MSBuild]::MakeRelative('$(MarkazorGeneratedWebRoot)', '%(_MarkazorGeneratedStaticWebAssetSource.Identity)'))</RelativePath>
+      </_MarkazorGeneratedStaticWebAssetCandidate>
+    </ItemGroup>
+
+    <DefineStaticWebAssets
+      CandidateAssets="@(_MarkazorGeneratedStaticWebAssetCandidate)"
+      SourceType="Discovered"
+      SourceId="$(PackageId)"
+      ContentRoot="$(MarkazorGeneratedWebRoot)"
+      BasePath="$(StaticWebAssetBasePath)"
+      AssetKind="All"
+      AssetMode="All"
+      AssetRole="Primary"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest">
+      <Output TaskParameter="Assets" ItemName="_MarkazorGeneratedStaticWebAsset" />
+    </DefineStaticWebAssets>
+
+    <DefineStaticWebAssetEndpoints
+      CandidateAssets="@(_MarkazorGeneratedStaticWebAsset)"
+      ExistingEndpoints="@(StaticWebAssetEndpoint)"
+      ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+      <Output TaskParameter="Endpoints" ItemName="_MarkazorGeneratedStaticWebAssetEndpoint" />
+    </DefineStaticWebAssetEndpoints>
+
+    <ItemGroup>
+      <StaticWebAsset Include="@(_MarkazorGeneratedStaticWebAsset)" />
+      <StaticWebAssetEndpoint Include="@(_MarkazorGeneratedStaticWebAssetEndpoint)" />
+      <StaticWebAssetDiscoveryPattern Include="$(PackageId)\markazor-site">
+        <Source>$(PackageId)</Source>
+        <BasePath>$(StaticWebAssetBasePath)</BasePath>
+        <ContentRoot>$(MarkazorGeneratedWebRoot)</ContentRoot>
+        <Pattern>**</Pattern>
+      </StaticWebAssetDiscoveryPattern>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="RemoveMarkazorDeploymentConfigFromBuildServiceWorkerManifest"
+          AfterTargets="GenerateBuildServiceWorkerStaticWebAssets"
+          BeforeTargets="ResolveMarkazorBuildServiceWorkerStaticWebAssets"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true' and '$(ServiceWorkerAssetsManifest)' != ''">
+    <MarkazorRemoveServiceWorkerAsset ManifestFile="$(_BuildServiceWorkerManifestIntermediatePath)"
+                                      AssetUrl="staticwebapp.config.json"
+                                      Condition="'$(_BuildServiceWorkerManifestIntermediatePath)' != ''" />
+  </Target>
+
+  <Target Name="RemoveMarkazorDeploymentConfigFromPublishServiceWorkerManifest"
+          AfterTargets="GeneratePublishServiceWorkerStaticWebAssets"
+          BeforeTargets="ResolveMarkazorPublishServiceWorkerStaticWebAssets"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true' and '$(ServiceWorkerAssetsManifest)' != ''">
+    <MarkazorRemoveServiceWorkerAsset ManifestFile="$(_PublishServiceWorkerManifestIntermediatePath)"
+                                      AssetUrl="staticwebapp.config.json"
+                                      Condition="'$(_PublishServiceWorkerManifestIntermediatePath)' != ''" />
+  </Target>
+
+  <Target Name="ResolveMarkazorBuildServiceWorkerStaticWebAssets"
+          AfterTargets="GenerateBuildServiceWorkerStaticWebAssets"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true' and '$(ServiceWorkerAssetsManifest)' != ''">
+    <MakeDir Directories="$(MarkazorServiceWorkerIntermediateRoot)" />
+    <Copy SourceFiles="$(MarkazorGeneratedWebRoot)service-worker.js"
+          DestinationFiles="$(MarkazorServiceWorkerIntermediateRoot)service-worker.js"
+          SkipUnchangedFiles="true" />
+
+    <ItemGroup>
+      <_MarkazorBuildServiceWorkerCandidate Include="$(MarkazorServiceWorkerIntermediateRoot)service-worker.js">
+        <RelativePath>service-worker.js</RelativePath>
+      </_MarkazorBuildServiceWorkerCandidate>
+      <_MarkazorBuildServiceWorkerCandidate Include="$(_BuildServiceWorkerManifestIntermediatePath)">
+        <RelativePath>$(ServiceWorkerAssetsManifest)</RelativePath>
+      </_MarkazorBuildServiceWorkerCandidate>
+    </ItemGroup>
+
+    <DefineStaticWebAssets
+      CandidateAssets="@(_MarkazorBuildServiceWorkerCandidate)"
+      SourceType="Computed"
+      SourceId="$(PackageId)"
+      ContentRoot="$(MarkazorServiceWorkerIntermediateRoot)"
+      BasePath="$(StaticWebAssetBasePath)"
+      AssetKind="Build"
+      AssetMode="All"
+      AssetRole="Primary"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="Never">
+      <Output TaskParameter="Assets" ItemName="_MarkazorBuildServiceWorkerStaticWebAsset" />
+    </DefineStaticWebAssets>
+
+    <DefineStaticWebAssetEndpoints
+      CandidateAssets="@(_MarkazorBuildServiceWorkerStaticWebAsset)"
+      ExistingEndpoints="@(StaticWebAssetEndpoint)"
+      ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+      <Output TaskParameter="Endpoints" ItemName="_MarkazorBuildServiceWorkerStaticWebAssetEndpoint" />
+    </DefineStaticWebAssetEndpoints>
+
+    <ItemGroup>
+      <StaticWebAsset Include="@(_MarkazorBuildServiceWorkerStaticWebAsset)" />
+      <StaticWebAssetEndpoint Include="@(_MarkazorBuildServiceWorkerStaticWebAssetEndpoint)" />
+      <FileWrites Include="$(MarkazorServiceWorkerIntermediateRoot)service-worker.js" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="ResolveMarkazorPublishServiceWorkerStaticWebAssets"
+          AfterTargets="GeneratePublishServiceWorkerStaticWebAssets"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true' and '$(ServiceWorkerAssetsManifest)' != ''">
+    <MakeDir Directories="$(MarkazorServiceWorkerIntermediateRoot)" />
+    <UpdateServiceWorkerFileWithVersion
+      ServiceWorkerSource="$(MarkazorGeneratedWebRoot)service-worker.published.js"
+      ServiceWorkerDestination="$(MarkazorServiceWorkerIntermediateRoot)service-worker.js.publish"
+      ManifestVersion="$(_PublishServiceWorkerAssetsManifestVersion)" />
+
+    <ItemGroup>
+      <_MarkazorPublishServiceWorkerCandidate Include="$(MarkazorServiceWorkerIntermediateRoot)service-worker.js.publish">
+        <RelativePath>service-worker.js</RelativePath>
+      </_MarkazorPublishServiceWorkerCandidate>
+      <_MarkazorPublishServiceWorkerCandidate Include="$(_PublishServiceWorkerManifestIntermediatePath)">
+        <RelativePath>$(ServiceWorkerAssetsManifest)</RelativePath>
+      </_MarkazorPublishServiceWorkerCandidate>
+    </ItemGroup>
+
+    <DefineStaticWebAssets
+      CandidateAssets="@(_MarkazorPublishServiceWorkerCandidate)"
+      SourceType="Computed"
+      SourceId="$(PackageId)"
+      ContentRoot="$(MarkazorServiceWorkerIntermediateRoot)"
+      BasePath="$(StaticWebAssetBasePath)"
+      AssetKind="Publish"
+      AssetMode="All"
+      AssetRole="Primary"
+      CopyToOutputDirectory="Never"
+      CopyToPublishDirectory="PreserveNewest">
+      <Output TaskParameter="Assets" ItemName="_MarkazorPublishServiceWorkerStaticWebAsset" />
+    </DefineStaticWebAssets>
+
+    <DefineStaticWebAssetEndpoints
+      CandidateAssets="@(_MarkazorPublishServiceWorkerStaticWebAsset)"
+      ExistingEndpoints="@(StaticWebAssetEndpoint)"
+      ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+      <Output TaskParameter="Endpoints" ItemName="_MarkazorPublishServiceWorkerStaticWebAssetEndpoint" />
+    </DefineStaticWebAssetEndpoints>
+
+    <ItemGroup>
+      <StaticWebAsset Include="@(_MarkazorPublishServiceWorkerStaticWebAsset)" />
+      <StaticWebAssetEndpoint Include="@(_MarkazorPublishServiceWorkerStaticWebAssetEndpoint)" />
+      <FileWrites Include="$(MarkazorServiceWorkerIntermediateRoot)service-worker.js.publish" />
+    </ItemGroup>
+  </Target>
+</Project>

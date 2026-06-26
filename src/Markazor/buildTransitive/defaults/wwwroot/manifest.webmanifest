@@ -1,0 +1,21 @@
+{
+  "name": "Markazor",
+  "short_name": "Markazor",
+  "description": "A repository-native site powered by Markazor.",
+  "lang": "en",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f8f4",
+  "theme_color": "#0aa882",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/assets/site-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

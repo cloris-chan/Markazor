@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/samples/" />
+  <Folder Name="/samples/Markazor.MinimalSite/" />
+  <Folder Name="/samples/Markazor.MinimalSite/src/">
+    <Project Path="samples/Markazor.MinimalSite/src/Markazor.MinimalSite.Functions/Markazor.MinimalSite.Functions.csproj" />
+    <Project Path="samples/Markazor.MinimalSite/src/Markazor.MinimalSite.Web/Markazor.MinimalSite.Web.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Markazor.Api/Markazor.Api.csproj" />
+    <Project Path="src/Markazor.Core/Markazor.Core.csproj" />
+    <Project Path="src/Markazor.SourceGen/Markazor.SourceGen.csproj" />
+    <Project Path="src/Markazor.Templates/Markazor.Templates.csproj" />
+    <Project Path="src/Markazor.Themes/Markazor.Themes.csproj" />
+    <Project Path="src/Markazor/Markazor.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Markazor.Api.Tests/Markazor.Api.Tests.csproj" />
+    <Project Path="tests/Markazor.Components.Tests/Markazor.Components.Tests.csproj" />
+    <Project Path="tests/Markazor.Core.Tests/Markazor.Core.Tests.csproj" />
+    <Project Path="tests/Markazor.Tests/Markazor.Tests.csproj" />
+    <Project Path="tests/Markazor.SourceGen.Tests/Markazor.SourceGen.Tests.csproj" />
+  </Folder>
+</Solution>

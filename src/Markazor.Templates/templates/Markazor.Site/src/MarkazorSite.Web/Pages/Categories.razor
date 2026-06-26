@@ -1,0 +1,65 @@
+@page "/categories"
+@using System.Globalization
+@using Markazor.Reading
+@inject IMarkazorReaderService Reader
+
+<PageTitle>@Title | @Reader.Site.Name</PageTitle>
+
+<section class="reader-page-heading">
+    <p class="reader-eyebrow">Browse</p>
+    <h1>@Title</h1>
+    @if (!string.IsNullOrWhiteSpace(Category))
+    {
+        <a href="/categories">View all categories</a>
+    }
+</section>
+
+@if (string.IsNullOrWhiteSpace(Category))
+{
+    <ul class="reader-taxonomy-list" aria-label="Categories">
+        @foreach (MarkazorTaxonomyItem item in Reader.GetCategories())
+        {
+            <li>
+                <a href="@CategoryLink(item.Name)">@item.Name</a>
+                <span>@item.Count</span>
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <ArticleList Page="articlePage"
+                 AriaLabel="@($"Articles in {Category}")"
+                 EmptyMessage="No published articles use this category."
+                 PageLinkFactory="@CreatePageLink" />
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "category")]
+    public string? Category { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? Page { get; set; }
+
+    private MarkazorArticlePage articlePage = new([], 1, 10, 0, 1);
+
+    private string Title => string.IsNullOrWhiteSpace(Category) ? "Categories" : Category;
+
+    protected override void OnParametersSet()
+    {
+        articlePage = string.IsNullOrWhiteSpace(Category)
+            ? new([], 1, Reader.Site.PageSize, 0, 1)
+            : Reader.GetCategory(Category, Page ?? 1);
+    }
+
+    private static string CategoryLink(string category)
+    {
+        return "/categories?category=" + Uri.EscapeDataString(category);
+    }
+
+    private string CreatePageLink(int page)
+    {
+        string root = CategoryLink(Category!);
+        return page <= 1 ? root : root + "&page=" + page.ToString(CultureInfo.InvariantCulture);
+    }
+}

@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <MarkazorGenerateFunctionsHostJson Condition="'$(MarkazorGenerateFunctionsHostJson)' == '' and '$(AzureFunctionsVersion)' != ''">true</MarkazorGenerateFunctionsHostJson>
+    <_MarkazorFunctionsHostJson Condition="'$(_MarkazorFunctionsHostJson)' == ''">$([System.IO.Path]::Combine('$(IntermediateOutputPath)', 'markazor', 'host.json'))</_MarkazorFunctionsHostJson>
+  </PropertyGroup>
+
+  <Target Name="GenerateMarkazorFunctionsHostJson"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'$(MarkazorGenerateFunctionsHostJson)' == 'true' and '$(AzureFunctionsVersion)' != '' and !Exists('$(MSBuildProjectDirectory)\host.json')">
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(_MarkazorFunctionsHostJson)'))" />
+    <WriteLinesToFile File="$(_MarkazorFunctionsHostJson)"
+                      Lines="{%0A  &quot;version&quot;: &quot;2.0&quot;%0A}"
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+    <ItemGroup>
+      <None Include="$(_MarkazorFunctionsHostJson)">
+        <Link>host.json</Link>
+        <TargetPath>host.json</TargetPath>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <Visible>false</Visible>
+      </None>
+    </ItemGroup>
+  </Target>
+</Project>

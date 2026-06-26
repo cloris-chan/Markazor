@@ -1,0 +1,9 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "GITHUB_APP_CLIENT_SECRET": "",
+    "MARKAZOR_AUTH_COOKIE_SECRET": ""
+  }
+}

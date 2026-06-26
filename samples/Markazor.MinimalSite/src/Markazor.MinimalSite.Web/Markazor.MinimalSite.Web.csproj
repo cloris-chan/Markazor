@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <MarkazorEnableSiteBuild>true</MarkazorEnableSiteBuild>
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);IL2111</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+    <ProjectReference Include="..\..\..\..\src\Markazor\Markazor.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Markazor.Themes\Markazor.Themes.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Markazor.SourceGen\Markazor.SourceGen.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+  <Import Project="..\..\..\..\src\Markazor\buildTransitive\Markazor.targets" />
+  <Import Project="..\..\..\..\src\Markazor.Themes\buildTransitive\Markazor.Themes.targets" />
+
+</Project>

@@ -1,0 +1,40 @@
+@page "/archive"
+@using System.Globalization
+@using Markazor.Content
+@using Markazor.Reading
+@inject IMarkazorReaderService Reader
+
+<PageTitle>Archive | @Reader.Site.Name</PageTitle>
+
+<section class="reader-page-heading">
+    <p class="reader-eyebrow">Browse</p>
+    <h1>Archive</h1>
+    <p>Published articles grouped by month.</p>
+</section>
+
+<div class="reader-archive">
+    @foreach (MarkazorArchiveGroup group in Reader.GetArchive())
+    {
+        <section>
+            <h2>@MonthLabel(group)</h2>
+            <ol>
+                @foreach (ArticleMeta article in group.Articles)
+                {
+                    <li>
+                        <time datetime="@article.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">
+                            @article.PublishedAtUtc.ToString("dd", CultureInfo.InvariantCulture)
+                        </time>
+                        <a href="@article.Route">@article.Title</a>
+                    </li>
+                }
+            </ol>
+        </section>
+    }
+</div>
+
+@code {
+    private static string MonthLabel(MarkazorArchiveGroup group)
+    {
+        return new DateTime(group.Year, group.Month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+    }
+}
