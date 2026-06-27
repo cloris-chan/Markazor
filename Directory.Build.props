@@ -26,7 +26,7 @@
     <PackageProjectUrl>https://github.com/cloris-chan/Markazor</PackageProjectUrl>
     <RepositoryUrl>https://github.com/cloris-chan/Markazor</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <PackageReadmeFile>package-readme.md</PackageReadmeFile>
   </PropertyGroup>
 
@@ -41,6 +41,10 @@
     <None Include="$(MSBuildThisFileDirectory)docs\package-readme.md"
           Pack="true"
           PackagePath="package-readme.md"
+          Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)LICENSE.txt"
+          Pack="true"
+          PackagePath="LICENSE.txt"
           Visible="false" />
   </ItemGroup>
 </Project>
