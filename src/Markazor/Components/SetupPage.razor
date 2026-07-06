@@ -1,7 +1,7 @@
 @page "/setup"
+@using Markazor.Client
 @using Markazor.Core.Auth
 @using Markazor.Core.Setup
-@using Markazor.Client
 @inject IMarkazorClientSession Session
 @inject IMarkazorSetupDiagnosticsService DiagnosticsService
 @inject NavigationManager Navigation
@@ -36,14 +36,14 @@
                 <button type="button" @onclick="ReloadAsync" disabled="@isBusy">Run checks</button>
             </div>
 
-            @if (status.MissingSettings.Count == 0)
+            @if (MissingStaticWebAppsSecrets.Count == 0)
             {
                 <p class="markazor-success">All required Static Web Apps secrets are present.</p>
             }
             else
             {
                 <ul class="markazor-token-list">
-                    @foreach (string setting in status.MissingSettings)
+                    @foreach (string setting in MissingStaticWebAppsSecrets)
                     {
                         <li>@setting</li>
                     }
@@ -100,7 +100,7 @@
             </dl>
 
             <ol class="markazor-checklist">
-                <li>Create the GitHub App, then copy its <code>Client ID</code> into the browser-local field below.</li>
+                <li>Create the GitHub App, then copy its <code>Client ID</code> into the temporary field below.</li>
                 <li>Generate a <code>Client secret</code> and add it to Static Web Apps environment variables as <code>GITHUB_APP_CLIENT_SECRET</code>.</li>
                 <li>Recommended: add a separate long random Static Web Apps environment variable named <code>MARKAZOR_AUTH_COOKIE_SECRET</code>.</li>
                 <li>Install the GitHub App on <code>@ConfiguredRepositoryFullName</code>, return here, then authorize GitHub.</li>
@@ -113,7 +113,7 @@
                 <span class="markazor-status-pill @(HasEffectiveClientId ? "is-ready" : "is-waiting")">@ClientIdStatusText</span>
             </div>
 
-            <p class="markazor-muted">This value is stored only in this browser and sent to the API when authorization starts. It is not committed from Setup.</p>
+            <p class="markazor-muted">This value is used only for the next authorization request. Save the canonical Client ID later from <code>/manage</code>.</p>
 
             <label class="markazor-field">
                 <span>GitHub App Client ID</span>
@@ -271,7 +271,11 @@
 
     private string DiagnosticsText => diagnostics?.Ready == true ? "Passed" : "Not passed";
 
-    private string ClientIdStatusText => HasEffectiveClientId ? "Stored locally" : "Required";
+    private string ClientIdStatusText => HasEffectiveClientId ? "Available" : "Required";
+
+    private IReadOnlyList<string> MissingStaticWebAppsSecrets => status?.MissingSettings
+        .Where(static setting => string.Equals(setting, "GITHUB_APP_CLIENT_SECRET", StringComparison.Ordinal))
+        .ToArray() ?? [];
 
     private string SiteBaseUrl => ResolveSiteBaseUrl();
 
@@ -371,35 +375,6 @@
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender)
-        {
-            return;
-        }
-
-        try
-        {
-            setupModule = await JavaScript.InvokeAsync<IJSObjectReference>(
-                "import",
-                "./_content/Markazor/markazor-setup.js").ConfigureAwait(false);
-            string? storedClientId =
-                await MarkazorSetupStorage.LoadClientIdAsync(setupModule).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(storedClientId))
-            {
-                localClientId = storedClientId;
-            }
-
-            StateHasChanged();
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        catch (JSException)
-        {
-        }
-    }
-
     private async Task ReloadAsync()
     {
         isBusy = true;
@@ -433,9 +408,9 @@
         localClientId = args.Value?.ToString() ?? string.Empty;
         clientIdMessage = string.IsNullOrWhiteSpace(localClientId)
             ? null
-            : "Stored in this browser.";
+            : "Ready for this authorization request.";
 
-        await MarkazorSetupStorage.SaveClientIdAsync(setupModule, localClientId).ConfigureAwait(false);
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     private async Task AuthorizeAsync()
@@ -448,8 +423,9 @@
             MarkazorGitHubAuthorizationRequest request = new(
                 string.IsNullOrWhiteSpace(EffectiveClientId) ? null : EffectiveClientId,
                 new Uri(SiteBaseUrl));
+            IJSObjectReference? module = await EnsureSetupModuleAsync().ConfigureAwait(false);
             await MarkazorSetupStorage.SaveAuthorizationReturnPathAsync(
-                setupModule,
+                module,
                 "/setup?auth=github").ConfigureAwait(false);
             Uri authorizationUrl = (await Session.StartGitHubAuthorizationAsync(request).ConfigureAwait(false)).AuthorizationUrl;
             Navigation.NavigateTo(authorizationUrl.ToString(), forceLoad: true);
@@ -463,6 +439,31 @@
         {
             errorMessage = ex.Message;
             isBusy = false;
+        }
+    }
+
+    private async Task<IJSObjectReference?> EnsureSetupModuleAsync()
+    {
+        if (setupModule is not null)
+        {
+            return setupModule;
+        }
+
+        try
+        {
+            setupModule = await JavaScript.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Markazor/markazor-setup.js").ConfigureAwait(false);
+
+            return setupModule;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (JSException)
+        {
+            return null;
         }
     }
 

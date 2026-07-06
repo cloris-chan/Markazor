@@ -2,7 +2,7 @@ using Markazor.Core.Setup;
 
 namespace Markazor.Components;
 
-internal sealed record MarkazorSettingsDraft(
+internal sealed record MarkazorSettingsForm(
     string SiteBaseUrls,
     string SiteName,
     string SiteDescription,
@@ -12,35 +12,22 @@ internal sealed record MarkazorSettingsDraft(
     string DefaultBranch,
     string ThemeName)
 {
-    private const char StorageSeparator = '\t';
+    public static MarkazorSettingsForm Empty { get; } = new(
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        "default");
 
-    public const string LocalStorageKey = "settingsDraft";
-
-    public const string ClientIdLocalStorageKey = "githubClientId";
-
-    public static MarkazorSettingsDraft Empty { get; } = CreateDefaults(string.Empty);
-
-    public static MarkazorSettingsDraft CreateDefaults(string siteBaseUrl)
-    {
-        return new MarkazorSettingsDraft(
-            siteBaseUrl,
-            MarkazorSitePublicSettings.DefaultName,
-            MarkazorSitePublicSettings.DefaultDescription,
-            string.Empty,
-            string.Empty,
-            string.Empty,
-            "main",
-            "default");
-    }
-
-    public static MarkazorSettingsDraft FromStatus(
-        MarkazorSetupStatus status,
-        string fallbackSiteBaseUrl)
+    public static MarkazorSettingsForm FromStatus(MarkazorSetupStatus status)
     {
         ArgumentNullException.ThrowIfNull(status);
 
-        return new MarkazorSettingsDraft(
-            FormatBaseUrls(status.Site.BaseUrls, fallbackSiteBaseUrl),
+        return new MarkazorSettingsForm(
+            FormatBaseUrls(status.Site.BaseUrls),
             MarkazorSitePublicSettings.NormalizeName(status.Site.Name),
             MarkazorSitePublicSettings.NormalizeDescription(status.Site.Description),
             status.GitHub.ClientId,
@@ -125,53 +112,6 @@ internal sealed record MarkazorSettingsDraft(
         return null;
     }
 
-    public string ToStorage()
-    {
-        string[] values =
-        [
-            SiteBaseUrls,
-            SiteName,
-            SiteDescription,
-            GitHubClientId,
-            RepositoryOwner,
-            RepositoryName,
-            DefaultBranch,
-            ThemeName,
-        ];
-
-        return string.Join(StorageSeparator, values.Select(static value =>
-            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(value))));
-    }
-
-    public static MarkazorSettingsDraft? FromStorage(string value)
-    {
-        try
-        {
-            string[] parts = value.Split(StorageSeparator);
-            if (parts.Length != 8)
-            {
-                return null;
-            }
-
-            string[] values = [.. parts.Select(static part =>
-                System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(part)))];
-
-            return new MarkazorSettingsDraft(
-                values[0],
-                values[1],
-                values[2],
-                values[3],
-                values[4],
-                values[5],
-                values[6],
-                values[7]);
-        }
-        catch (FormatException)
-        {
-            return null;
-        }
-    }
-
     public static Uri? ParseBaseUrl(string value)
     {
         return Uri.TryCreate(value.Trim(), UriKind.Absolute, out Uri? uri)
@@ -207,10 +147,10 @@ internal sealed record MarkazorSettingsDraft(
         return null;
     }
 
-    public static string FormatBaseUrls(IReadOnlyList<Uri>? baseUrls, string fallback)
+    public static string FormatBaseUrls(IReadOnlyList<Uri>? baseUrls)
     {
         return baseUrls is null || baseUrls.Count == 0
-            ? fallback
+            ? string.Empty
             : string.Join(Environment.NewLine, baseUrls.Select(static url => url.ToString()));
     }
 

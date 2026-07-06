@@ -123,7 +123,7 @@ Markazor keeps secrets in Azure Static Web Apps environment variables, public se
 
 | Boundary | Contains | Write path |
 |---|---|---|
-| User browser | GitHub App Client ID, short-lived access token, protected refresh cookie | Calls the Functions API for setup/auth and GitHub REST API for content operations. |
+| User browser | Temporary GitHub App Client ID entry, short-lived access token, protected refresh cookie | Calls the Functions API for setup/auth and GitHub REST API for content operations. |
 | Azure Static Web Apps | Functions API, `GITHUB_APP_CLIENT_SECRET`, `MARKAZOR_AUTH_COOKIE_SECRET` | Exchanges OAuth codes and issues/verifies protected cookies. |
 | GitHub App | selected-repository installation, Contents read/write permission | Grants the browser session scoped repository access after authorization. |
 | GitHub repository | posts, notes, drafts, assets, `public/markazor.settings.json`, public overlays, source code, workflow | Receives ordinary commits for content, assets, and public settings changes. |

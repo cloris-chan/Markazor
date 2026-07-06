@@ -396,12 +396,12 @@ public sealed class MarkazorGitHubRepositoryClient(HttpClient httpClient, Markaz
     {
         if (string.IsNullOrWhiteSpace(options.RepositoryOwner))
         {
-            throw new InvalidOperationException("MARKAZOR_REPO_OWNER is not configured.");
+            throw new InvalidOperationException("Repository owner is not configured.");
         }
 
         if (string.IsNullOrWhiteSpace(options.RepositoryName))
         {
-            throw new InvalidOperationException("MARKAZOR_REPO_NAME is not configured.");
+            throw new InvalidOperationException("Repository name is not configured.");
         }
     }
 

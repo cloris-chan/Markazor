@@ -88,7 +88,7 @@
         <section class="markazor-panel">
             <div class="markazor-section-header">
                 <h2>Public Settings</h2>
-                <span class="markazor-status-pill @(settingsDraftDirty ? "is-waiting" : "is-ready")">@SettingsDraftText</span>
+                <span class="markazor-status-pill @(settingsFormDirty ? "is-waiting" : "is-ready")">@SettingsFormText</span>
             </div>
 
             <p class="markazor-muted"><code>markazor.settings.json</code> stores public, non-secret values. Saving here commits the canonical settings through the authorized GitHub App.</p>
@@ -96,7 +96,7 @@
             <div class="markazor-settings-form">
                 <label class="markazor-field markazor-field-wide">
                     <span>Site Base URLs</span>
-                    <textarea value="@settingsDraft.SiteBaseUrls"
+                    <textarea value="@settingsForm.SiteBaseUrls"
                               @oninput="OnSiteBaseUrlsInput"
                               rows="3"
                               autocomplete="url"
@@ -106,7 +106,7 @@
 
                 <label class="markazor-field markazor-site-title-field">
                     <span>Site Title</span>
-                    <input value="@settingsDraft.SiteName"
+                    <input value="@settingsForm.SiteName"
                            @oninput="OnSiteNameInput"
                            autocomplete="off"
                            spellcheck="false" />
@@ -114,7 +114,7 @@
 
                 <label class="markazor-field markazor-field-wide">
                     <span>Site Description</span>
-                    <textarea value="@settingsDraft.SiteDescription"
+                    <textarea value="@settingsForm.SiteDescription"
                               @oninput="OnSiteDescriptionInput"
                               rows="2"
                               spellcheck="false"></textarea>
@@ -128,7 +128,7 @@
 
                 <label class="markazor-field">
                     <span>GitHub App Client ID</span>
-                    <input value="@settingsDraft.GitHubClientId"
+                    <input value="@settingsForm.GitHubClientId"
                            @oninput="OnGitHubClientIdInput"
                            autocomplete="off"
                            spellcheck="false" />
@@ -136,7 +136,7 @@
 
                 <label class="markazor-field">
                     <span>Repository Owner</span>
-                    <input value="@settingsDraft.RepositoryOwner"
+                    <input value="@settingsForm.RepositoryOwner"
                            @oninput="OnRepositoryOwnerInput"
                            autocomplete="off"
                            spellcheck="false" />
@@ -144,7 +144,7 @@
 
                 <label class="markazor-field">
                     <span>Repository Name</span>
-                    <input value="@settingsDraft.RepositoryName"
+                    <input value="@settingsForm.RepositoryName"
                            @oninput="OnRepositoryNameInput"
                            autocomplete="off"
                            spellcheck="false" />
@@ -152,7 +152,7 @@
 
                 <label class="markazor-field">
                     <span>Default Branch</span>
-                    <input value="@settingsDraft.DefaultBranch"
+                    <input value="@settingsForm.DefaultBranch"
                            @oninput="OnDefaultBranchInput"
                            autocomplete="off"
                            spellcheck="false" />
@@ -160,7 +160,7 @@
 
                 <label class="markazor-field">
                     <span>Theme</span>
-                    <select value="@settingsDraft.ThemeName" @onchange="OnThemeNameInput">
+                    <select value="@settingsForm.ThemeName" @onchange="OnThemeNameInput">
                         @foreach (MarkazorThemeDescriptor theme in MarkazorThemes.All)
                         {
                             <option value="@theme.Name">@theme.DisplayName</option>
@@ -170,9 +170,6 @@
             </div>
 
             <div class="markazor-actions">
-                <button type="button" @onclick="UseCurrentDeploymentAsync" disabled="@isBusy">Use Current Deployment</button>
-                <button type="button" @onclick="RestoreRepositorySettingsAsync" disabled="@(isBusy || status is null)">Restore Repository Settings</button>
-                <button type="button" @onclick="ResetSettingsDraftAsync" disabled="@isBusy">Reset Defaults</button>
                 <button type="button" @onclick="SaveSettingsAsync" disabled="@(!CanSaveSettings)">Save Settings</button>
             </div>
 
@@ -260,11 +257,10 @@
     private bool isLoading = true;
     private string? errorMessage;
     private string? settingsMessage;
-    private MarkazorSettingsDraft settingsDraft = MarkazorSettingsDraft.Empty;
-    private bool settingsDraftDirty;
+    private MarkazorSettingsForm settingsForm = MarkazorSettingsForm.Empty;
+    private bool settingsFormDirty;
     private bool settingsSaved;
     private bool settingsMessageIsSuccess;
-    private string localClientId = string.Empty;
     private IJSObjectReference? setupModule;
     private MarkazorSettingsAsset? selectedSiteIcon;
     private string? selectedSiteIconName;
@@ -284,7 +280,9 @@
 
     private string DiagnosticsText => diagnostics?.Ready == true ? "Passed" : "Not passed";
 
-    private string SettingsDraftText => settingsDraftDirty ? "Local draft" : "Repository";
+    private string SettingsFormText => settingsFormDirty
+        ? "Unsaved changes"
+        : status?.SettingsFileExists == true ? "Repository" : "Not saved";
 
     private string SettingsMessageClass => settingsMessageIsSuccess ? "markazor-success" : "markazor-alert";
 
@@ -309,7 +307,7 @@
         ? "Open Setup to enter the GitHub App Client ID and configure the Static Web Apps secret before authorizing this browser."
         : "Authorize the GitHub App before opening repository settings, diagnostics, and maintenance tools.";
 
-    private string SiteBaseUrl => MarkazorSettingsDraft.ParseBaseUrls(settingsDraft.SiteBaseUrls).FirstOrDefault()?.ToString()
+    private string SiteBaseUrl => MarkazorSettingsForm.ParseBaseUrls(settingsForm.SiteBaseUrls).FirstOrDefault()?.ToString()
         ?? status?.Site.PrimaryBaseUrl?.ToString()
         ?? Navigation.BaseUri;
 
@@ -317,14 +315,9 @@
     {
         get
         {
-            if (!string.IsNullOrWhiteSpace(settingsDraft.GitHubClientId))
+            if (!string.IsNullOrWhiteSpace(settingsForm.GitHubClientId))
             {
-                return settingsDraft.GitHubClientId.Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(localClientId))
-            {
-                return localClientId.Trim();
+                return settingsForm.GitHubClientId.Trim();
             }
 
             return status?.GitHub.ClientId.Trim() ?? string.Empty;
@@ -411,7 +404,7 @@
                 return siteIconError;
             }
 
-            return settingsDraft.Validate();
+            return settingsForm.Validate();
         }
     }
 
@@ -419,46 +412,6 @@
     {
         isLocalPreview = MarkazorLocalPreview.IsEnabled(Navigation);
         await ReloadAsync().ConfigureAwait(false);
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender)
-        {
-            return;
-        }
-
-        try
-        {
-            setupModule = await EnsureSetupModuleAsync().ConfigureAwait(false);
-            MarkazorSettingsDraft? localDraft =
-                await MarkazorSetupStorage.LoadSettingsDraftAsync(setupModule).ConfigureAwait(false);
-            if (localDraft is not null)
-            {
-                settingsDraft = localDraft;
-                settingsDraftDirty = true;
-            }
-            else
-            {
-                string? storedClientId =
-                    await MarkazorSetupStorage.LoadClientIdAsync(setupModule).ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(settingsDraft.GitHubClientId)
-                    && !string.IsNullOrWhiteSpace(storedClientId))
-                {
-                    localClientId = storedClientId;
-                    settingsDraft = settingsDraft with { GitHubClientId = storedClientId };
-                    settingsDraftDirty = true;
-                }
-            }
-
-            StateHasChanged();
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        catch (JSException)
-        {
-        }
     }
 
     private async Task<IJSObjectReference?> EnsureSetupModuleAsync()
@@ -502,9 +455,9 @@
             status = isLocalPreview
                 ? MarkazorLocalPreview.CreateSetupStatus(Navigation.BaseUri)
                 : await Session.LoadSetupStatusAsync().ConfigureAwait(false);
-            if (!settingsDraftDirty)
+            if (!settingsFormDirty)
             {
-                settingsDraft = CreateRepositorySettingsDraft();
+                settingsForm = CreateRepositorySettingsForm();
             }
 
             diagnostics = null;
@@ -538,7 +491,7 @@
 
         try
         {
-            string? validationError = settingsDraft.Validate();
+            string? validationError = settingsForm.Validate();
             if (!string.IsNullOrWhiteSpace(validationError))
             {
                 settingsMessageIsSuccess = false;
@@ -548,17 +501,13 @@
             }
 
             MarkazorSettingsSyncResult result =
-                await SettingsSync.SaveAsync(settingsDraft.ToSettings(), selectedSiteIcon).ConfigureAwait(false);
+                await SettingsSync.SaveAsync(settingsForm.ToSettings(), selectedSiteIcon).ConfigureAwait(false);
 
             settingsMessageIsSuccess = result.Succeeded;
             settingsSaved = result.Succeeded;
             if (result.Succeeded)
             {
-                settingsDraftDirty = false;
-                await MarkazorSetupStorage.ClearSettingsDraftAsync(setupModule).ConfigureAwait(false);
-                await MarkazorSetupStorage.SaveClientIdAsync(
-                    setupModule,
-                    settingsDraft.GitHubClientId).ConfigureAwait(false);
+                settingsFormDirty = false;
                 selectedSiteIcon = null;
                 selectedSiteIconName = null;
                 siteIconError = null;
@@ -608,17 +557,17 @@
 
     private Task OnSiteBaseUrlsInput(ChangeEventArgs args)
     {
-        return UpdateSettingsDraftAsync(settingsDraft with { SiteBaseUrls = ToInputValue(args) });
+        return UpdateSettingsFormAsync(settingsForm with { SiteBaseUrls = ToInputValue(args) });
     }
 
     private Task OnSiteNameInput(ChangeEventArgs args)
     {
-        return UpdateSettingsDraftAsync(settingsDraft with { SiteName = ToInputValue(args) });
+        return UpdateSettingsFormAsync(settingsForm with { SiteName = ToInputValue(args) });
     }
 
     private Task OnSiteDescriptionInput(ChangeEventArgs args)
     {
-        return UpdateSettingsDraftAsync(settingsDraft with { SiteDescription = ToInputValue(args) });
+        return UpdateSettingsFormAsync(settingsForm with { SiteDescription = ToInputValue(args) });
     }
 
     private async Task SelectSiteIconAsync(InputFileChangeEventArgs args)
@@ -631,7 +580,7 @@
             selectedSiteIcon = null;
             selectedSiteIconName = null;
             siteIconError = "Site icon must be a PNG file.";
-            settingsDraftDirty = true;
+            settingsFormDirty = true;
             settingsSaved = false;
 
             return;
@@ -642,7 +591,7 @@
             selectedSiteIcon = null;
             selectedSiteIconName = null;
             siteIconError = "Site icon must be 512 KB or smaller.";
-            settingsDraftDirty = true;
+            settingsFormDirty = true;
             settingsSaved = false;
 
             return;
@@ -668,7 +617,7 @@
             selectedSiteIcon = null;
             selectedSiteIconName = null;
             siteIconError = "Site icon must be a valid PNG file.";
-            settingsDraftDirty = true;
+            settingsFormDirty = true;
             settingsSaved = false;
 
             return;
@@ -679,80 +628,51 @@
             "image/png",
             iconContent.ToArray());
         selectedSiteIconName = file.Name;
-        settingsDraftDirty = true;
+        settingsFormDirty = true;
         settingsSaved = false;
         settingsMessage = null;
     }
 
     private Task OnGitHubClientIdInput(ChangeEventArgs args)
     {
-        return UpdateSettingsDraftAsync(settingsDraft with { GitHubClientId = ToInputValue(args) });
+        return UpdateSettingsFormAsync(settingsForm with { GitHubClientId = ToInputValue(args) });
     }
 
     private Task OnRepositoryOwnerInput(ChangeEventArgs args)
     {
-        return UpdateSettingsDraftAsync(settingsDraft with { RepositoryOwner = ToInputValue(args) });
+        return UpdateSettingsFormAsync(settingsForm with { RepositoryOwner = ToInputValue(args) });
     }
 
     private Task OnRepositoryNameInput(ChangeEventArgs args)
     {
-        return UpdateSettingsDraftAsync(settingsDraft with { RepositoryName = ToInputValue(args) });
+        return UpdateSettingsFormAsync(settingsForm with { RepositoryName = ToInputValue(args) });
     }
 
     private Task OnDefaultBranchInput(ChangeEventArgs args)
     {
-        return UpdateSettingsDraftAsync(settingsDraft with { DefaultBranch = ToInputValue(args) });
+        return UpdateSettingsFormAsync(settingsForm with { DefaultBranch = ToInputValue(args) });
     }
 
     private Task OnThemeNameInput(ChangeEventArgs args)
     {
-        return UpdateSettingsDraftAsync(settingsDraft with { ThemeName = ToInputValue(args) });
+        return UpdateSettingsFormAsync(settingsForm with { ThemeName = ToInputValue(args) });
     }
 
-    private Task UseCurrentDeploymentAsync()
+    private Task UpdateSettingsFormAsync(MarkazorSettingsForm next)
     {
-        MarkazorSettingsDraft next = settingsDraft with
-        {
-            SiteBaseUrls = Navigation.BaseUri,
-        };
-
-        return UpdateSettingsDraftAsync(next);
-    }
-
-    private Task RestoreRepositorySettingsAsync()
-    {
-        settingsDraft = CreateRepositorySettingsDraft();
-        settingsDraftDirty = false;
+        settingsForm = next;
+        settingsFormDirty = true;
         settingsSaved = false;
         settingsMessage = null;
 
-        return MarkazorSetupStorage.ClearSettingsDraftAsync(setupModule);
+        return Task.CompletedTask;
     }
 
-    private Task ResetSettingsDraftAsync()
+    private MarkazorSettingsForm CreateRepositorySettingsForm()
     {
-        settingsDraft = MarkazorSettingsDraft.CreateDefaults(Navigation.BaseUri);
-        settingsDraftDirty = true;
-        settingsSaved = false;
-        settingsMessage = null;
-
-        return MarkazorSetupStorage.SaveSettingsDraftAsync(setupModule, settingsDraft);
-    }
-
-    private async Task UpdateSettingsDraftAsync(MarkazorSettingsDraft next)
-    {
-        settingsDraft = next;
-        settingsDraftDirty = true;
-        settingsSaved = false;
-        settingsMessage = null;
-        await MarkazorSetupStorage.SaveSettingsDraftAsync(setupModule, settingsDraft).ConfigureAwait(false);
-    }
-
-    private MarkazorSettingsDraft CreateRepositorySettingsDraft()
-    {
-        return status is null
-            ? MarkazorSettingsDraft.CreateDefaults(Navigation.BaseUri)
-            : MarkazorSettingsDraft.FromStatus(status, Navigation.BaseUri);
+        return status?.SettingsFileExists == true
+            ? MarkazorSettingsForm.FromStatus(status)
+            : MarkazorSettingsForm.Empty;
     }
 
     private void OpenSetup()

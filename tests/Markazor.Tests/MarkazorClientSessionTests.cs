@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
+using Markazor.Client;
 using Markazor.Core.Auth;
 using Markazor.Core.GitHub;
 using Markazor.Core.Setup;
-using Markazor.Client;
 
 namespace Markazor.Tests;
 
@@ -161,7 +161,7 @@ public sealed class MarkazorClientSessionTests
     }
 
     [Fact]
-    public async Task SettingsSyncUsesDraftRepositorySettingsAsTarget()
+    public async Task SettingsSyncUsesSubmittedRepositorySettingsAsTarget()
     {
         MarkazorSiteSettings settings = CreateDraftSettings();
         using SessionHandler handler = new()

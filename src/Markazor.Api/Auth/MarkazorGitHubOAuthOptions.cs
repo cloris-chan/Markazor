@@ -29,16 +29,9 @@ public sealed class MarkazorGitHubOAuthOptions
 
         return new MarkazorGitHubOAuthOptions
         {
-            ClientId = ReadOrDefault(read, "GITHUB_APP_CLIENT_ID", settings?.GitHub?.ClientId ?? string.Empty),
+            ClientId = settings?.GitHub?.ClientId ?? string.Empty,
             ClientSecret = clientSecret,
             CookieProtectionSecret = read("MARKAZOR_AUTH_COOKIE_SECRET") ?? clientSecret,
         };
-    }
-
-    private static string ReadOrDefault(Func<string, string?> read, string name, string defaultValue)
-    {
-        string? value = read(name);
-
-        return string.IsNullOrWhiteSpace(value) ? defaultValue : value;
     }
 }

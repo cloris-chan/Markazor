@@ -32,6 +32,7 @@ public sealed class MarkazorSetupStatusServiceTests
 
         Assert.False(status.Ready);
         Assert.Equal(["repository.name"], status.MissingSettings);
+        Assert.True(status.SettingsFileExists);
         Assert.Equal("cloris", status.Repository.Owner);
         Assert.Equal(string.Empty, status.Repository.Name);
         Assert.DoesNotContain("super-secret", status.ToString(), StringComparison.Ordinal);
@@ -59,38 +60,9 @@ public sealed class MarkazorSetupStatusServiceTests
 
         Assert.True(status.Ready);
         Assert.Empty(status.MissingSettings);
+        Assert.True(status.SettingsFileExists);
         Assert.Equal("main", status.Repository.DefaultBranch);
         Assert.Equal("src/Test.Web", status.ExpectedStaticWebAppsBuildSettings.AppLocation);
-    }
-
-    [Fact]
-    public void EnvironmentValuesOverrideSiteSettings()
-    {
-        Dictionary<string, string?> environment = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["GITHUB_APP_CLIENT_SECRET"] = "secret",
-            ["MARKAZOR_REPO_OWNER"] = "env-owner",
-            ["MARKAZOR_REPO_NAME"] = "env-repo",
-            ["MARKAZOR_DEFAULT_BRANCH"] = "preview",
-        };
-
-        MarkazorSetupStatus status = CreateService(
-            environment,
-            new MarkazorSiteSettings
-            {
-                GitHub = new MarkazorGitHubSettings { ClientId = "client-id" },
-                Repository = new MarkazorRepositorySettings
-                {
-                    Owner = "settings-owner",
-                    Name = "settings-repo",
-                    DefaultBranch = "main",
-                },
-            }).GetStatus();
-
-        Assert.True(status.Ready);
-        Assert.Equal("env-owner", status.Repository.Owner);
-        Assert.Equal("env-repo", status.Repository.Name);
-        Assert.Equal("preview", status.Repository.DefaultBranch);
     }
 
     [Fact]
@@ -111,6 +83,7 @@ public sealed class MarkazorSetupStatusServiceTests
 
         Assert.False(status.Ready);
         Assert.Equal(["github.clientId", "repository.owner", "repository.name"], status.MissingSettings);
+        Assert.True(status.SettingsFileExists);
         Assert.Equal("main", status.Repository.DefaultBranch);
     }
 
@@ -137,6 +110,7 @@ public sealed class MarkazorSetupStatusServiceTests
 
         Assert.True(status.Ready);
         Assert.Empty(status.MissingSettings);
+        Assert.True(status.SettingsFileExists);
         Assert.Equal("File Site", status.Site.Name);
         Assert.Equal("file-owner", status.Repository.Owner);
         Assert.Equal("file-repo", status.Repository.Name);
@@ -163,6 +137,7 @@ public sealed class MarkazorSetupStatusServiceTests
                 name => environment.TryGetValue(name, out string? value) ? value : null).GetStatus();
 
             Assert.True(status.Ready);
+            Assert.True(status.SettingsFileExists);
             Assert.Equal("file-owner", status.Repository.Owner);
             Assert.Equal("file-repo", status.Repository.Name);
         }
@@ -185,6 +160,26 @@ public sealed class MarkazorSetupStatusServiceTests
         Assert.Equal(string.Empty, settings.GitHub.ClientId);
         Assert.Equal(string.Empty, settings.Repository.Owner);
         Assert.Equal(string.Empty, settings.Repository.Name);
+    }
+
+    [Fact]
+    public void ReportsMissingSettingsFile()
+    {
+        string settingsPath = Path.Combine(CreateTemporaryDirectory(), MarkazorSiteSettingsLoader.DefaultFileName);
+        Dictionary<string, string?> environment = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["GITHUB_APP_CLIENT_SECRET"] = "secret",
+        };
+
+        MarkazorSetupStatus status = new MarkazorSetupStatusService(
+            name => environment.TryGetValue(name, out string? value) ? value : null,
+            new MarkazorSetupStatusOptions
+            {
+                SiteSettingsFilePath = settingsPath,
+            }).GetStatus();
+
+        Assert.False(status.SettingsFileExists);
+        Assert.Equal(["github.clientId", "repository.owner", "repository.name"], status.MissingSettings);
     }
 
     private static MarkazorSetupStatusService CreateService(

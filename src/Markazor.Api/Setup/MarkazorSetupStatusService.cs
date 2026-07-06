@@ -11,15 +11,15 @@ public sealed class MarkazorSetupStatusService(
 
     public MarkazorSetupStatus GetStatus()
     {
-        MarkazorSiteSettings siteSettings = GetSiteSettings();
+        (MarkazorSiteSettings siteSettings, bool settingsFileExists) = GetSiteSettings();
         MarkazorSitePublicSettings sitePublicSettings = Normalize(siteSettings.Site);
         MarkazorGitHubSettings gitHubSettings = siteSettings.GitHub ?? new MarkazorGitHubSettings();
         MarkazorRepositorySettings repositorySettings = siteSettings.Repository ?? new MarkazorRepositorySettings();
         MarkazorThemeSettings themeSettings = siteSettings.Theme ?? new MarkazorThemeSettings();
-        string clientId = ReadOrDefault("GITHUB_APP_CLIENT_ID", gitHubSettings.ClientId);
-        string repositoryOwner = ReadOrDefault("MARKAZOR_REPO_OWNER", repositorySettings.Owner);
-        string repositoryName = ReadOrDefault("MARKAZOR_REPO_NAME", repositorySettings.Name);
-        string defaultBranch = ReadOrDefault("MARKAZOR_DEFAULT_BRANCH", repositorySettings.DefaultBranch);
+        string clientId = gitHubSettings.ClientId;
+        string repositoryOwner = repositorySettings.Owner;
+        string repositoryName = repositorySettings.Name;
+        string defaultBranch = repositorySettings.DefaultBranch;
         string[] missingSettings = [.. GetMissingSettings(clientId, repositoryOwner, repositoryName)];
 
         return new MarkazorSetupStatus(
@@ -29,12 +29,20 @@ public sealed class MarkazorSetupStatusService(
             new MarkazorGitHubSettings { ClientId = clientId, },
             new MarkazorRepositoryStatus(repositoryOwner, repositoryName, string.IsNullOrWhiteSpace(defaultBranch) ? "main" : defaultBranch),
             new MarkazorThemeSettings { Name = string.IsNullOrWhiteSpace(themeSettings.Name) ? "default" : themeSettings.Name, },
-            options.ExpectedStaticWebAppsBuildSettings);
+            options.ExpectedStaticWebAppsBuildSettings,
+            settingsFileExists);
     }
 
-    private MarkazorSiteSettings GetSiteSettings()
+    private (MarkazorSiteSettings Settings, bool SettingsFileExists) GetSiteSettings()
     {
-        return options.SiteSettings ?? MarkazorSiteSettingsLoader.Load(options.SiteSettingsFilePath);
+        if (options.SiteSettings is not null)
+        {
+            return (options.SiteSettings, true);
+        }
+
+        return (
+            MarkazorSiteSettingsLoader.Load(options.SiteSettingsFilePath),
+            MarkazorSiteSettingsLoader.Exists(options.SiteSettingsFilePath));
     }
 
     private static MarkazorSitePublicSettings Normalize(MarkazorSitePublicSettings? settings)
@@ -73,13 +81,6 @@ public sealed class MarkazorSetupStatusService(
         {
             yield return "repository.name";
         }
-    }
-
-    private string ReadOrDefault(string name, string defaultValue)
-    {
-        string? value = readEnvironment(name);
-
-        return string.IsNullOrWhiteSpace(value) ? defaultValue : value;
     }
 
 }

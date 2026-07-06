@@ -9,6 +9,11 @@ public static class MarkazorSiteSettingsLoader
 
     public const string PublishedFileName = "markazor.settings.json";
 
+    public static bool Exists(string? filePath = null)
+    {
+        return File.Exists(ResolvePath(filePath));
+    }
+
     public static MarkazorSiteSettings Load(string? filePath = null)
     {
         string resolvedPath = ResolvePath(filePath);

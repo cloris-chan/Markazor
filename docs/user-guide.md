@@ -57,7 +57,7 @@ Use these settings:
 After creating the app:
 
 1. Copy the GitHub App Client ID.
-2. Paste it into the browser-local Client ID field on `/setup`.
+2. Paste it into the temporary Client ID field on `/setup`.
 3. Generate a GitHub App Client secret.
 4. Add the secret to Azure Static Web Apps environment variables as `GITHUB_APP_CLIENT_SECRET`.
 5. Add `MARKAZOR_AUTH_COOKIE_SECRET` as a separate long random value when possible.

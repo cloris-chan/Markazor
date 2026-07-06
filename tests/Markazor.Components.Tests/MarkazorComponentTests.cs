@@ -1,13 +1,12 @@
 using Bunit;
+using Markazor.Client;
+using Markazor.Content;
 using Markazor.Core.Auth;
 using Markazor.Core.GitHub;
 using Markazor.Core.Setup;
-using Markazor.Client;
-using Markazor.Components;
-using Markazor.Content;
 using Markazor.Editing;
-using Markazor.Reading;
 using Markazor.Pwa;
+using Markazor.Reading;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Markazor.Components.Tests;
@@ -337,7 +336,7 @@ public sealed class MarkazorComponentTests
     }
 
     [Fact]
-    public void ManageSavesEditedPublicSettingsDraft()
+    public void ManageSavesEditedPublicSettings()
     {
         using BunitContext context = new();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -351,7 +350,12 @@ public sealed class MarkazorComponentTests
         IRenderedComponent<ManagePage> component = context.Render<ManagePage>();
 
         component.WaitForAssertion(() =>
-            Assert.Contains("Public Settings", component.Markup, StringComparison.Ordinal));
+        {
+            Assert.Contains("Public Settings", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("Not saved", component.Markup, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, GetInput(component, "Site Title").GetAttribute("value") ?? string.Empty);
+            Assert.Equal(string.Empty, GetInput(component, "Repository Owner").GetAttribute("value") ?? string.Empty);
+        });
 
         SetTextarea(component, "Site Base URLs", "https://site.example.test/\nhttps://www.example.test/");
         SetInput(component, "Site Title", "Edited Site");
@@ -746,10 +750,19 @@ public sealed class MarkazorComponentTests
         string value)
         where TComponent : Microsoft.AspNetCore.Components.IComponent
     {
-        component.FindAll("label")
+        GetInput(component, labelText).Input(value);
+    }
+
+    private static AngleSharp.Dom.IElement GetInput<TComponent>(
+        IRenderedComponent<TComponent> component,
+        string labelText)
+        where TComponent : Microsoft.AspNetCore.Components.IComponent
+    {
+        AngleSharp.Dom.IElement? input = component.FindAll("label")
             .Single(label => label.TextContent.Contains(labelText, StringComparison.Ordinal))
-            .QuerySelector("input")
-            ?.Input(value);
+            .QuerySelector("input");
+
+        return Assert.IsAssignableFrom<AngleSharp.Dom.IElement>(input);
     }
 
     private static void SetTextarea<TComponent>(
