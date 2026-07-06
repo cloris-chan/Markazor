@@ -1,4 +1,3 @@
-@page "/editor"
 @using Markazor.Core.GitHub
 @using Markazor.Core.Security
 @using Markazor.Core.Setup
@@ -19,15 +18,14 @@
 @inject Microsoft.JSInterop.IJSRuntime JavaScript
 @implements IAsyncDisposable
 
-<PageTitle>Editor</PageTitle>
 <NavigationLock ConfirmExternalNavigation="@IsDirty"
                 OnBeforeInternalNavigation="ConfirmNavigationAsync" />
 
-<main class="markazor-shell markazor-workbench-shell markazor-editor-shell">
+<div class="markazor-shell markazor-workbench-shell markazor-editor-shell">
     <header class="markazor-page-header markazor-workbench-header">
         <div>
             <p class="markazor-eyebrow">Author workspace</p>
-            <h1>Editor</h1>
+            <h1>Write</h1>
             <p>@StatusLine</p>
         </div>
         <div class="markazor-header-actions">
@@ -267,7 +265,7 @@
 
         </section>
     </section>
-</main>
+</div>
 
 @code {
     private const long MaxImageAssetBytes = 8L * 1024 * 1024;
@@ -1052,7 +1050,7 @@
 
     private void OpenSetup()
     {
-        Navigation.NavigateTo("/setup");
+        Navigation.NavigateTo("/studio/setup");
     }
 
     private static string DescribeSetupFailure(Exception exception)

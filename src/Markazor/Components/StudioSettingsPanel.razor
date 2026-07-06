@@ -1,4 +1,3 @@
-@page "/manage"
 @using Markazor.Core.Auth
 @using Markazor.Core.Setup
 @using Markazor.Client
@@ -11,13 +10,11 @@
 @inject IJSRuntime JavaScript
 @implements IAsyncDisposable
 
-<PageTitle>Manage</PageTitle>
-
-<main class="markazor-shell markazor-workbench-shell markazor-manage-shell">
+<div class="markazor-shell markazor-workbench-shell markazor-settings-shell">
     <header class="markazor-page-header markazor-workbench-header">
         <div>
-            <p class="markazor-eyebrow">Site operations</p>
-            <h1>Manage</h1>
+            <p class="markazor-eyebrow">Site settings</p>
+            <h1>Settings</h1>
             <p>Authenticated configuration and maintenance workspace.</p>
         </div>
         <div class="markazor-header-actions">
@@ -27,7 +24,7 @@
 
     @if (isLoading)
     {
-        <p class="markazor-muted">Loading management status...</p>
+        <p class="markazor-muted">Loading settings status...</p>
     }
     else if (!string.IsNullOrWhiteSpace(errorMessage))
     {
@@ -38,11 +35,11 @@
     {
         <section class="markazor-panel">
             <div class="markazor-section-header">
-                <h2>@ManagementGateTitle</h2>
-                <span class="markazor-status-pill is-waiting">@ManagementGateStatus</span>
+                <h2>@SettingsGateTitle</h2>
+                <span class="markazor-status-pill is-waiting">@SettingsGateStatus</span>
             </div>
 
-            <p class="markazor-muted">@ManagementGateDescription</p>
+            <p class="markazor-muted">@SettingsGateDescription</p>
 
             <div class="markazor-actions">
                 @if (NeedsSetupBeforeAuthorization)
@@ -81,7 +78,7 @@
             <div class="markazor-actions">
                 <button type="button" @onclick="RefreshAsync" disabled="@isBusy">Refresh</button>
                 <button type="button" @onclick="OpenSetup" disabled="@isBusy">Setup</button>
-                <button type="button" @onclick="OpenEditor" disabled="@(!CanOpenEditor)">Editor</button>
+                <button type="button" @onclick="OpenWrite" disabled="@(!CanOpenWrite)">Write</button>
             </div>
         </section>
 
@@ -248,7 +245,7 @@
             <p class="markazor-muted">Future media management can live here: inventory uploaded assets, find files that are not referenced by any post or note, and clean them through a scheduled workflow.</p>
         </section>
     }
-</main>
+</div>
 
 @code {
     private MarkazorSetupStatus? status;
@@ -299,11 +296,11 @@
         || (MarkazorSetupReadiness.IsPersistedGitHubClientIdMissing(status)
             && string.IsNullOrWhiteSpace(EffectiveClientId));
 
-    private string ManagementGateTitle => NeedsSetupBeforeAuthorization ? "Setup Required" : "GitHub Authorization";
+    private string SettingsGateTitle => NeedsSetupBeforeAuthorization ? "Setup Required" : "GitHub Authorization";
 
-    private string ManagementGateStatus => NeedsSetupBeforeAuthorization ? "Setup first" : "Required";
+    private string SettingsGateStatus => NeedsSetupBeforeAuthorization ? "Setup first" : "Required";
 
-    private string ManagementGateDescription => NeedsSetupBeforeAuthorization
+    private string SettingsGateDescription => NeedsSetupBeforeAuthorization
         ? "Open Setup to enter the GitHub App Client ID and configure the Static Web Apps secret before authorizing this browser."
         : "Authorize the GitHub App before opening repository settings, diagnostics, and maintenance tools.";
 
@@ -330,7 +327,7 @@
         {
             if (isBusy)
             {
-                return "Management is busy.";
+                return "Settings are busy.";
             }
 
             if (status is null)
@@ -353,7 +350,7 @@
         }
     }
 
-    private bool CanOpenEditor => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
+    private bool CanOpenWrite => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
         && IsWorkspaceVisible
         && diagnostics?.Ready == true
         && !isBusy;
@@ -371,7 +368,7 @@
         {
             if (isBusy)
             {
-                return "Management is busy.";
+                return "Settings are busy.";
             }
 
             if (status is null)
@@ -396,7 +393,7 @@
 
             if (settingsSaved)
             {
-                return "Settings are already saved for this management session.";
+                return "Settings are already saved for this Studio session.";
             }
 
             if (!string.IsNullOrWhiteSpace(siteIconError))
@@ -535,7 +532,7 @@
             IJSObjectReference? module = await EnsureSetupModuleAsync().ConfigureAwait(false);
             await MarkazorSetupStorage.SaveAuthorizationReturnPathAsync(
                 module,
-                "/manage?auth=github").ConfigureAwait(false);
+                "/studio/settings?auth=github").ConfigureAwait(false);
 
             MarkazorGitHubAuthorizationRequest request = new(
                 string.IsNullOrWhiteSpace(EffectiveClientId) ? null : EffectiveClientId,
@@ -677,12 +674,12 @@
 
     private void OpenSetup()
     {
-        Navigation.NavigateTo("/setup");
+        Navigation.NavigateTo("/studio/setup");
     }
 
-    private void OpenEditor()
+    private void OpenWrite()
     {
-        Navigation.NavigateTo("/editor");
+        Navigation.NavigateTo("/studio/write");
     }
 
     private static string ToInputValue(ChangeEventArgs args)

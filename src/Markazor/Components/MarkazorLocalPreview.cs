@@ -143,7 +143,7 @@ internal static class MarkazorLocalPreview
             string.Empty,
             "# Workbench Redesign",
             string.Empty,
-            "This preview lets the editor and management views render without a live GitHub session.",
+            "This preview lets the writing and settings views render without a live GitHub session.",
             string.Empty,
             "Use it to check spacing, metadata controls, markdown editing, preview typography, and action density before shipping the theme.");
     }
@@ -165,6 +165,6 @@ internal static class MarkazorLocalPreview
             string.Empty,
             "# Hello Workbench",
             string.Empty,
-            "The default theme should feel coherent across reading, setup, management, and editing.");
+            "The default theme should feel coherent across reading, setup, settings, and writing.");
     }
 }

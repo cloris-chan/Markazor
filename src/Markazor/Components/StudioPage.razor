@@ -1,0 +1,93 @@
+@page "/setup"
+@page "/studio"
+@page "/studio/setup"
+@page "/studio/settings"
+@page "/studio/write"
+@layout StudioLayout
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitle</PageTitle>
+
+<section class="markazor-studio-shell" aria-label="Markazor Studio">
+    <aside class="markazor-studio-sidebar">
+        <a class="markazor-studio-brand" href="/">
+            <span class="markazor-studio-mark" aria-hidden="true"></span>
+            <span>
+                <strong>Markazor Studio</strong>
+                <small>Site control room</small>
+            </span>
+        </a>
+
+        <nav class="markazor-studio-nav" aria-label="Studio navigation">
+            <a class="@NavClass(StudioSection.Setup)" href="/setup">
+                <span>Setup</span>
+                <small>GitHub App and authorization</small>
+            </a>
+            <a class="@NavClass(StudioSection.Settings)" href="/studio/settings">
+                <span>Settings</span>
+                <small>Repository and site profile</small>
+            </a>
+            <a class="@NavClass(StudioSection.Write)" href="/studio/write">
+                <span>Write</span>
+                <small>Posts, notes, and drafts</small>
+            </a>
+        </nav>
+
+        <a class="markazor-studio-site-link" href="/">View Site</a>
+    </aside>
+
+    <section class="markazor-studio-stage">
+        @switch (ActiveSection)
+        {
+            case StudioSection.Setup:
+                <StudioSetupPanel />
+                break;
+            case StudioSection.Write:
+                <StudioWriterPanel />
+                break;
+            default:
+                <StudioSettingsPanel />
+                break;
+        }
+    </section>
+</section>
+
+@code {
+    private StudioSection ActiveSection => ResolveSection(Navigation.ToBaseRelativePath(Navigation.Uri));
+
+    private string PageTitle => $"{SectionTitle} - Markazor Studio";
+
+    private string SectionTitle => ActiveSection switch
+    {
+        StudioSection.Setup => "Setup",
+        StudioSection.Write => "Write",
+        _ => "Settings",
+    };
+
+    private string NavClass(StudioSection section)
+    {
+        return section == ActiveSection ? "is-active" : string.Empty;
+    }
+
+    private static StudioSection ResolveSection(string relativePath)
+    {
+        string normalizedPath = relativePath.Split('?', 2)[0]
+            .Split('#', 2)[0]
+            .Trim('/')
+            .ToLowerInvariant();
+
+        return normalizedPath switch
+        {
+            "setup" or "studio/setup" => StudioSection.Setup,
+            "studio/write" => StudioSection.Write,
+            _ => StudioSection.Settings,
+        };
+    }
+
+    private enum StudioSection
+    {
+        Setup,
+        Settings,
+        Write,
+    }
+}

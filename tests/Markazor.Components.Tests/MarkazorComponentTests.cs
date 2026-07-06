@@ -222,14 +222,14 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: false, canPush: false)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
 
-        IRenderedComponent<SetupPage> component = context.Render<SetupPage>();
+        IRenderedComponent<StudioSetupPanel> component = context.Render<StudioSetupPanel>();
 
         component.WaitForAssertion(() =>
         {
             Assert.Contains("cannot push", component.Markup, StringComparison.Ordinal);
-            AngleSharp.Dom.IElement openEditor = component.FindAll("button")
-                .Single(button => button.TextContent.Contains("Open Editor", StringComparison.Ordinal));
-            Assert.True(openEditor.HasAttribute("disabled"));
+            AngleSharp.Dom.IElement openWrite = component.FindAll("button")
+                .Single(button => button.TextContent.Contains("Open Write", StringComparison.Ordinal));
+            Assert.True(openWrite.HasAttribute("disabled"));
         });
     }
 
@@ -243,7 +243,7 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: false, canPush: false)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
 
-        IRenderedComponent<SetupPage> component = context.Render<SetupPage>();
+        IRenderedComponent<StudioSetupPanel> component = context.Render<StudioSetupPanel>();
 
         component.WaitForAssertion(() =>
         {
@@ -263,13 +263,13 @@ public sealed class MarkazorComponentTests
             Assert.Contains("Required SWA secret", component.Markup, StringComparison.Ordinal);
             Assert.Contains("Recommended SWA secret", component.Markup, StringComparison.Ordinal);
             Assert.Contains("protects OAuth state and refresh cookies independently", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("Open Manage", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("Open Settings", component.Markup, StringComparison.Ordinal);
             Assert.DoesNotContain("Save Settings", component.Markup, StringComparison.Ordinal);
         });
     }
 
     [Fact]
-    public void ManageRoutesSignedOutSetupGapsBackToSetup()
+    public void SettingsRoutesSignedOutSetupGapsBackToSetup()
     {
         using BunitContext context = new();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -280,7 +280,7 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
 
-        IRenderedComponent<ManagePage> component = context.Render<ManagePage>();
+        IRenderedComponent<StudioSettingsPanel> component = context.Render<StudioSettingsPanel>();
 
         component.WaitForAssertion(() =>
         {
@@ -294,7 +294,7 @@ public sealed class MarkazorComponentTests
     }
 
     [Fact]
-    public void ManageShowsAuthorizationWhenSetupIsCompleteButSignedOut()
+    public void SettingsShowsAuthorizationWhenSetupIsCompleteButSignedOut()
     {
         using BunitContext context = new();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -303,7 +303,7 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
 
-        IRenderedComponent<ManagePage> component = context.Render<ManagePage>();
+        IRenderedComponent<StudioSettingsPanel> component = context.Render<StudioSettingsPanel>();
 
         component.WaitForAssertion(() =>
         {
@@ -316,7 +316,7 @@ public sealed class MarkazorComponentTests
     }
 
     [Fact]
-    public void ManageShowsApiTimeoutInsteadOfStayingLoading()
+    public void SettingsShowsApiTimeoutInsteadOfStayingLoading()
     {
         using BunitContext context = new();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -326,17 +326,17 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
 
-        IRenderedComponent<ManagePage> component = context.Render<ManagePage>();
+        IRenderedComponent<StudioSettingsPanel> component = context.Render<StudioSettingsPanel>();
 
         component.WaitForAssertion(() =>
         {
             Assert.Contains("The Markazor API did not respond before the request timed out.", component.Markup, StringComparison.Ordinal);
-            Assert.DoesNotContain("Loading management status", component.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("Loading settings status", component.Markup, StringComparison.Ordinal);
         });
     }
 
     [Fact]
-    public void ManageSavesEditedPublicSettings()
+    public void SettingsSavesEditedPublicSettings()
     {
         using BunitContext context = new();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -347,7 +347,7 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(settingsSync);
 
-        IRenderedComponent<ManagePage> component = context.Render<ManagePage>();
+        IRenderedComponent<StudioSettingsPanel> component = context.Render<StudioSettingsPanel>();
 
         component.WaitForAssertion(() =>
         {
@@ -400,7 +400,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
         {
@@ -428,7 +428,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
             Assert.Contains("drafts/hello.md", component.Markup, StringComparison.Ordinal));
@@ -465,7 +465,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
         {
@@ -509,7 +509,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
             Assert.Contains("No GitHub content files are available under the configured roots.", component.Markup, StringComparison.Ordinal));
@@ -544,7 +544,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
             Assert.Contains("No GitHub content files are available under the configured roots.", component.Markup, StringComparison.Ordinal));
@@ -581,7 +581,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
         component.WaitForAssertion(() =>
             Assert.Contains("No GitHub content files are available under the configured roots.", component.Markup, StringComparison.Ordinal));
 
@@ -634,7 +634,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
         {
@@ -681,7 +681,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
             Assert.Contains("drafts/hello.md", component.Markup, StringComparison.Ordinal));
@@ -720,7 +720,7 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
-        IRenderedComponent<EditorPage> component = context.Render<EditorPage>();
+        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
         {
@@ -778,7 +778,7 @@ public sealed class MarkazorComponentTests
     }
 
     private static AngleSharp.Dom.IElement GetMetadataInput(
-        IRenderedComponent<EditorPage> component,
+        IRenderedComponent<StudioWriterPanel> component,
         string labelText)
     {
         AngleSharp.Dom.IElement? input = component.Find(".markazor-metadata-toolbar")
@@ -790,7 +790,7 @@ public sealed class MarkazorComponentTests
     }
 
     private static AngleSharp.Dom.IElement GetMetadataKindInput(
-        IRenderedComponent<EditorPage> component,
+        IRenderedComponent<StudioWriterPanel> component,
         string kind)
     {
         AngleSharp.Dom.IElement? input = component.Find(".markazor-metadata-kind")

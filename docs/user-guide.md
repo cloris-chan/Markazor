@@ -18,7 +18,7 @@ In Visual Studio, choose **Markazor Site**, set the solution name, and keep **Cr
 
 If you created the site locally, push it to GitHub before creating the Azure Static Web App.
 
-The starter repository begins without `posts/`, `notes/`, `drafts/`, `assets/`, or `public/markazor.settings.json`. `/editor` creates content and asset paths when you write, and `/manage` creates the public settings file when you save settings.
+The starter repository begins without `posts/`, `notes/`, `drafts/`, `assets/`, or `public/markazor.settings.json`. Studio Write creates content and asset paths when you write, and Studio Settings creates the public settings file when you save settings.
 
 ## 2. Create Azure Static Web Apps
 
@@ -80,7 +80,7 @@ If `MARKAZOR_AUTH_COOKIE_SECRET` is omitted, the Functions API falls back to `GI
 
 ## 4. Save Public Settings
 
-After authorization, open `/manage`.
+After authorization, open `/studio/settings`.
 
 `public/markazor.settings.json` stores public, non-secret site settings:
 
@@ -90,7 +90,7 @@ After authorization, open `/manage`.
 - repository owner, name, and default branch;
 - theme selection.
 
-`/manage` can also upload a PNG site icon. The file is always saved to `assets/site-icon.png` and served from `/assets/site-icon.png`.
+Studio Settings can also upload a PNG site icon. The file is always saved to `assets/site-icon.png` and served from `/assets/site-icon.png`.
 
 Use **Save Settings** to commit settings back to the repository. If the current values already match the repository file, Markazor skips the commit.
 
@@ -98,7 +98,7 @@ Secrets must stay in Azure Static Web Apps environment variables and must not be
 
 ## 5. Verify Repository Access
 
-`/manage` runs repository diagnostics after authorization. The editor should be used only when these checks pass:
+Studio Settings runs repository diagnostics after authorization. Studio Write should be used only when these checks pass:
 
 - repository exists and is accessible;
 - read permission works;
@@ -110,9 +110,9 @@ If diagnostics fail, check the GitHub App installation target, repository permis
 
 ## 6. Write Content
 
-Open `/editor` after setup and diagnostics pass.
+Open `/studio/write` after setup and diagnostics pass.
 
-The editor uses the live GitHub repository tree as the content source. This means new drafts, deleted files, and published files appear immediately in the editor even before the next Azure Static Web Apps deployment updates the public reader.
+Studio Write uses the live GitHub repository tree as the content source. This means new drafts, deleted files, and published files appear immediately in the writing workspace even before the next Azure Static Web Apps deployment updates the public reader.
 
 Supported operations:
 
@@ -124,11 +124,11 @@ Supported operations:
 - upload PNG or other Markdown-referenced assets;
 - publish one or more drafts in an atomic commit.
 
-Saving or publishing from the editor creates Git commits in the site repository. A successful commit does not instantly update the public reader: the Azure Static Web Apps deployment workflow must rebuild and publish the site.
+Saving or publishing from Studio Write creates Git commits in the site repository. A successful commit does not instantly update the public reader: the Azure Static Web Apps deployment workflow must rebuild and publish the site.
 
 Until that deployment completes:
 
-- `/editor` shows the live GitHub state;
+- `/studio/write` shows the live GitHub state;
 - the public reader shows the last deployed build-time index.
 
 ## 7. Content Layout
@@ -206,15 +206,15 @@ Check:
 - the Client ID pasted into `/setup` belongs to the same GitHub App;
 - the GitHub App is installed on the site repository.
 
-### `/editor` Cannot Save
+### Studio Write Cannot Save
 
 Check:
 
-- `/manage` repository diagnostics pass;
+- `/studio/settings` repository diagnostics pass;
 - the GitHub App has Contents read/write permission;
 - the file path is under `posts/`, `notes/`, `drafts/`, `assets/`, or `public/`;
 - the target branch still exists.
 
 ### Public Reader Still Shows Old Content
 
-Check the Azure Static Web Apps workflow run. The editor sees GitHub immediately; the public reader updates after deployment.
+Check the Azure Static Web Apps workflow run. Studio Write sees GitHub immediately; the public reader updates after deployment.

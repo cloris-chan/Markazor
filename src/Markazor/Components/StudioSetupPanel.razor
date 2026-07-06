@@ -1,4 +1,3 @@
-@page "/setup"
 @using Markazor.Client
 @using Markazor.Core.Auth
 @using Markazor.Core.Setup
@@ -8,9 +7,7 @@
 @inject IJSRuntime JavaScript
 @implements IAsyncDisposable
 
-<PageTitle>Setup</PageTitle>
-
-<main class="markazor-shell">
+<div class="markazor-shell">
     <header class="markazor-page-header">
         <div>
             <h1>Setup</h1>
@@ -56,7 +53,7 @@
                 <dt>Recommended SWA secret</dt>
                 <dd><code>MARKAZOR_AUTH_COOKIE_SECRET</code> protects OAuth state and refresh cookies independently. If it is omitted, Markazor falls back to <code>GITHUB_APP_CLIENT_SECRET</code>.</dd>
                 <dt>Public settings</dt>
-                <dd>After authorization, use <code>/manage</code> to save <code>markazor.settings.json</code> and maintain deployment settings.</dd>
+                <dd>After authorization, use Studio settings to save <code>markazor.settings.json</code> and maintain deployment settings.</dd>
             </dl>
         </section>
 
@@ -113,7 +110,7 @@
                 <span class="markazor-status-pill @(HasEffectiveClientId ? "is-ready" : "is-waiting")">@ClientIdStatusText</span>
             </div>
 
-            <p class="markazor-muted">This value is used only for the next authorization request. Save the canonical Client ID later from <code>/manage</code>.</p>
+            <p class="markazor-muted">This value is used only for the next authorization request. Save the canonical Client ID later from Studio settings.</p>
 
             <label class="markazor-field">
                 <span>GitHub App Client ID</span>
@@ -143,8 +140,8 @@
             <div class="markazor-actions">
                 <button type="button" @onclick="AuthorizeAsync" disabled="@(!CanAuthorize)">Authorize GitHub</button>
                 <button type="button" @onclick="RefreshAuthAsync" disabled="@(!CanRefreshSession)">Refresh Session</button>
-                <button type="button" @onclick="OpenManage" disabled="@(!CanOpenManage)">Open Manage</button>
-                <button type="button" @onclick="OpenEditor" disabled="@(!CanOpenEditor)">Open Editor</button>
+                <button type="button" @onclick="OpenSettings" disabled="@(!CanOpenSettings)">Open Settings</button>
+                <button type="button" @onclick="OpenWrite" disabled="@(!CanOpenWrite)">Open Write</button>
             </div>
 
             @if (!string.IsNullOrWhiteSpace(AuthorizationDisabledReason))
@@ -234,7 +231,7 @@
             }
         </section>
     }
-</main>
+</div>
 
 @code {
     private MarkazorSetupStatus? status;
@@ -251,11 +248,11 @@
     private bool CanRefreshSession => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
         && !isBusy;
 
-    private bool CanOpenManage => MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
+    private bool CanOpenSettings => MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
         && Session.IsAuthenticated
         && !isBusy;
 
-    private bool CanOpenEditor => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
+    private bool CanOpenWrite => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
         && Session.IsAuthenticated
         && diagnostics?.Ready == true;
 
@@ -322,7 +319,7 @@
         ? "Markazor Site"
         : $"Markazor {status.Repository.Name}";
 
-    private string GitHubAppDescription => $"Repository-native Markazor editor for {ConfiguredRepositoryFullName}.";
+    private string GitHubAppDescription => $"Repository-native Markazor Studio for {ConfiguredRepositoryFullName}.";
 
     private string GitHubCallbackUrl => new Uri(new Uri(SiteBaseUrl), "setup/github-callback").ToString();
 
@@ -495,14 +492,14 @@
         return status?.Site.PrimaryBaseUrl?.ToString() ?? Navigation.BaseUri;
     }
 
-    private void OpenManage()
+    private void OpenSettings()
     {
-        Navigation.NavigateTo("/manage");
+        Navigation.NavigateTo("/studio/settings");
     }
 
-    private void OpenEditor()
+    private void OpenWrite()
     {
-        Navigation.NavigateTo("/editor");
+        Navigation.NavigateTo("/studio/write");
     }
 
     private static string Display(string? value)

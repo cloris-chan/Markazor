@@ -2,7 +2,7 @@
 
 **Markazor is a browser-first, self-owned Blazor WebAssembly site framework for posts, notes, and static publishing on GitHub and Azure Static Web Apps.**
 
-Markazor gives you a deployable Blazor WebAssembly reader, Azure Functions setup/auth API, `/setup`, `/manage`, and `/editor` pages, and build-time Markdown indexing through `Markazor.SourceGen`. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
+Markazor gives you a deployable Blazor WebAssembly reader, Azure Functions setup/auth API, a browser-based Studio for setup, settings, and writing, and build-time Markdown indexing through `Markazor.SourceGen`. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
 
 All durable state stays in accounts you control: source code, posts, notes, drafts, media, public settings, the GitHub App, and the deployment workflow live in your GitHub and Azure resources. Browser edits become ordinary Git commits; public content is indexed at build time, while `drafts/**` stays out of publish output and service worker assets.
 
@@ -40,7 +40,7 @@ Wait for the first deployment to complete.
 
 ### 3. Finish Setup in the Browser
 
-Open the deployed site and go to `/setup`. The page guides you through GitHub App creation, Client ID entry, Static Web Apps environment variables, GitHub authorization, and the final `/manage` settings save.
+Open the deployed site and go to `/setup`. The page guides you through GitHub App creation, Client ID entry, Static Web Apps environment variables, GitHub authorization, and the final Studio settings save.
 
 Required Static Web Apps environment variable:
 
@@ -68,8 +68,8 @@ flowchart LR
     N["dotnet new<br/>markazor-site"] --> R
     R --> A["Azure Static Web Apps<br/>first deployment<br/>src/*.Web + src/*.Functions"]
     A --> S["/setup<br/>GitHub App + SWA secret"]
-    S --> M["/manage<br/>save public settings"]
-    M --> E["/editor<br/>write content"]
+    S --> M["/studio/settings<br/>save public settings"]
+    M --> E["/studio/write<br/>write content"]
 ```
 
 The Static Web Apps secret step is intentionally explicit. Markazor does not ask for broad Azure permissions and does not mutate the Azure management plane from the site.
@@ -95,11 +95,11 @@ flowchart LR
 
 ### Daily Writing and Publishing
 
-The editor uses the live GitHub repository tree as its source of truth. Public pages use the last deployed build-time index, so a successful browser commit becomes visible after Azure Static Web Apps rebuilds and deploys the site.
+Studio Write uses the live GitHub repository tree as its source of truth. Public pages use the last deployed build-time index, so a successful browser commit becomes visible after Azure Static Web Apps rebuilds and deploys the site.
 
 ```mermaid
 sequenceDiagram
-    participant B as Browser /editor
+    participant B as Browser /studio/write
     participant GH as GitHub API
     participant R as User repo
     participant W as SWA workflow
@@ -135,7 +135,7 @@ The GitHub App Client ID is not a secret and can be stored in `public/markazor.s
 Generated sites use fixed repository-root folders:
 
 ```text
-src/{SiteName}.Web/        Blazor WebAssembly reader, setup, manage, and editor UI
+src/{SiteName}.Web/        Blazor WebAssembly reader and Studio UI
 src/{SiteName}.Functions/  Azure Functions API for setup status and GitHub OAuth
 posts/                     Public posts, created when content is written
 notes/                     Public notes, created when content is written
@@ -144,7 +144,7 @@ assets/                    Markdown-referenced media assets
 public/                    Public web root overlay and markazor.settings.json
 ```
 
-The starter template begins with the source skeleton only. Content roots, assets, and `public/markazor.settings.json` are created later by `/editor` and `/manage`, which keeps template updates away from user-owned content.
+The starter template begins with the source skeleton only. Content roots, assets, and `public/markazor.settings.json` are created later by Studio Write and Studio Settings, which keeps template updates away from user-owned content.
 
 Generated Web projects do not keep a source-controlled `wwwroot`. The final web root is built from `public/**`, repository assets, public Markdown, and Markazor package defaults during build.
 

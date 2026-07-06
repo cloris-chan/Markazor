@@ -10,19 +10,13 @@
   },
   "routes": [
     {
-      "route": "/editor*",
-      "headers": {
-        "Cache-Control": "no-store"
-      }
-    },
-    {
       "route": "/setup*",
       "headers": {
         "Cache-Control": "no-store"
       }
     },
     {
-      "route": "/manage*",
+      "route": "/studio*",
       "headers": {
         "Cache-Control": "no-store"
       }
