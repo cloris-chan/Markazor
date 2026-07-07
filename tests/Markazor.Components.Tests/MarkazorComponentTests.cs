@@ -222,7 +222,7 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: false, canPush: false)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
 
-        IRenderedComponent<StudioSetupPanel> component = context.Render<StudioSetupPanel>();
+        IRenderedComponent<SetupPage> component = context.Render<SetupPage>();
 
         component.WaitForAssertion(() =>
         {
@@ -243,7 +243,7 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: false, canPush: false)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
 
-        IRenderedComponent<StudioSetupPanel> component = context.Render<StudioSetupPanel>();
+        IRenderedComponent<SetupPage> component = context.Render<SetupPage>();
 
         component.WaitForAssertion(() =>
         {

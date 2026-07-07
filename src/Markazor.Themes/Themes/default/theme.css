@@ -216,8 +216,23 @@ a {
   padding: clamp(1.6rem, 3vw, 2.25rem) 0 4rem;
 }
 
+.markazor-setup-layout,
 .markazor-studio-layout {
   min-height: 100vh;
+}
+
+.markazor-setup-layout {
+  background:
+    radial-gradient(circle at 0 0, rgba(10, 168, 130, 0.15), transparent 26rem),
+    radial-gradient(circle at 100% 0, rgba(227, 82, 103, 0.1), transparent 26rem),
+    linear-gradient(180deg, #fbfbf8 0%, var(--page-2) 58%, var(--page) 100%);
+  color: var(--ink);
+  padding: clamp(1rem, 2.8vw, 2.5rem);
+}
+
+.markazor-setup-layout > .markazor-shell {
+  margin: 0 auto;
+  max-width: 86rem;
 }
 
 .markazor-studio-shell {
@@ -1496,7 +1511,7 @@ a {
   }
 
   .markazor-studio-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .markazor-studio-site-link {
@@ -1561,6 +1576,7 @@ a {
     justify-self: start;
   }
 
+  .markazor-setup-layout,
   .markazor-studio-sidebar,
   .markazor-studio-stage {
     padding: 1rem;

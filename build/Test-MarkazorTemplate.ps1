@@ -563,8 +563,12 @@ if (-not (Test-Path -LiteralPath $generatedThemeCss)) {
 
 $generatedStaticWebAppConfigPath = Join-Path $generatedWebRoot 'staticwebapp.config.json'
 $generatedStaticWebAppConfig = Get-Content -Raw -LiteralPath $generatedStaticWebAppConfigPath
-if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"route": "/manage*"')) {
-    throw 'Generated staticwebapp.config.json is missing the /manage no-store route.'
+if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"route": "/setup*"')) {
+    throw 'Generated staticwebapp.config.json is missing the /setup no-store route.'
+}
+
+if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"route": "/studio*"')) {
+    throw 'Generated staticwebapp.config.json is missing the /studio no-store route.'
 }
 
 if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"apiRuntime": "dotnet-isolated:9.0"')) {

@@ -1,6 +1,4 @@
-@page "/setup"
 @page "/studio"
-@page "/studio/setup"
 @page "/studio/settings"
 @page "/studio/write"
 @layout StudioLayout
@@ -19,10 +17,6 @@
         </a>
 
         <nav class="markazor-studio-nav" aria-label="Studio navigation">
-            <a class="@NavClass(StudioSection.Setup)" href="/setup">
-                <span>Setup</span>
-                <small>GitHub App and authorization</small>
-            </a>
             <a class="@NavClass(StudioSection.Settings)" href="/studio/settings">
                 <span>Settings</span>
                 <small>Repository and site profile</small>
@@ -39,9 +33,6 @@
     <section class="markazor-studio-stage">
         @switch (ActiveSection)
         {
-            case StudioSection.Setup:
-                <StudioSetupPanel />
-                break;
             case StudioSection.Write:
                 <StudioWriterPanel />
                 break;
@@ -59,7 +50,6 @@
 
     private string SectionTitle => ActiveSection switch
     {
-        StudioSection.Setup => "Setup",
         StudioSection.Write => "Write",
         _ => "Settings",
     };
@@ -78,7 +68,6 @@
 
         return normalizedPath switch
         {
-            "setup" or "studio/setup" => StudioSection.Setup,
             "studio/write" => StudioSection.Write,
             _ => StudioSection.Settings,
         };
@@ -86,7 +75,6 @@
 
     private enum StudioSection
     {
-        Setup,
         Settings,
         Write,
     }

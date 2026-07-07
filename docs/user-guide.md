@@ -40,7 +40,7 @@ Wait for Azure's generated deployment workflow to finish. `/setup` is available 
 
 Open the deployed site and go to `/setup`.
 
-The setup page shows the values to use when creating the GitHub App. The generated "Create App" link prefills safe defaults, but the app name and description are only suggestions.
+The setup page is an independent initialization surface, separate from Studio. It shows the values to use when creating the GitHub App. The generated "Create App" link prefills safe defaults, but the app name and description are only suggestions.
 
 Use these settings:
 
@@ -80,7 +80,7 @@ If `MARKAZOR_AUTH_COOKIE_SECRET` is omitted, the Functions API falls back to `GI
 
 ## 4. Save Public Settings
 
-After authorization, open `/studio/settings`.
+After authorization, open `/studio/settings`. Studio is the authenticated settings and writing workspace; setup remains a separate initialization page at `/setup`.
 
 `public/markazor.settings.json` stores public, non-secret site settings:
 

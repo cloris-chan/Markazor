@@ -24,10 +24,7 @@ public partial class App
         typeof(Markazor.Components.SetupPage))]
     [DynamicDependency(
         DynamicallyAccessedMemberTypes.All,
-        typeof(Markazor.Components.ManagePage))]
-    [DynamicDependency(
-        DynamicallyAccessedMemberTypes.All,
-        typeof(Markazor.Components.EditorPage))]
+        typeof(Markazor.Components.StudioPage))]
     [DynamicDependency(
         DynamicallyAccessedMemberTypes.All,
         typeof(Markazor.Components.GitHubCallbackPage))]

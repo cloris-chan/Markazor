@@ -2,7 +2,7 @@
 
 **Markazor is a browser-first, self-owned Blazor WebAssembly site framework for posts, notes, and static publishing on GitHub and Azure Static Web Apps.**
 
-Markazor gives you a deployable Blazor WebAssembly reader, Azure Functions setup/auth API, a browser-based Studio for setup, settings, and writing, and build-time Markdown indexing through `Markazor.SourceGen`. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
+Markazor gives you a deployable Blazor WebAssembly reader, Azure Functions setup/auth API, an independent browser setup page, a browser-based Studio for settings and writing, and build-time Markdown indexing through `Markazor.SourceGen`. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
 
 All durable state stays in accounts you control: source code, posts, notes, drafts, media, public settings, the GitHub App, and the deployment workflow live in your GitHub and Azure resources. Browser edits become ordinary Git commits; public content is indexed at build time, while `drafts/**` stays out of publish output and service worker assets.
 
@@ -40,7 +40,7 @@ Wait for the first deployment to complete.
 
 ### 3. Finish Setup in the Browser
 
-Open the deployed site and go to `/setup`. The page guides you through GitHub App creation, Client ID entry, Static Web Apps environment variables, GitHub authorization, and the final Studio settings save.
+Open the deployed site and go to `/setup`. This independent setup page guides you through GitHub App creation, Client ID entry, Static Web Apps environment variables, and GitHub authorization. After authorization, continue in Studio Settings to save the public repository settings.
 
 Required Static Web Apps environment variable:
 
@@ -60,7 +60,7 @@ For the full walkthrough, see [User Guide](https://github.com/cloris-chan/Markaz
 
 ### Site Creation and First Setup
 
-Both creation paths produce a user-owned site repository. Azure deploys that repository first, then the deployed site guides GitHub App authorization and public settings.
+Both creation paths produce a user-owned site repository. Azure deploys that repository first, then the independent setup page guides GitHub App authorization before Studio handles public settings and writing.
 
 ```mermaid
 flowchart LR
