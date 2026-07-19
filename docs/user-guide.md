@@ -189,7 +189,9 @@ For package-only upgrades, update the `Markazor` version in the generated reposi
 
 For template structure changes, compare the target version of `cloris-chan/Markazor.Template` with your site repository and merge the relevant changes manually.
 
-Template repository tags are expected to align with package versions.
+Stable template releases update the template repository's `main` branch. Prerelease templates update the separate `preview` branch, which is rooted at the repository's initial commit and does not inherit a previous stable skeleton. The `main` branch therefore remains on the latest stable skeleton, and template repository tags align with their package versions.
+
+The versionless NuGet commands in this guide resolve stable packages. To test a prerelease, select its exact version explicitly, for example `Markazor.Templates::0.2.0-preview.1`.
 
 ## Troubleshooting
 

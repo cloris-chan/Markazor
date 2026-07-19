@@ -13,9 +13,7 @@ param(
 
     [string] $WorkDirectory = 'artifacts/template-sync',
 
-    [string] $ProjectName = 'MarkazorSite',
-
-    [string] $Branch = 'main'
+    [string] $ProjectName = 'MarkazorSite'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,6 +27,8 @@ $workPath = Join-Path $repoRoot $WorkDirectory
 $generatedPath = Join-Path $workPath 'generated'
 $clonePath = Join-Path $workPath 'repository'
 $nugetPackagesPath = Join-Path ([System.IO.Path]::GetTempPath()) ('markazor-template-sync-' + [guid]::NewGuid().ToString('N'))
+$versionWithoutBuildMetadata = $Version.Split('+', 2)[0]
+$targetBranch = if ($versionWithoutBuildMetadata.Contains('-')) { 'preview' } else { 'main' }
 
 function Get-AuthenticatedRepositoryUrl {
     param(
@@ -134,11 +134,29 @@ $repositoryUrl = "https://github.com/$Repository.git"
 $authenticatedRepositoryUrl = Get-AuthenticatedRepositoryUrl -Repository $Repository -Token $Token
 
 git clone `
-    --branch $Branch `
-    --single-branch `
     $authenticatedRepositoryUrl `
     $clonePath
 git -C $clonePath remote set-url origin $repositoryUrl
+
+$currentBranch = (git -C $clonePath branch --show-current).Trim()
+if (-not [string]::Equals($currentBranch, $targetBranch, [System.StringComparison]::Ordinal)) {
+    $remoteTargetBranch = @(git -C $clonePath branch --remotes --list "origin/$targetBranch")
+    if ($remoteTargetBranch.Count -gt 0) {
+        git -C $clonePath switch --create $targetBranch --track "origin/$targetBranch"
+    }
+    elseif ([string]::Equals($targetBranch, 'preview', [System.StringComparison]::Ordinal)) {
+        $initialCommits = @(git -C $clonePath rev-list --max-parents=0 origin/main)
+        if ($initialCommits.Count -ne 1) {
+            throw "Template repository main branch must have exactly one initial commit; found $($initialCommits.Count)."
+        }
+
+        git -C $clonePath switch --detach $initialCommits[0]
+        git -C $clonePath switch --create $targetBranch
+    }
+    else {
+        throw "Template repository is missing required branch '$targetBranch'."
+    }
+}
 
 function Push-Authenticated {
     param(
@@ -191,7 +209,7 @@ if ($protectedChanges.Count -gt 0) {
 $changes = @(git -C $clonePath diff --cached --name-only)
 if ($changes.Count -gt 0) {
     git -C $clonePath commit -m "Release Markazor $Version"
-    Push-Authenticated -GitArguments @('push', 'origin', "HEAD:$Branch")
+    Push-Authenticated -GitArguments @('push', 'origin', "HEAD:$targetBranch")
 }
 else {
     Write-Output 'Template repository already matches the generated skeleton.'
@@ -200,4 +218,5 @@ else {
 git -C $clonePath tag -f "v$Version"
 Push-Authenticated -GitArguments @('push', '--force', 'origin', "v$Version")
 
+Write-Output "Template branch: $targetBranch"
 Write-Output $clonePath
