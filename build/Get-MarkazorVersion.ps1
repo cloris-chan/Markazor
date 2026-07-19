@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Get-VersionPrefix {
+function Get-RepositoryVersion {
     $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')
     [xml] $directoryBuildProps = Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props')
     $versionPrefix = $directoryBuildProps.Project.PropertyGroup.VersionPrefix |
@@ -15,7 +15,15 @@ function Get-VersionPrefix {
         throw 'Directory.Build.props does not define VersionPrefix.'
     }
 
-    return $versionPrefix.Trim()
+    $versionSuffix = $directoryBuildProps.Project.PropertyGroup.VersionSuffix |
+        Select-Object -First 1
+
+    $resolvedVersion = $versionPrefix.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($versionSuffix)) {
+        $resolvedVersion += "-$($versionSuffix.Trim())"
+    }
+
+    return $resolvedVersion
 }
 
 if (-not [string]::IsNullOrWhiteSpace($Version)) {
@@ -25,7 +33,7 @@ elseif (-not [string]::IsNullOrWhiteSpace($RefName) -and $RefName.StartsWith('v'
     $resolvedVersion = $RefName.Substring(1)
 }
 else {
-    $resolvedVersion = Get-VersionPrefix
+    $resolvedVersion = Get-RepositoryVersion
 }
 
 if ($resolvedVersion.StartsWith('v', [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -33,7 +41,7 @@ if ($resolvedVersion.StartsWith('v', [System.StringComparison]::OrdinalIgnoreCas
 }
 
 if ($resolvedVersion -notmatch '^\d+\.\d+\.\d+([-.+][0-9A-Za-z.-]+)?$') {
-    throw "Invalid Markazor version '$resolvedVersion'. Expected a SemVer-like value such as 0.1.0."
+    throw "Invalid Markazor version '$resolvedVersion'. Expected a SemVer-like value such as 0.2.0-preview.1."
 }
 
 Write-Output $resolvedVersion

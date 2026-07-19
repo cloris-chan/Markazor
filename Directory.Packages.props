@@ -6,11 +6,11 @@
 
   <ItemGroup>
     <PackageVersion Include="bunit" Version="2.7.2" />
-    <PackageVersion Include="HtmlSanitizer" Version="9.0.892" />
-    <PackageVersion Include="Markazor" Version="0.1.0" />
-    <PackageVersion Include="Markazor.Api" Version="0.1.0" />
-    <PackageVersion Include="Markazor.Core" Version="0.1.0" />
-    <PackageVersion Include="Markazor.Themes" Version="0.1.0" />
+    <PackageVersion Include="HtmlSanitizer" Version="9.1.949-beta" />
+    <PackageVersion Include="Markazor" Version="0.2.0-preview.1" />
+    <PackageVersion Include="Markazor.Api" Version="0.2.0-preview.1" />
+    <PackageVersion Include="Markazor.Core" Version="0.2.0-preview.1" />
+    <PackageVersion Include="Markazor.Themes" Version="0.2.0-preview.1" />
     <PackageVersion Include="Markdig" Version="1.2.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="9.0.16" Condition="'$(TargetFramework)' == 'net9.0'" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.8" Condition="'$(TargetFramework)' != 'net9.0'" />

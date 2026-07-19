@@ -20,7 +20,8 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.2.0</VersionPrefix>
+    <VersionSuffix>preview.1</VersionSuffix>
     <Authors>Markazor contributors</Authors>
     <Company>Markazor</Company>
     <PackageProjectUrl>https://github.com/cloris-chan/Markazor</PackageProjectUrl>
