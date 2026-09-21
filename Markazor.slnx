@@ -7,6 +7,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Markazor.Api/Markazor.Api.csproj" />
+    <Project Path="src/Markazor.Build/Markazor.Build.csproj" />
     <Project Path="src/Markazor.Core/Markazor.Core.csproj" />
     <Project Path="src/Markazor.SourceGen/Markazor.SourceGen.csproj" />
     <Project Path="src/Markazor.Templates/Markazor.Templates.csproj" />
@@ -14,6 +15,7 @@
     <Project Path="src/Markazor/Markazor.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Markazor.Build.Tests/Markazor.Build.Tests.csproj" />
     <Project Path="tests/Markazor.Api.Tests/Markazor.Api.Tests.csproj" />
     <Project Path="tests/Markazor.Components.Tests/Markazor.Components.Tests.csproj" />
     <Project Path="tests/Markazor.Core.Tests/Markazor.Core.Tests.csproj" />

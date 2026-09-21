@@ -1,6 +1,4 @@
 using System.Globalization;
-using Ganss.Xss;
-using Markdig;
 
 namespace Markazor.Content;
 
@@ -25,10 +23,6 @@ public static class MarkdownContent
         "tags",
         "title",
     };
-
-    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-
-    private static readonly HtmlSanitizer Sanitizer = new();
 
     public static MarkdownDocument SplitDocument(string relativePath, string markdown)
     {
@@ -89,14 +83,12 @@ public static class MarkdownContent
         return split.HasFrontMatter ? split.Body.Trim() : markdown.Trim();
     }
 
-    public static string ToSafeHtml(string markdown)
+    public static MarkdownRenderResult Render(string markdown, string? articleTitle = null)
     {
         ArgumentNullException.ThrowIfNull(markdown);
 
         string body = StripFrontMatter(markdown);
-        string html = Markdown.ToHtml(body, Pipeline);
-
-        return Sanitizer.Sanitize(html);
+        return MarkdownDocumentRenderer.Render(body, articleTitle ?? Get(ParseFrontMatter(markdown), "title"));
     }
 
     public static string MarkAsPublished(string markdown)
@@ -375,7 +367,7 @@ public static class MarkdownContent
             ? NotesSegment
             : PostsSegment;
 
-        return string.Concat(SitePathSeparatorText, CombineSitePath(routeRoot, slug));
+        return string.Concat(SitePathSeparatorText, CombineSitePath(routeRoot, Uri.EscapeDataString(slug)));
     }
 
     private static string NormalizeSitePath(string path)

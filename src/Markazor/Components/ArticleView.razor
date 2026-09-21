@@ -2,15 +2,15 @@
 
 <article class="markazor-reader-article">
     <header>
-        <a class="markazor-back-link" href="@BackLinkHref">@BackLinkText</a>
+        <a class="markazor-back-link" href="@BackLinkHref"><MarkazorIcon Kind="MarkazorIconKind.ArrowLeft" />@BackLinkText</a>
         <div class="markazor-reader-meta">
             <span class="markazor-reader-kind">@ArticleKindLabel</span>
             <time datetime="@Article.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">
-                @Article.PublishedAtUtc.ToString("MMMM d, yyyy", CultureInfo.InvariantCulture)
+                @Article.PublishedAtUtc.ToString("D", CultureInfo.InvariantCulture)
             </time>
             @if (!string.IsNullOrWhiteSpace(Article.Category))
             {
-                <a href="@TaxonomyLink("/categories", "category", Article.Category)">
+                <a href="@MarkazorReaderRoutes.Category(Article.Category)">
                     @Article.Category
                 </a>
             }
@@ -25,7 +25,7 @@
             <ul class="markazor-reader-tags" aria-label="Tags">
                 @foreach (string tag in Article.Tags)
                 {
-                    <li><a href="@TaxonomyLink("/tags", "tag", tag)">#@tag</a></li>
+                    <li><a href="@MarkazorReaderRoutes.Tag(tag)">#@tag</a></li>
                 }
             </ul>
         }
@@ -44,7 +44,7 @@
     }
     else
     {
-        <div class="markazor-markdown-body">@((MarkupString)Html)</div>
+        <div class="markazor-markdown-body"><MarkdownBody Content="Content" /></div>
     }
 
     <nav class="markazor-article-navigation" aria-label="Adjacent articles">
@@ -70,7 +70,7 @@
     public ArticleMeta Article { get; set; } = default!;
 
     [Parameter]
-    public string Html { get; set; } = string.Empty;
+    public MarkdownRenderResult Content { get; set; } = MarkdownRenderResult.Empty;
 
     [Parameter]
     public bool IsLoading { get; set; }
@@ -90,9 +90,4 @@
     private string ArticleKindLabel => string.Equals(Article.Kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
         ? "Note"
         : "Post";
-
-    private static string TaxonomyLink(string path, string parameter, string value)
-    {
-        return $"{path}?{parameter}={Uri.EscapeDataString(value)}";
-    }
 }

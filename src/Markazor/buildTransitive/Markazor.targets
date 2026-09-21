@@ -16,13 +16,14 @@
     <MarkazorSourceWebRoot>$([MSBuild]::EnsureTrailingSlash($([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', 'wwwroot'))))</MarkazorSourceWebRoot>
     <MarkazorGeneratedWebRoot Condition="'$(MarkazorGeneratedWebRoot)' == ''">$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', '$(Configuration)', '$(TargetFramework)', 'markazor', 'site'))))</MarkazorGeneratedWebRoot>
     <MarkazorGenerateWebRoot Condition="'$(MarkazorGenerateWebRoot)' == ''">$(MarkazorPublishShell)</MarkazorGenerateWebRoot>
-    <MarkazorCleanGeneratedWebRoot Condition="'$(MarkazorCleanGeneratedWebRoot)' == ''">true</MarkazorCleanGeneratedWebRoot>
     <MarkazorEffectiveServiceWorkerSource Condition="'$(MarkazorServiceWorkerSource)' == ''">$(MarkazorDefaultShellRoot)service-worker.js</MarkazorEffectiveServiceWorkerSource>
     <MarkazorEffectiveServiceWorkerSource Condition="'$(MarkazorServiceWorkerSource)' != ''">$(MarkazorServiceWorkerSource)</MarkazorEffectiveServiceWorkerSource>
     <MarkazorEffectivePublishedServiceWorkerSource Condition="'$(MarkazorPublishedServiceWorkerSource)' == ''">$(MarkazorDefaultShellRoot)service-worker.published.js</MarkazorEffectivePublishedServiceWorkerSource>
     <MarkazorEffectivePublishedServiceWorkerSource Condition="'$(MarkazorPublishedServiceWorkerSource)' != ''">$(MarkazorPublishedServiceWorkerSource)</MarkazorEffectivePublishedServiceWorkerSource>
     <MarkazorServiceWorkerIntermediateRoot Condition="'$(MarkazorServiceWorkerIntermediateRoot)' == ''">$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', '$(Configuration)', '$(TargetFramework)', 'markazor', 'service-worker'))))</MarkazorServiceWorkerIntermediateRoot>
     <_MarkazorMSBuildTasksAssembly>$([System.IO.Path]::Combine('$(MSBuildToolsPath)', 'Microsoft.Build.Tasks.Core.dll'))</_MarkazorMSBuildTasksAssembly>
+    <_MarkazorStaticBuilder>$(MSBuildThisFileDirectory)tools\Markazor.Build.dll</_MarkazorStaticBuilder>
+    <_MarkazorStaticBuilder Condition="!Exists('$(_MarkazorStaticBuilder)')">$(MSBuildThisFileDirectory)..\..\Markazor.Build\bin\$(Configuration)\net9.0\Markazor.Build.dll</_MarkazorStaticBuilder>
   </PropertyGroup>
 
   <UsingTask TaskName="MarkazorGenerateWebManifest"
@@ -181,8 +182,8 @@ manifest.AppendLine("  \"id\": \"/\",");
 manifest.AppendLine("  \"start_url\": \"/\",");
 manifest.AppendLine("  \"scope\": \"/\",");
 manifest.AppendLine("  \"display\": \"standalone\",");
-manifest.AppendLine("  \"background_color\": \"#f7f8f4\",");
-manifest.AppendLine("  \"theme_color\": \"#0aa882\",");
+manifest.AppendLine("  \"background_color\": \"#f4f1e9\",");
+manifest.AppendLine("  \"theme_color\": \"#2f4a56\",");
 manifest.AppendLine("  \"prefer_related_applications\": false,");
 manifest.AppendLine("  \"icons\": [");
 manifest.AppendLine("    {");
@@ -320,7 +321,7 @@ if (match.Success)
           DependsOnTargets="ValidateMarkazorSiteBuildInputs"
           Condition="'$(MarkazorGenerateWebRoot)' == 'true'">
     <RemoveDir Directories="$(MarkazorGeneratedWebRoot)"
-               Condition="'$(MarkazorCleanGeneratedWebRoot)' == 'true' and Exists('$(MarkazorGeneratedWebRoot)')" />
+               Condition="Exists('$(MarkazorGeneratedWebRoot)')" />
     <MakeDir Directories="$(MarkazorGeneratedWebRoot)" />
 
     <ItemGroup Condition="'$(MarkazorPublishPublic)' == 'true' and Exists('$(_MarkazorPublicRoot)')">
@@ -430,9 +431,19 @@ if (match.Success)
     </ItemGroup>
   </Target>
 
+  <Target Name="GenerateMarkazorStaticPages"
+          DependsOnTargets="PrepareMarkazorGeneratedWebRoot"
+          Condition="'$(MarkazorGenerateWebRoot)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(_MarkazorStaticBuilder)')"
+           Text="The Markazor static builder is missing. Source checkouts must build Markazor.Build before the site; installed Markazor packages include it." />
+    <Error Condition="'$(MarkazorPublishContent)' != 'true'"
+           Text="Static reader pages require MarkazorPublishContent=true." />
+    <Exec Command="dotnet &quot;$(_MarkazorStaticBuilder)&quot; &quot;$(_MarkazorContentRoot).&quot; &quot;$(MarkazorGeneratedWebRoot).&quot;" />
+  </Target>
+
   <Target Name="ResolveMarkazorGeneratedStaticWebAssets"
           BeforeTargets="ResolveProjectStaticWebAssets"
-          DependsOnTargets="PrepareMarkazorGeneratedWebRoot"
+          DependsOnTargets="GenerateMarkazorStaticPages"
           Condition="'$(MarkazorGenerateWebRoot)' == 'true'">
     <ItemGroup>
       <_MarkazorGeneratedStaticWebAssetSource Include="$(MarkazorGeneratedWebRoot)**\*"

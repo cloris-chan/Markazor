@@ -14,7 +14,7 @@ builder.Services.AddMarkazor(options =>
     options.Articles = SiteIndex.Articles;
     options.Site.Name = string.IsNullOrWhiteSpace(SiteIndex.Site.Name) ? "Markazor Minimal Site" : SiteIndex.Site.Name;
     options.Site.Description = string.IsNullOrWhiteSpace(SiteIndex.Site.Description) ? "Notes on building a small, repository-native publishing workflow." : SiteIndex.Site.Description;
-    options.Site.Language = "en";
+    options.Site.BaseUrl = SiteIndex.Site.BaseUrl;
 });
 
 await builder.Build().RunAsync().ConfigureAwait(false);

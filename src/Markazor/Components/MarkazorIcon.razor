@@ -1,0 +1,51 @@
+<svg class="markazor-icon @Class" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+    @switch (Kind)
+    {
+        case MarkazorIconKind.ArrowUpRight:
+            <path d="M6 18 18 6M6 6h12v12" />
+            break;
+        case MarkazorIconKind.ArrowDownLeft:
+            <path d="M18 6 6 18M6 6v12h12" />
+            break;
+        case MarkazorIconKind.ArrowUp:
+            <path d="M12 20V4m-6 6 6-6 6 6" />
+            break;
+        case MarkazorIconKind.ArrowDown:
+            <path d="M12 4v16m-6-6 6 6 6-6" />
+            break;
+        case MarkazorIconKind.ArrowLeft:
+            <path d="M20 12H4m6-6-6 6 6 6" />
+            break;
+        case MarkazorIconKind.Menu:
+            <path d="M4 7h16M4 12h10M4 17h16" />
+            break;
+        case MarkazorIconKind.Close:
+            <path d="m6 6 12 12M6 18 18 6" />
+            break;
+        case MarkazorIconKind.Write:
+            <path d="m14.5 4.5 5 5M5 14l11-11 5 5-11 11-6 1 1-6ZM4 23h16" />
+            break;
+        case MarkazorIconKind.Settings:
+            <path d="M4 6h7m4 0h5M4 12h2m4 0h10M4 18h10m4 0h2" />
+            <circle cx="13" cy="6" r="2" />
+            <circle cx="8" cy="12" r="2" />
+            <circle cx="16" cy="18" r="2" />
+            break;
+        case MarkazorIconKind.Book:
+            <path d="M12 6c-3-2-6-3-10-3v15c4 0 7 1 10 3 3-2 6-3 10-3V3c-4 0-7 1-10 3Zm0 0v15M6 4v6l2-1 2 2V5" />
+            break;
+        case MarkazorIconKind.Bookmark:
+            <path d="M6 3h12v18l-6-4-6 4V3ZM10 7h4" />
+            break;
+        default:
+            throw new ArgumentOutOfRangeException(nameof(Kind), Kind, "Unknown Markazor icon.");
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired]
+    public MarkazorIconKind Kind { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+}

@@ -8,7 +8,7 @@ public static class MarkazorThemes
 
     public static IReadOnlyList<MarkazorThemeDescriptor> All { get; } =
     [
-        new(DefaultThemeName, "Default", "The built-in Markazor visual theme."),
+        new(DefaultThemeName, "Fieldnotes", "An independent journal: warm paper, editorial typography, and muted Prussian blue."),
         new(NoneThemeName, "None", "Disable built-in theme output."),
     ];
 

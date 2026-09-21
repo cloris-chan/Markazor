@@ -13,9 +13,9 @@
 <div class="markazor-shell markazor-workbench-shell markazor-settings-shell">
     <header class="markazor-page-header markazor-workbench-header">
         <div>
-            <p class="markazor-eyebrow">Site settings</p>
+            <p class="markazor-eyebrow">02 / Make it yours</p>
             <h1>Settings</h1>
-            <p>Authenticated configuration and maintenance workspace.</p>
+            <p>A home for your words, with your name on the door.</p>
         </div>
         <div class="markazor-header-actions">
             <span class="markazor-status-pill @ReadyClass">@ReadyText</span>
@@ -68,7 +68,7 @@
 
             @if (Session.AccessTokenExpiresAtUtc is not null)
             {
-                <p class="markazor-muted">Access expires at @Session.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.CurrentCulture).</p>
+                <p class="markazor-muted">Access expires at @Session.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.InvariantCulture).</p>
             }
             else
             {

@@ -21,7 +21,7 @@ public sealed class MarkdownContentTests
     }
 
     [Fact]
-    public void ToSafeHtmlRendersMarkdownAndRemovesUnsafeHtml()
+    public void RenderProducesMarkdownAndRemovesUnsafeHtml()
     {
         const string Markdown = """
             ---
@@ -34,7 +34,7 @@ public sealed class MarkdownContentTests
             <a href="javascript:alert('xss')" onclick="alert('xss')">bad</a>
             """;
 
-        string html = MarkdownContent.ToSafeHtml(Markdown);
+        string html = MarkdownContent.Render(Markdown).Html;
 
         Assert.Contains("<strong>world</strong>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
@@ -185,6 +185,16 @@ public sealed class MarkdownContentTests
         Assert.False(article.IsDraft);
         Assert.Equal(RoutePath("notes", "runtime-note"), article.Route);
         Assert.Equal(MarkazorArticleKind.Note, article.Kind);
+    }
+
+    [Fact]
+    public void ParseArticleMetaEscapesReservedCharactersInContentPath()
+    {
+        ArticleMeta article = MarkdownContent.ParseArticleMeta(
+            ContentPath("posts", "C# notes%.md"),
+            "# Reserved filename");
+
+        Assert.Equal("/_markazor/content/posts/C%23%20notes%25.md", article.ContentPath);
     }
 
     [Fact]

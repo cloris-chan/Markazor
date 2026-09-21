@@ -13,6 +13,9 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
     <ProjectReference Include="..\..\..\..\src\Markazor\Markazor.csproj" />
     <ProjectReference Include="..\..\..\..\src\Markazor.Themes\Markazor.Themes.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Markazor.Build\Markazor.Build.csproj"
+                      ReferenceOutputAssembly="false" PrivateAssets="all"
+                      GlobalPropertiesToRemove="RuntimeIdentifier;RuntimeIdentifiers;SelfContained" />
     <ProjectReference Include="..\..\..\..\src\Markazor.SourceGen\Markazor.SourceGen.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"

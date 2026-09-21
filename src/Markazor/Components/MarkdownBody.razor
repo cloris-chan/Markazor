@@ -1,0 +1,25 @@
+<div class="markazor-reading-layout @(ShowContents && Content.Headings.Length >= 3 ? "has-contents" : null)">
+    @if (ShowContents && Content.Headings.Length >= 3)
+    {
+        <aside class="markazor-contents">
+            <details open>
+                <summary>On this page <span>@Content.Headings.Length</span></summary>
+                <nav aria-label="Article sections">
+                    @foreach (MarkdownHeading heading in Content.Headings)
+                    {
+                        <a class="@(heading.Level == 3 ? "is-subsection" : null)" href="@("#" + Uri.EscapeDataString(heading.Id))">@heading.Text</a>
+                    }
+                </nav>
+            </details>
+        </aside>
+    }
+    <div @key="Content.Html" class="markazor-prose">@((MarkupString)Content.Html)</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public MarkdownRenderResult Content { get; set; } = MarkdownRenderResult.Empty;
+
+    [Parameter]
+    public bool ShowContents { get; set; } = true;
+}

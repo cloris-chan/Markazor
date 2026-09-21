@@ -1,6 +1,8 @@
 <Project>
   <PropertyGroup>
     <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.SourceGen'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Build'">true</MarkazorDisableAotCompatibility>
+    <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Build.Tests'">true</MarkazorDisableAotCompatibility>
     <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Templates'">true</MarkazorDisableAotCompatibility>
     <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Themes'">true</MarkazorDisableAotCompatibility>
     <MarkazorDisableAotCompatibility Condition="'$(MSBuildProjectName)' == 'Markazor.Tests'">true</MarkazorDisableAotCompatibility>

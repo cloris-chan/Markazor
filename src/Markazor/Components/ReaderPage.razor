@@ -1,0 +1,180 @@
+@using System.Globalization
+@inject IMarkazorReaderService Reader
+@implements IDisposable
+
+<PageTitle>@PageTitle</PageTitle>
+<HeadContent><meta name="description" content="@Description" /></HeadContent>
+
+@if (Kind == MarkazorReaderPageKind.Home)
+{
+    <ReaderHome Page="PageNumber" />
+}
+else if (Kind is MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note)
+{
+    @if (article is null)
+    {
+        <section class="reader-empty-state">
+            <p class="reader-eyebrow">404</p>
+            <h1>@Title</h1>
+            <p>The article may have moved or is not published.</p>
+            <a href="@ArticleRoot">Return to all @(Kind == MarkazorReaderPageKind.Note ? "notes" : "posts")</a>
+        </section>
+    }
+    else
+    {
+        <ArticleView Article="article" Content="content" IsLoading="@(loadState == ArticleLoadState.Loading)" LoadFailed="@(loadState == ArticleLoadState.Failed)"
+                     Navigation="navigation" BackLinkHref="@ArticleRoot" BackLinkText="@(Kind == MarkazorReaderPageKind.Note ? "All notes" : "All posts")" />
+    }
+}
+else
+{
+    <section class="reader-page-heading">
+        <p class="reader-eyebrow">Browse</p>
+        <h1>@Title</h1>
+        @if (!string.IsNullOrEmpty(Value) && Kind is MarkazorReaderPageKind.Tags or MarkazorReaderPageKind.Categories)
+        {
+            <a href="@(Kind == MarkazorReaderPageKind.Tags ? "/tags" : "/categories")">View all @(Kind == MarkazorReaderPageKind.Tags ? "tags" : "categories")</a>
+        }
+        else
+        {
+            <p>@Description</p>
+        }
+    </section>
+
+    @if (Kind == MarkazorReaderPageKind.Archive)
+    {
+        <div class="reader-archive">
+            @foreach (MarkazorArchiveGroup group in Reader.GetArchive())
+            {
+                <section>
+                    <h2>@(new DateTime(group.Year, group.Month, 1).ToString("Y", CultureInfo.InvariantCulture))</h2>
+                    <ol>
+                        @foreach (ArticleMeta entry in group.Articles)
+                        {
+                            <li><time datetime="@entry.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">@entry.PublishedAtUtc.ToString("dd", CultureInfo.InvariantCulture)</time><a href="@entry.Route">@entry.Title</a></li>
+                        }
+                    </ol>
+                </section>
+            }
+        </div>
+    }
+    else if (string.IsNullOrEmpty(Value) && Kind is MarkazorReaderPageKind.Categories or MarkazorReaderPageKind.Tags)
+    {
+        <ul class="reader-taxonomy-list" aria-label="@Title">
+            @foreach (MarkazorTaxonomyItem item in Kind == MarkazorReaderPageKind.Tags ? Reader.GetTags() : Reader.GetCategories())
+            {
+                <li><a href="@(Kind == MarkazorReaderPageKind.Tags ? MarkazorReaderRoutes.Tag(item.Name) : MarkazorReaderRoutes.Category(item.Name))">@item.Name</a><span>@item.Count</span></li>
+            }
+        </ul>
+    }
+    else
+    {
+        <ArticleList Page="articlePage" AriaLabel="@Title" PageLinkFactory="CreatePageLink" />
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public MarkazorReaderPageKind Kind { get; set; }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public int PageNumber { get; set; } = 1;
+
+    private ArticleMeta? article;
+    private MarkdownRenderResult content = MarkdownRenderResult.Empty;
+    private MarkazorArticleNavigation navigation = new(null, null);
+    private MarkazorArticlePage articlePage = new([], 1, 10, 0, 1);
+    private CancellationTokenSource? loading;
+    private ArticleLoadState loadState;
+
+    private string ArticleRoot => Kind == MarkazorReaderPageKind.Note ? "/notes" : "/posts";
+
+    private string Title => Kind switch
+    {
+        MarkazorReaderPageKind.Home => Reader.Site.Name,
+        MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note => article?.Title ?? "Article not found",
+        MarkazorReaderPageKind.Tags => string.IsNullOrEmpty(Value) ? "Tags" : "#" + Value,
+        MarkazorReaderPageKind.Categories => string.IsNullOrEmpty(Value) ? "Categories" : Value,
+        _ => Kind.ToString(),
+    };
+
+    private string PageTitle => Kind == MarkazorReaderPageKind.Home ? Reader.Site.Name : $"{Title} | {Reader.Site.Name}";
+
+    private string Description => Kind switch
+    {
+        MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note => article?.Summary ?? string.Empty,
+        MarkazorReaderPageKind.Posts => "Long-form articles and release notes.",
+        MarkazorReaderPageKind.Notes => "Short updates, field notes, and working thoughts.",
+        MarkazorReaderPageKind.Archive => "Published articles grouped by month.",
+        _ => Reader.Site.Description,
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading?.Cancel();
+        loading?.Dispose();
+        loading = null;
+        if (Kind is MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note)
+        {
+            string articleKind = Kind == MarkazorReaderPageKind.Note ? MarkazorArticleKind.Note : MarkazorArticleKind.Post;
+            article = string.IsNullOrWhiteSpace(Value) ? null : Reader.FindArticle(Value, articleKind);
+            content = MarkdownRenderResult.Empty;
+            navigation = article is null ? new(null, null) : Reader.GetNavigation(article.Slug, articleKind);
+            if (article is null)
+            {
+                return;
+            }
+
+            CancellationTokenSource current = new();
+            loading = current;
+            loadState = ArticleLoadState.Loading;
+            try
+            {
+                MarkdownRenderResult result = await Reader.LoadContentAsync(article, current.Token);
+                if (!current.IsCancellationRequested)
+                {
+                    content = result;
+                    loadState = ArticleLoadState.Loaded;
+                }
+            }
+            catch (OperationCanceledException) when (current.IsCancellationRequested)
+            {
+            }
+            catch (HttpRequestException) when (!current.IsCancellationRequested)
+            {
+                loadState = ArticleLoadState.Failed;
+            }
+        }
+        else
+        {
+            articlePage = Kind switch
+            {
+                MarkazorReaderPageKind.Posts => Reader.GetPosts(PageNumber),
+                MarkazorReaderPageKind.Notes => Reader.GetNotes(PageNumber),
+                MarkazorReaderPageKind.Tags when !string.IsNullOrEmpty(Value) => Reader.GetTag(Value, PageNumber),
+                MarkazorReaderPageKind.Categories when !string.IsNullOrEmpty(Value) => Reader.GetCategory(Value, PageNumber),
+                _ => Reader.GetArticles(PageNumber),
+            };
+        }
+    }
+
+    private string CreatePageLink(int number) => MarkazorReaderRoutes.Page(Kind switch
+    {
+        MarkazorReaderPageKind.Posts => "/posts",
+        MarkazorReaderPageKind.Notes => "/notes",
+        MarkazorReaderPageKind.Tags => MarkazorReaderRoutes.Tag(Value!),
+        MarkazorReaderPageKind.Categories => MarkazorReaderRoutes.Category(Value!),
+        _ => "/",
+    }, number);
+
+    public void Dispose()
+    {
+        loading?.Cancel();
+        loading?.Dispose();
+    }
+
+    private enum ArticleLoadState { Loading, Loaded, Failed }
+}

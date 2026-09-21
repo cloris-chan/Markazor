@@ -10,7 +10,8 @@
     "@codemirror/language": "6.12.3",
     "@codemirror/search": "6.7.0",
     "@codemirror/state": "6.6.0",
-    "@codemirror/view": "6.43.0"
+    "@codemirror/view": "6.43.0",
+    "highlight.js": "11.11.1"
   },
   "devDependencies": {
     "esbuild": "0.28.0"

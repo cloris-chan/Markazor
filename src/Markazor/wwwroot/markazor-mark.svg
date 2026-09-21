@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Markazor — an open book, a personal mark</title>
+  <rect width="64" height="64" fill="#2f4a56" />
+  <path d="M16 19c6 0 10 2 14 6v24c-4-4-8-6-14-6V19Zm18 6c4-4 8-6 14-6v24c-6 0-10 2-14 6V25Z" fill="#f4f1e9" />
+  <path d="M21 19.6c1.8.4 3.5 1 5 1.8V33l-2.5-2-2.5 1V19.6Z" fill="#bc9274" />
+</svg>

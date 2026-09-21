@@ -31,5 +31,5 @@ public interface IMarkazorReaderService
 
     MarkazorArticleNavigation GetNavigation(string slug, string kind);
 
-    Task<string> LoadSafeHtmlAsync(ArticleMeta article, CancellationToken cancellationToken = default);
+    Task<MarkdownRenderResult> LoadContentAsync(ArticleMeta article, CancellationToken cancellationToken = default);
 }

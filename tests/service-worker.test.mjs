@@ -1,0 +1,125 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+import vm from 'node:vm';
+
+const source = await readFile(new URL('../src/Markazor/buildTransitive/defaults/wwwroot/service-worker.published.js', import.meta.url), 'utf8');
+
+function createWorker() {
+  const origin = 'https://journal.example';
+  const entries = new Map([
+    ['/index.html', 'Home'],
+    ['/posts/article/index.html', 'Article'],
+    ['/tags/c%23/index.html', 'C# collection'],
+    ['/_markazor/content/posts/C%23%20hello%25.md', '# Reserved filename'],
+    ['/_markazor/app.html', 'Studio shell'],
+    ['/404.html', 'Page not found'],
+    ['/site.css', 'body {}'],
+  ]);
+  const manifestAssets = [
+    '/index.html',
+    '/posts/article/index.html',
+    '/tags/c#/index.html',
+    '/_markazor/content/posts/C# hello%.md',
+    '/_markazor/app.html',
+    '/404.html',
+    '/site.css',
+    '/_markazor/content/drafts/private.md',
+  ];
+  const events = new Map();
+  const state = { network: [], installed: [], deleted: [], claimed: false, skipped: false };
+  const worker = {
+    origin,
+    assetsManifest: { version: 'current', assets: manifestAssets.map(url => ({ url })) },
+    markazorRoutes: { '/': '/index.html', '/posts/article': '/posts/article/index.html', '/tags/c%23': '/tags/c%23/index.html' },
+    importScripts() {},
+    addEventListener(name, listener) { events.set(name, listener); },
+    clients: { async claim() { state.claimed = true; } },
+    skipWaiting() { state.skipped = true; },
+  };
+  const context = vm.createContext({
+    self: worker,
+    URL,
+    Response,
+    Request: class extends Request {
+      constructor(input, options) { super(new URL(input, origin), options); }
+    },
+    console: { info() {} },
+    caches: {
+      async open() {
+        return {
+          async match(input) {
+            const path = new URL(typeof input === 'string' ? input : input.url, origin).pathname;
+            return entries.has(path) ? new Response(entries.get(path)) : undefined;
+          },
+          async addAll(requests) { state.installed = requests.map(request => request.url); },
+        };
+      },
+      async keys() { return ['offline-cache-current', 'offline-cache-old', 'unrelated-cache']; },
+      async delete(name) { state.deleted.push(name); return true; },
+    },
+    async fetch(input) {
+      const url = String(input.url || input);
+      state.network.push(url);
+      if (url.includes('/api/') || !url.startsWith(origin)) return new Response('Network response');
+      throw new TypeError('Offline');
+    },
+  });
+  vm.runInContext(source, context);
+  const request = (path, overrides = {}) => context.onFetch({ request: { url: new URL(path, origin).href, method: 'GET', mode: 'navigate', ...overrides } });
+  return { context, events, request, state };
+}
+
+test('offline navigation returns the requested article, including a trailing slash or query', async () => {
+  const { request, state } = createWorker();
+  assert.equal(await (await request('/posts/article/?view=reading')).text(), 'Article');
+  assert.equal(await (await request('/')).text(), 'Home');
+  assert.equal(await (await request('/tags/c%23')).text(), 'C# collection');
+  assert.equal(state.network.length, 0);
+});
+
+test('Studio navigation uses the application shell', async () => {
+  const { request } = createWorker();
+  assert.equal(await (await request('/studio/write?markazor-preview=1')).text(), 'Studio shell');
+});
+
+test('unknown offline routes return a real 404 response', async () => {
+  const { request } = createWorker();
+  const response = await request('/posts/missing');
+  assert.equal(response.status, 404);
+  assert.equal(await response.text(), 'Page not found');
+});
+
+test('public cached assets are served while missing assets return 503', async () => {
+  const { request } = createWorker();
+  assert.equal(await (await request('/site.css', { mode: 'cors' })).text(), 'body {}');
+  assert.equal((await request('/missing.png', { mode: 'cors' })).status, 503);
+});
+
+test('API, cross-origin and non-GET requests bypass the static cache', async () => {
+  const { request, state } = createWorker();
+  await request('/api/setup/status');
+  await request('https://other.example/resource');
+  await request('/api/auth/github/start', { method: 'POST' });
+  assert.equal(state.network.length, 3);
+});
+
+test('installation excludes drafts and activation only removes older owned caches', async () => {
+  const { context, state } = createWorker();
+  await context.onInstall({});
+  assert.ok(state.installed.some(url => url.endsWith('/posts/article/index.html')));
+  assert.ok(state.installed.some(url => url.endsWith('/tags/c%23/index.html')));
+  assert.ok(state.installed.some(url => url.endsWith('/_markazor/content/posts/C%23%20hello%25.md')));
+  assert.ok(state.installed.every(url => !url.includes('#')));
+  assert.ok(state.installed.every(url => !url.includes('/drafts/')));
+  await context.onActivate({});
+  assert.deepEqual(state.deleted, ['offline-cache-old']);
+  assert.equal(state.claimed, true);
+});
+
+test('waiting updates activate only after the explicit message', () => {
+  const { events, state } = createWorker();
+  assert.equal(state.skipped, false);
+  events.get('message')({ data: { type: 'SKIP_WAITING' } });
+  assert.equal(state.skipped, true);
+});

@@ -24,7 +24,7 @@
 <div class="markazor-shell markazor-workbench-shell markazor-editor-shell">
     <header class="markazor-page-header markazor-workbench-header">
         <div>
-            <p class="markazor-eyebrow">Author workspace</p>
+            <p class="markazor-eyebrow">01 / The writing desk</p>
             <h1>Write</h1>
             <p>@StatusLine</p>
         </div>
@@ -60,36 +60,39 @@
                 <span><strong>@PublishedCount</strong> public</span>
             </div>
 
-            <div class="markazor-new-draft">
-                <fieldset class="markazor-content-kind-picker">
-                    <legend>Type</legend>
+            <details class="markazor-disclosure">
+                <summary>Start a new draft</summary>
+                <div class="markazor-new-draft">
+                    <fieldset class="markazor-content-kind-picker">
+                        <legend>Type</legend>
+                        <label>
+                            <input type="radio"
+                                   name="new-draft-kind"
+                                   value="@MarkazorArticleKind.Post"
+                                   checked="@IsNewDraftKind(MarkazorArticleKind.Post)"
+                                   @onchange="args => ChangeNewDraftKind(args)" />
+                            <span>Post</span>
+                        </label>
+                        <label>
+                            <input type="radio"
+                                   name="new-draft-kind"
+                                   value="@MarkazorArticleKind.Note"
+                                   checked="@IsNewDraftKind(MarkazorArticleKind.Note)"
+                                   @onchange="args => ChangeNewDraftKind(args)" />
+                            <span>Note</span>
+                        </label>
+                    </fieldset>
                     <label>
-                        <input type="radio"
-                               name="new-draft-kind"
-                               value="@MarkazorArticleKind.Post"
-                               checked="@IsNewDraftKind(MarkazorArticleKind.Post)"
-                               @onchange="args => ChangeNewDraftKind(args)" />
-                        <span>Post</span>
+                        <span>Title</span>
+                        <input value="@newDraftTitle" @oninput="OnNewDraftTitleInput" />
                     </label>
                     <label>
-                        <input type="radio"
-                               name="new-draft-kind"
-                               value="@MarkazorArticleKind.Note"
-                               checked="@IsNewDraftKind(MarkazorArticleKind.Note)"
-                               @onchange="args => ChangeNewDraftKind(args)" />
-                        <span>Note</span>
+                        <span>Slug</span>
+                        <input value="@newDraftSlug" @oninput="OnNewDraftSlugInput" />
                     </label>
-                </fieldset>
-                <label>
-                    <span>Title</span>
-                    <input value="@newDraftTitle" @oninput="OnNewDraftTitleInput" />
-                </label>
-                <label>
-                    <span>Slug</span>
-                    <input value="@newDraftSlug" @oninput="OnNewDraftSlugInput" />
-                </label>
-                <button type="button" @onclick="CreateDraftAsync" disabled="@isBusy">New Draft</button>
-            </div>
+                    <button type="button" @onclick="CreateDraftAsync" disabled="@isBusy">New Draft</button>
+                </div>
+            </details>
 
             <div class="markazor-article-list">
                 @foreach (MarkazorContentEntry entry in EditorEntries)
@@ -148,71 +151,74 @@
                     </div>
                     <div class="markazor-actions markazor-document-actions">
                         <button type="button" @onclick="SaveAsync" disabled="@(!CanSave)">Save</button>
-                        <button type="button" @onclick="DeleteAsync" disabled="@(!CanDelete)">@DeleteText</button>
-                        <button type="button" @onclick="PublishAsync" disabled="@(!CanPublish)">Publish</button>
+                        <button class="markazor-action-danger" type="button" @onclick="DeleteAsync" disabled="@(!CanDelete)">@DeleteText</button>
+                        <button class="markazor-action-primary" type="button" @onclick="PublishAsync" disabled="@(!CanPublish)">Publish</button>
                     </div>
                 </div>
             </div>
 
-            <section class="markazor-metadata-toolbar" aria-label="Document metadata">
-                <div class="markazor-metadata-primary">
-                    <label class="markazor-field markazor-title-field">
-                        <span>Title</span>
-                        <input value="@metadata.Title" @oninput="OnMetadataTitleInput" disabled="@isBusy" />
-                    </label>
-                    <label class="markazor-field markazor-slug-field">
-                        <span>Slug</span>
-                        <input value="@metadata.Slug" @oninput="OnMetadataSlugInput" disabled="@isBusy" />
-                    </label>
-                    <fieldset class="markazor-content-kind-picker markazor-metadata-kind">
-                        <legend>Type</legend>
-                        <label>
-                            <input type="radio"
-                                   name="document-kind"
-                                   value="@MarkazorArticleKind.Post"
-                                   checked="@IsMetadataKind(MarkazorArticleKind.Post)"
-                                   @onchange="args => ChangeMetadataKind(args)"
-                                   disabled="@isBusy" />
-                            <span>Post</span>
+            <details class="markazor-disclosure markazor-document-details">
+                <summary>Document details <small>Title, URL &amp; publishing</small></summary>
+                <section class="markazor-metadata-toolbar" aria-label="Document metadata">
+                    <div class="markazor-metadata-primary">
+                        <label class="markazor-field markazor-title-field">
+                            <span>Title</span>
+                            <input value="@metadata.Title" @oninput="OnMetadataTitleInput" disabled="@isBusy" />
                         </label>
-                        <label>
-                            <input type="radio"
-                                   name="document-kind"
-                                   value="@MarkazorArticleKind.Note"
-                                   checked="@IsMetadataKind(MarkazorArticleKind.Note)"
-                                   @onchange="args => ChangeMetadataKind(args)"
-                                   disabled="@isBusy" />
-                            <span>Note</span>
+                        <label class="markazor-field markazor-slug-field">
+                            <span>Slug</span>
+                            <input value="@metadata.Slug" @oninput="OnMetadataSlugInput" disabled="@isBusy" />
                         </label>
-                    </fieldset>
-                </div>
-                <label class="markazor-field markazor-path-field">
-                    <span>Path</span>
-                    <input value="@documentPath" @oninput="OnDocumentPathInput" disabled="@(!isNewDocument || isBusy)" />
-                </label>
-                <div class="markazor-metadata-secondary">
-                    <label class="markazor-field markazor-date-field">
-                        <span>Published</span>
-                        <input type="datetime-local" @bind="metadata.PublishedAt" @bind:format="yyyy-MM-ddTHH:mm:ss" disabled="@isBusy" />
+                        <fieldset class="markazor-content-kind-picker markazor-metadata-kind">
+                            <legend>Type</legend>
+                            <label>
+                                <input type="radio"
+                                       name="document-kind"
+                                       value="@MarkazorArticleKind.Post"
+                                       checked="@IsMetadataKind(MarkazorArticleKind.Post)"
+                                       @onchange="args => ChangeMetadataKind(args)"
+                                       disabled="@isBusy" />
+                                <span>Post</span>
+                            </label>
+                            <label>
+                                <input type="radio"
+                                       name="document-kind"
+                                       value="@MarkazorArticleKind.Note"
+                                       checked="@IsMetadataKind(MarkazorArticleKind.Note)"
+                                       @onchange="args => ChangeMetadataKind(args)"
+                                       disabled="@isBusy" />
+                                <span>Note</span>
+                            </label>
+                        </fieldset>
+                    </div>
+                    <label class="markazor-field markazor-path-field">
+                        <span>Path</span>
+                        <input value="@documentPath" @oninput="OnDocumentPathInput" disabled="@(!isNewDocument || isBusy)" />
                     </label>
-                    <label class="markazor-field markazor-checkbox-field">
-                        <input type="checkbox" @bind="metadata.IsDraft" disabled="@isBusy" />
-                        <span>Draft</span>
+                    <div class="markazor-metadata-secondary">
+                        <label class="markazor-field markazor-date-field">
+                            <span>Published</span>
+                            <input type="datetime-local" @bind="metadata.PublishedAt" @bind:format="yyyy-MM-ddTHH:mm:ss" disabled="@isBusy" />
+                        </label>
+                        <label class="markazor-field markazor-checkbox-field">
+                            <input type="checkbox" @bind="metadata.IsDraft" disabled="@isBusy" />
+                            <span>Draft</span>
+                        </label>
+                        <label class="markazor-field markazor-category-field">
+                            <span>Category</span>
+                            <input @bind="metadata.Category" disabled="@isBusy" />
+                        </label>
+                        <label class="markazor-field markazor-tags-field">
+                            <span>Tags</span>
+                            <input @bind="metadata.Tags" placeholder="dotnet, blazor, notes" disabled="@isBusy" />
+                        </label>
+                    </div>
+                    <label class="markazor-field markazor-summary-field">
+                        <span>Summary</span>
+                        <textarea @bind="metadata.Summary" disabled="@isBusy"></textarea>
                     </label>
-                    <label class="markazor-field markazor-category-field">
-                        <span>Category</span>
-                        <input @bind="metadata.Category" disabled="@isBusy" />
-                    </label>
-                    <label class="markazor-field markazor-tags-field">
-                        <span>Tags</span>
-                        <input @bind="metadata.Tags" placeholder="dotnet, blazor, notes" disabled="@isBusy" />
-                    </label>
-                </div>
-                <label class="markazor-field markazor-summary-field">
-                    <span>Summary</span>
-                    <textarea @bind="metadata.Summary" disabled="@isBusy"></textarea>
-                </label>
-            </section>
+                </section>
+            </details>
 
             <div class="markazor-authoring-grid">
                 <section class="markazor-authoring-pane" aria-label="Markdown editor">
@@ -234,7 +240,7 @@
                     <div class="markazor-pane-header">
                         <h3>Preview</h3>
                     </div>
-                    <article class="markazor-preview-body">@((MarkupString)RenderPreviewHtml())</article>
+                    <article class="markazor-preview-body"><MarkdownBody Content="RenderPreview()" ShowContents="false" /></article>
                 </section>
             </div>
 
@@ -916,9 +922,20 @@
         bodyMarkdown += markdown;
     }
 
-    private string RenderPreviewHtml()
+    private string? renderedBody;
+    private string? renderedTitle;
+    private MarkdownRenderResult renderedPreview = MarkdownRenderResult.Empty;
+
+    private MarkdownRenderResult RenderPreview()
     {
-        string html = MarkdownRenderer.ToSafeHtml(bodyMarkdown);
+        if (!string.Equals(renderedBody, bodyMarkdown, StringComparison.Ordinal) || !string.Equals(renderedTitle, metadata.Title, StringComparison.Ordinal))
+        {
+            renderedPreview = MarkdownRenderer.Render(bodyMarkdown, metadata.Title);
+            renderedBody = bodyMarkdown;
+            renderedTitle = metadata.Title;
+        }
+
+        string html = renderedPreview.Html;
 
         foreach (PendingEditorAsset asset in GetReferencedPendingAssets())
         {
@@ -939,7 +956,7 @@
                 StringComparison.Ordinal);
         }
 
-        return html;
+        return ReferenceEquals(html, renderedPreview.Html) ? renderedPreview : renderedPreview with { Html = html };
     }
 
     private IReadOnlyList<PendingEditorAsset> GetReferencedPendingAssets()

@@ -28,7 +28,7 @@ public sealed class MarkazorSitePublicSettings
     public IReadOnlyList<Uri> BaseUrls { get; init; } = [];
 
     [JsonIgnore]
-    public Uri? PrimaryBaseUrl => BaseUrls.Count == 0 ? null : BaseUrls[0];
+    public Uri? PrimaryBaseUrl => BaseUrls is { Count: > 0 } ? BaseUrls[0] : null;
 
     public static string NormalizeName(string? value)
     {

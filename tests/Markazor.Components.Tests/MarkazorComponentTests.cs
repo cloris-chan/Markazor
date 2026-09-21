@@ -14,6 +14,89 @@ namespace Markazor.Components.Tests;
 public sealed class MarkazorComponentTests
 {
     [Fact]
+    public void ArticleListShowsAnAccessibleEmptyState()
+    {
+        using BunitContext context = new();
+        IRenderedComponent<ArticleList> component = context.Render<ArticleList>(parameters => parameters
+            .Add(static item => item.Page, new MarkazorArticlePage([], 1, 10, 0, 1))
+            .Add(static item => item.EmptyMessage, "No notes have been published."));
+
+        Assert.Contains("No notes have been published.", component.Find("[role='status']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(component.FindAll(".markazor-reader-card"));
+        Assert.Empty(component.FindAll(".markazor-pagination"));
+    }
+
+    [Fact]
+    public void ArticleListContinuesNumberingAcrossPages()
+    {
+        using BunitContext context = new();
+        IRenderedComponent<ArticleList> component = context.Render<ArticleList>(parameters => parameters
+            .Add(static item => item.Page, new MarkazorArticlePage([ReaderArticle("second", "Second", null, [])], 2, 1, 2, 2))
+            .Add(static item => item.PageLinkFactory, static number => MarkazorReaderRoutes.Page("/posts", number)));
+
+        Assert.Equal("02", component.Find(".markazor-reader-entry-number").TextContent);
+        Assert.Equal("true", component.Find(".markazor-reader-entry-number").GetAttribute("aria-hidden"));
+        Assert.Equal("/posts", component.Find(".markazor-pagination a[rel='prev']").GetAttribute("href"));
+        Assert.Empty(component.FindAll(".markazor-pagination a[rel='next']"));
+    }
+
+    [Fact]
+    public void ReaderHomeUsesConfiguredIdentityAndPublishedContent()
+    {
+        using BunitContext context = new();
+        using HttpClient httpClient = new();
+        Markazor.Configuration.MarkazorOptions options = new()
+        {
+            Articles =
+            [
+                ReaderArticle("first", "First post", null, []),
+                ReaderArticle("second", "Second post", null, []),
+                ReaderArticle("note", "A note", null, []) with { Kind = MarkazorArticleKind.Note, RelativePath = "notes/note.md", Route = "/notes/note" },
+                ReaderArticle("private", "Private draft", null, []) with { IsDraft = true },
+            ],
+        };
+        options.Site.Name = "A personal journal";
+        options.Site.Description = "Writing from my own corner.";
+        options.Site.PageSize = 1;
+        context.Services.AddSingleton<IMarkazorReaderService>(new MarkazorReaderService(httpClient, new FakeMarkdownRenderer(), options));
+
+        IRenderedComponent<ReaderHome> component = context.Render<ReaderHome>(parameters => parameters.Add(static item => item.Page, 2));
+
+        Assert.Contains(options.Site.Name, component.Find("h1").TextContent, StringComparison.Ordinal);
+        Assert.Equal(options.Site.Description, component.Find(".reader-intro-description").TextContent);
+        Assert.Equal("02", component.Find(".reader-colophon-index a[href='/posts'] small").TextContent);
+        Assert.Equal("01", component.Find(".reader-colophon-index a[href='/notes'] small").TextContent);
+        Assert.Single(component.FindAll(".markazor-reader-card"));
+        Assert.Equal("/posts/first", component.Find(".markazor-reader-card h2 a").GetAttribute("href"));
+        Assert.DoesNotContain("Private draft", component.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReaderMenuSupportsEscapeAndClosesAfterNavigation()
+    {
+        using BunitContext context = new();
+        using HttpClient httpClient = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IMarkazorReaderService>(new MarkazorReaderService(httpClient, new FakeMarkdownRenderer(), new Markazor.Configuration.MarkazorOptions()));
+        context.Services.AddSingleton<IMarkazorPwaUpdateService>(new FakePwaUpdateService());
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/posts");
+
+        IRenderedComponent<ReaderShell> component = context.Render<ReaderShell>(parameters => parameters.AddChildContent("<h1>Posts</h1>"));
+
+        Assert.Equal("page", component.Find("#reader-navigation a[href='/posts']").GetAttribute("aria-current"));
+        Assert.Equal("false", component.Find(".site-menu-toggle").GetAttribute("aria-expanded"));
+        component.Find(".site-menu-toggle").Click();
+        Assert.Equal("true", component.Find(".site-menu-toggle").GetAttribute("aria-expanded"));
+        component.Find(".site-header").KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Escape" });
+        Assert.Equal("false", component.Find(".site-menu-toggle").GetAttribute("aria-expanded"));
+        component.Find(".site-menu-toggle").Click();
+        component.Find("#reader-navigation a[href='/notes']").Click();
+        Assert.Equal("false", component.Find(".site-menu-toggle").GetAttribute("aria-expanded"));
+        Assert.Equal("#main-content", component.Find(".markazor-skip-link").GetAttribute("href"));
+        Assert.NotNull(component.Find("main#main-content"));
+    }
+
+    [Fact]
     public void ArticleListRendersMetadataTaxonomyAndPagination()
     {
         using BunitContext context = new();
@@ -26,13 +109,13 @@ public sealed class MarkazorComponentTests
 
         IRenderedComponent<ArticleList> component = context.Render<ArticleList>(parameters => parameters
             .Add(static item => item.Page, page)
-            .Add(static item => item.PageLinkFactory, static number => $"/?page={number}"));
+            .Add(static item => item.PageLinkFactory, static number => MarkazorReaderRoutes.Page("/", number)));
 
         Assert.Contains("href=\"/posts/hello\"", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("href=\"/categories?category=General\"", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("href=\"/tags?tag=intro\"", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("rel=\"prev\" href=\"/?page=1\"", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("rel=\"next\" href=\"/?page=3\"", component.Markup, StringComparison.Ordinal);
+        Assert.Contains("href=\"/categories/general\"", component.Markup, StringComparison.Ordinal);
+        Assert.Contains("href=\"/tags/intro\"", component.Markup, StringComparison.Ordinal);
+        Assert.Contains("rel=\"prev\" href=\"/\"", component.Markup, StringComparison.Ordinal);
+        Assert.Contains("rel=\"next\" href=\"/page/3\"", component.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -46,7 +129,7 @@ public sealed class MarkazorComponentTests
 
         IRenderedComponent<ArticleView> component = context.Render<ArticleView>(parameters => parameters
             .Add(static item => item.Article, article)
-            .Add(static item => item.Html, "<h2>Rendered body</h2>")
+            .Add(static item => item.Content, new MarkdownRenderResult("<h2>Rendered body</h2>", []))
             .Add(static item => item.Navigation, navigation));
 
         Assert.Contains("<h2>Rendered body</h2>", component.Markup, StringComparison.Ordinal);
@@ -63,7 +146,7 @@ public sealed class MarkazorComponentTests
 
         IRenderedComponent<ArticleView> component = context.Render<ArticleView>(parameters => parameters
             .Add(static item => item.Article, article)
-            .Add(static item => item.Html, "<p>Rendered body</p>")
+            .Add(static item => item.Content, new MarkdownRenderResult("<p>Rendered body</p>", []))
             .Add(static item => item.Navigation, navigation));
 
         Assert.DoesNotContain("markazor-article-navigation-previous", component.Markup, StringComparison.Ordinal);
@@ -154,7 +237,7 @@ public sealed class MarkazorComponentTests
             .Add(static editor => editor.ValueChanged, value => editedMarkdown = value));
 
         Assert.Contains("Markdown tools", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("Heading 1", component.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Heading 1", component.Markup, StringComparison.Ordinal);
         Assert.Contains("Code block", component.Markup, StringComparison.Ordinal);
         Assert.Contains("Table", component.Markup, StringComparison.Ordinal);
         Assert.Contains("Image", component.Markup, StringComparison.Ordinal);
@@ -1116,9 +1199,9 @@ public sealed class MarkazorComponentTests
 
     private sealed class FakeMarkdownRenderer : IMarkazorMarkdownRenderer
     {
-        public string ToSafeHtml(string markdown)
+        public MarkdownRenderResult Render(string markdown, string? articleTitle = null)
         {
-            return "<p>Preview</p>";
+            return new MarkdownRenderResult("<p>Preview</p>", []);
         }
     }
 

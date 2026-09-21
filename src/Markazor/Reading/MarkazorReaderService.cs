@@ -129,14 +129,14 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
                 NextArticle: index > 0 ? articles[index - 1] : null);
     }
 
-    public async Task<string> LoadSafeHtmlAsync(ArticleMeta article, CancellationToken cancellationToken = default)
+    public async Task<MarkdownRenderResult> LoadContentAsync(ArticleMeta article, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(article);
 
         ArticleMeta? publishedArticle = publishedArticles.FirstOrDefault(candidate => string.Equals(candidate.RelativePath, article.RelativePath, StringComparison.Ordinal)) ?? throw new InvalidOperationException("Only published articles can be loaded by the reader service.");
         string markdown = await httpClient.GetStringAsync(new Uri(publishedArticle.ContentPath, UriKind.Relative), cancellationToken).ConfigureAwait(false);
 
-        return markdownRenderer.ToSafeHtml(markdown);
+        return markdownRenderer.Render(markdown, article.Title);
     }
 
     private MarkazorArticlePage CreatePage(IEnumerable<ArticleMeta> source, int requestedPage)

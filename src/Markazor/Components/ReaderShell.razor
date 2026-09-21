@@ -1,0 +1,69 @@
+@inject IMarkazorReaderService Reader
+
+<MarkazorHead />
+<a class="markazor-skip-link" href="#main-content">Skip to content</a>
+
+<div class="site-shell" id="top">
+    <header class="site-header @(isMenuOpen ? "is-menu-open" : null)" @onkeydown="HandleMenuKeyDownAsync">
+        <a class="site-brand" href="/">
+            <img class="site-brand-icon" src="/assets/site-icon.png" alt="" width="32" height="32" />
+            <span>@Reader.Site.Name</span>
+        </a>
+        <button class="site-menu-toggle" type="button" aria-controls="reader-navigation" aria-expanded="@(isMenuOpen ? "true" : "false")" @onclick="ToggleMenu" @ref="menuButton">
+            @(isMenuOpen ? "Close" : "Menu") <MarkazorIcon Kind="@(isMenuOpen ? MarkazorIconKind.Close : MarkazorIconKind.Menu)" />
+        </button>
+        <nav id="reader-navigation" aria-label="Primary navigation" @onclick="CloseMenu">
+            <NavLink href="/" Match="NavLinkMatch.All">Home</NavLink>
+            <NavLink href="/posts">Posts</NavLink>
+            <NavLink href="/notes">Notes</NavLink>
+            <NavLink href="/categories">Categories</NavLink>
+            <NavLink href="/tags">Tags</NavLink>
+            <NavLink href="/archive">Archive</NavLink>
+            <a class="site-studio-link" href="/studio">Studio <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
+        </nav>
+    </header>
+
+    <div class="site-edition" aria-hidden="true">
+        <span>A personal publication</span>
+        <span>Independent words. Open web.</span>
+    </div>
+
+    <main id="main-content" tabindex="-1">
+        @ChildContent
+    </main>
+
+    <footer class="site-footer">
+        <div>
+            <a class="site-footer-title" href="/">@Reader.Site.Name<span aria-hidden="true">.</span></a>
+            <p>A small corner of the open web.</p>
+        </div>
+        <nav aria-label="Footer navigation">
+            <a href="/archive">The archive <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
+            <a href="#top">Back to top <MarkazorIcon Kind="MarkazorIconKind.ArrowUp" /></a>
+        </nav>
+        <span class="site-footer-credit">Published with Markazor</span>
+    </footer>
+</div>
+
+<PwaUpdatePrompt />
+
+@code {
+    [Parameter, EditorRequired]
+    public RenderFragment ChildContent { get; set; } = default!;
+
+    private bool isMenuOpen;
+    private ElementReference menuButton;
+
+    private void ToggleMenu() => isMenuOpen = !isMenuOpen;
+
+    private void CloseMenu() => isMenuOpen = false;
+
+    private async Task HandleMenuKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && isMenuOpen)
+        {
+            CloseMenu();
+            await menuButton.FocusAsync();
+        }
+    }
+}

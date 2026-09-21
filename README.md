@@ -2,7 +2,7 @@
 
 **Markazor is a browser-first, self-owned Blazor WebAssembly site framework for posts, notes, and static publishing on GitHub and Azure Static Web Apps.**
 
-Markazor gives you a deployable Blazor WebAssembly reader, Azure Functions setup/auth API, an independent browser setup page, a browser-based Studio for settings and writing, and build-time Markdown indexing through `Markazor.SourceGen`. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
+Markazor generates complete public HTML at build time, with a Blazor WebAssembly Studio for settings and writing, an independent browser setup page, and an Azure Functions setup/auth API. `Markazor.SourceGen` indexes public Markdown; the packaged static builder renders the shared reader components with article content and search/share metadata. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
 
 All durable state stays in accounts you control: source code, posts, notes, drafts, media, public settings, the GitHub App, and the deployment workflow live in your GitHub and Azure resources. Browser edits become ordinary Git commits; public content is indexed at build time, while `drafts/**` stays out of publish output and service worker assets.
 
@@ -91,7 +91,7 @@ flowchart LR
     G --> O["Azure SWA output<br/>wwwroot"]
 ```
 
-`public/**` is copied first, then Markazor fills missing shell files from package defaults. Repository assets are published under `/assets/**`, public Markdown is staged under `/_markazor/content/**`, and drafts are excluded from both publish output and service worker assets.
+`public/**` is copied first, then Markazor fills missing shell files from package defaults. Repository assets are published under `/assets/**`, public Markdown is staged under `/_markazor/content/**`, and drafts are excluded from both publish output and service worker assets. Public routes receive physical `index.html` files containing the full reader page. Studio and Setup retain the application shell.
 
 ### Daily Writing and Publishing
 

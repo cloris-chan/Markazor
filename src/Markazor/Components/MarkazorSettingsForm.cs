@@ -71,7 +71,7 @@ internal sealed record MarkazorSettingsForm(
         string? invalidBaseUrl = FindInvalidBaseUrl(SiteBaseUrls);
         if (invalidBaseUrl is not null)
         {
-            return $"Site Base URL '{invalidBaseUrl}' is not a valid HTTP or HTTPS URL.";
+            return $"Site Base URL '{invalidBaseUrl}' must be an HTTP or HTTPS origin without a path, credentials, query, or fragment.";
         }
 
         if (ParseBaseUrls(SiteBaseUrls).Count == 0)
@@ -117,6 +117,7 @@ internal sealed record MarkazorSettingsForm(
         return Uri.TryCreate(value.Trim(), UriKind.Absolute, out Uri? uri)
             && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            && uri.AbsolutePath == "/" && uri.UserInfo.Length == 0 && uri.Query.Length == 0 && uri.Fragment.Length == 0
             ? uri
             : null;
     }

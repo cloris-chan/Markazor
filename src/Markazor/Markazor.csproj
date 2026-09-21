@@ -20,6 +20,8 @@
     <_MarkazorEditorBundleInput Include="package.json" />
     <_MarkazorEditorBundleInput Include="package-lock.json" />
     <_MarkazorEditorBundleInput Include="$(MarkazorEditorBundleSourcePath)" />
+    <_MarkazorEditorBundleInput Include="assets/markazor-reader.js" />
+    <_MarkazorEditorBundleInput Include="wwwroot/markazor-pwa.js" />
   </ItemGroup>
 
   <ItemGroup>
@@ -193,6 +195,19 @@ if (!IsUpToDate())
              Properties="Configuration=$(Configuration)" />
   </Target>
 
+  <Target Name="PackMarkazorStaticBuilder" BeforeTargets="_GetPackageFiles">
+    <MSBuild Projects="..\Markazor.Build\Markazor.Build.csproj"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration);BuildProjectReferences=false"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;TargetFramework"
+             Condition="'$(NoBuild)' != 'true'" />
+    <ItemGroup>
+      <None Include="..\Markazor.Build\bin\$(Configuration)\net9.0\*.dll;..\Markazor.Build\bin\$(Configuration)\net9.0\*.deps.json;..\Markazor.Build\bin\$(Configuration)\net9.0\*.runtimeconfig.json"
+            Pack="true" PackagePath="buildTransitive/tools" Visible="false" />
+    </ItemGroup>
+    <Error Condition="!Exists('..\Markazor.Build\bin\$(Configuration)\net9.0\Markazor.Build.dll')" Text="Build Markazor.Build before packing Markazor." />
+  </Target>
+
   <Target Name="RestoreMarkazorEditorAssets"
           BeforeTargets="BuildMarkazorEditorAssets"
           Inputs="@(_MarkazorEditorRestoreInput)"
@@ -208,12 +223,12 @@ if (!IsUpToDate())
           BeforeTargets="ResolveStaticWebAssetsInputs"
           DependsOnTargets="RestoreMarkazorEditorAssets"
           Inputs="@(_MarkazorEditorBundleInput)"
-          Outputs="$(MarkazorEditorBundleOutput)"
+          Outputs="$(MarkazorEditorBundleOutput);$(MarkazorEditorBundleContentRoot)markazor-reader.js"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(TargetFramework)' != ''">
     <MakeDir Directories="$(MarkazorEditorBundleContentRoot)" />
-    <Exec Command="npx esbuild assets/markazor-markdown-editor.js --bundle --format=esm --target=es2022 --outfile=&quot;$(MarkazorEditorBundleOutput)&quot; --minify" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="npx esbuild assets/markazor-markdown-editor.js assets/markazor-reader.js --bundle --format=esm --target=es2022 --outdir=&quot;$(MarkazorEditorBundleContentRoot).&quot; --minify" WorkingDirectory="$(MSBuildProjectDirectory)" />
     <ItemGroup>
-      <FileWrites Include="$(MarkazorEditorBundleOutput)" />
+      <FileWrites Include="$(MarkazorEditorBundleOutput);$(MarkazorEditorBundleContentRoot)markazor-reader.js" />
     </ItemGroup>
   </Target>
 
@@ -225,6 +240,9 @@ if (!IsUpToDate())
       <Content Remove="$(MarkazorEditorBundleRelativePath)" />
       <_MarkazorEditorStaticWebAssetCandidate Include="$(MarkazorEditorBundleOutput)">
         <RelativePath>$(MarkazorEditorBundleFileName)</RelativePath>
+      </_MarkazorEditorStaticWebAssetCandidate>
+      <_MarkazorEditorStaticWebAssetCandidate Include="$(MarkazorEditorBundleContentRoot)markazor-reader.js">
+        <RelativePath>markazor-reader.js</RelativePath>
       </_MarkazorEditorStaticWebAssetCandidate>
     </ItemGroup>
 

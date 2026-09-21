@@ -142,10 +142,27 @@ public sealed class SiteIndexGeneratorTests
         Assert.Null(article.Category);
         Assert.Empty(article.Tags);
         Assert.Equal(RepositoryContentPath("posts", "plain-file.md"), article.RelativePath);
+        Assert.Equal("/_markazor/content/posts/plain-file.md", article.ContentPath);
         Assert.Equal(RoutePath("posts", "plain-file"), article.Route);
         Assert.Equal(MarkazorArticleKind.Post, article.Kind);
         Assert.Equal(new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero), article.PublishedAtUtc);
         Assert.False(article.IsDraft);
+        Assert.Empty(execution.Diagnostics);
+    }
+
+    [Fact]
+    public void EscapesReservedCharactersInPublishedContentPaths()
+    {
+        TestAdditionalText[] additionalTexts =
+        [
+            new(RepositoryPath("posts", "C# notes%.md"), "# Reserved filename"),
+        ];
+
+        GeneratorExecution execution = RunGenerator(additionalTexts);
+        ArticleMeta article = Assert.Single(LoadArticles(execution.OutputCompilation));
+
+        Assert.Equal(RepositoryContentPath("posts", "C# notes%.md"), article.RelativePath);
+        Assert.Equal("/_markazor/content/posts/C%23%20notes%25.md", article.ContentPath);
         Assert.Empty(execution.Diagnostics);
     }
 

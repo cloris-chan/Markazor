@@ -92,6 +92,8 @@ After authorization, open `/studio/settings`. Studio is the authenticated settin
 
 Studio Settings can also upload a PNG site icon. The file is always saved to `assets/site-icon.png` and served from `/assets/site-icon.png`.
 
+The built-in **Fieldnotes** theme uses the `default` configuration name. It provides a matching public journal, Studio, and setup interface.
+
 Use **Save Settings** to commit settings back to the repository. If the current values already match the repository file, Markazor skips the commit.
 
 Secrets must stay in Azure Static Web Apps environment variables and must not be committed.
@@ -161,9 +163,11 @@ Private drafts:
 
 - `drafts/**`
 
-Repository assets under `assets/**` are published to `/assets/**`. Public Markdown is staged internally under `/_markazor/content/**`, so reader routes like `/posts/{slug}` and `/notes/{slug}` do not collide with raw Markdown files.
+Repository assets under `assets/**` are published to `/assets/**`. Public Markdown is staged internally under `/_markazor/content/**`, so reader routes like `/posts/{slug}` and `/notes/{slug}` do not collide with raw Markdown files. The build also renders complete HTML for public pages, including the article body, title, contents links, and metadata. Taxonomy and pagination use path-based routes such as `/tags/design` and `/posts/page/2`.
 
-`public/**` is the user-owned web root overlay. Use `public/styles/site.css` and `public/scripts/site.js` for ordinary customization without replacing the shell. Advanced users can fully replace `index.html` or override files such as `staticwebapp.config.json`.
+Write the article title in front matter and start body sections with `##`. Studio preview and published articles share the same safe Markdown renderer and typography. The current UI and date formatting are English; there is no site-language setting.
+
+`public/**` is the user-owned web root overlay. Use `public/styles/site.css` and `public/scripts/site.js` for ordinary customization without replacing the shell. A replacement `index.html` must retain `#app` and the resources needed by the application. The builder derives public pages and the Studio/Setup shell from it, adds the reader enhancement module, and preserves deployment headers and route rules while applying the static route contract. Public assets cannot occupy a generated page's `index.html` path.
 
 These `public/**` paths are reserved and rejected:
 

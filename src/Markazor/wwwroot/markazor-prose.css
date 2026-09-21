@@ -1,0 +1,241 @@
+.markazor-reading-layout {
+  display: grid;
+  gap: 2rem;
+  margin-inline: auto;
+  max-width: 42rem;
+  min-width: 0;
+  width: 100%;
+}
+.markazor-prose {
+  color: var(--mk-ink, #252721);
+  font: 1.12rem/1.9 var(--mk-font-display, Georgia, serif);
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.markazor-prose :is(h2, h3, h4, h5, h6) {
+  color: var(--mk-ink);
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: -.025em;
+  line-height: 1.35;
+  margin: 2.5em 0 .8em;
+  scroll-margin-block: 2rem;
+  text-wrap: pretty;
+}
+.markazor-prose h2 { font-size: 1.85rem; }
+.markazor-prose h3 { font-size: 1.4rem; }
+.markazor-prose h4 { font-size: 1.18rem; }
+.markazor-prose h5 { font-size: 1.08rem; }
+.markazor-prose h6 { font-size: 1rem; }
+.markazor-prose :is(p, ul, ol, dl, blockquote, pre, figure, .markazor-table-scroll, details) {
+  margin: 0 0 1.4em;
+}
+.markazor-prose > :first-child { margin-top: 0; }
+.markazor-prose > :last-child { margin-bottom: 0; }
+.markazor-prose :is(ul, ol) { padding-inline-start: 1.6em; }
+.markazor-prose li { padding-inline-start: .2em; }
+.markazor-prose li + li { margin-block-start: .35em; }
+.markazor-prose li > :is(ul, ol) { margin-block: .5em; }
+.markazor-prose li > p { margin-block: .5em; }
+.markazor-prose li::marker { color: var(--mk-editorial, #94624a); }
+.markazor-prose dt { font-weight: 600; }
+.markazor-prose dd { margin-inline-start: 1.5em; }
+.markazor-prose a {
+  color: var(--mk-accent, #2f4a56);
+  overflow-wrap: anywhere;
+  text-decoration-thickness: .06em;
+  text-underline-offset: .2em;
+}
+.markazor-prose a:hover { text-decoration-thickness: .1em; }
+.markazor-prose .markazor-heading-link {
+  display: inline-block;
+  font-size: .65em;
+  font-weight: 400;
+  margin-inline-start: .6em;
+  opacity: 0;
+  padding: .1em .2em;
+  text-decoration: none;
+}
+.markazor-prose :is(h2, h3, h4, h5, h6):hover .markazor-heading-link,
+.markazor-prose .markazor-heading-link:focus-visible { opacity: 1; }
+.markazor-prose blockquote {
+  border-inline-start: 2px solid var(--mk-editorial, #94624a);
+  color: var(--mk-muted, #66665d);
+  margin-inline: 0;
+  padding: .25rem 0 .25rem 1.4rem;
+}
+.markazor-prose blockquote > :last-child { margin-bottom: 0; }
+.markazor-prose hr {
+  border: 0;
+  border-top: 1px solid var(--mk-line, #d6d3c8);
+  margin-block: 2.75rem;
+}
+.markazor-prose :is(code, kbd) {
+  background: var(--mk-soft, #eae7de);
+  border-radius: 2px;
+  color: var(--mk-ink);
+  font-family: var(--mk-font-mono, Consolas, monospace);
+  font-size: .8em;
+  overflow-wrap: anywhere;
+  padding: .12em .3em;
+}
+.markazor-prose kbd { border: 1px solid var(--mk-line); }
+.markazor-prose pre {
+  background: var(--mk-ink, #252721);
+  border: 0;
+  border-radius: 3px;
+  color: var(--mk-paper, #f4f1e9);
+  font: .82rem/1.8 var(--mk-font-mono, Consolas, monospace);
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 1.25rem 1.4rem;
+  tab-size: 4;
+}
+.markazor-prose pre code {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  overflow-wrap: normal;
+  padding: 0;
+  white-space: pre;
+}
+.markazor-code { margin-block-end: 1.6em; min-width: 0; }
+.markazor-code pre { border-start-start-radius: 0; border-start-end-radius: 0; margin: 0; }
+.markazor-code-toolbar {
+  align-items: center;
+  background: var(--mk-accent, #2f4a56);
+  border-radius: 3px 3px 0 0;
+  color: white;
+  display: flex;
+  font: .7rem/1.5 var(--mk-font-mono, Consolas, monospace);
+  gap: 1rem;
+  justify-content: space-between;
+  padding: .4rem .8rem .4rem 1.4rem;
+}
+.markazor-code-copy {
+  background: transparent;
+  border: 1px solid #ffffff66;
+  border-radius: 2px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  min-height: 2rem;
+  padding: .2rem .7rem;
+}
+.markazor-code-copy:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+.markazor-prose .hljs-comment,
+.markazor-prose .hljs-quote { color: #b7beb4; font-style: italic; }
+.markazor-prose .hljs-keyword,
+.markazor-prose .hljs-selector-tag,
+.markazor-prose .hljs-type { color: #adcbd8; }
+.markazor-prose .hljs-string,
+.markazor-prose .hljs-regexp,
+.markazor-prose .hljs-template-variable { color: #eac29f; }
+.markazor-prose .hljs-number,
+.markazor-prose .hljs-literal { color: #d9aab7; }
+.markazor-prose .hljs-title,
+.markazor-prose .hljs-attr,
+.markazor-prose .hljs-built_in { color: #e4d0a0; }
+.markazor-table-scroll {
+  border: 1px solid var(--mk-line, #d6d3c8);
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.markazor-prose table {
+  border-collapse: collapse;
+  font: .88rem/1.65 var(--mk-font-body, system-ui, sans-serif);
+  min-width: 100%;
+  width: max-content;
+}
+.markazor-prose :is(th, td) {
+  border-bottom: 1px solid var(--mk-line, #d6d3c8);
+  max-width: 28rem;
+  padding: .8rem 1rem;
+  text-align: start;
+  vertical-align: top;
+}
+.markazor-prose th { background: var(--mk-soft, #eae7de); font-weight: 600; }
+.markazor-prose tr:last-child td { border-bottom: 0; }
+.markazor-prose caption { padding: .75rem; text-align: start; }
+.markazor-table-hint {
+  color: var(--mk-muted, #66665d);
+  font: .7rem/1.5 var(--mk-font-body, system-ui, sans-serif);
+  margin-block: -.9rem 1.4rem;
+}
+.markazor-prose img {
+  display: block;
+  height: auto;
+  margin-inline: auto;
+  max-width: 100%;
+}
+.markazor-prose figure { margin-inline: 0; }
+.markazor-prose figcaption {
+  color: var(--mk-muted, #66665d);
+  font: .8rem/1.7 var(--mk-font-body, system-ui, sans-serif);
+  padding-block-start: .75rem;
+  text-align: center;
+}
+.markazor-prose details { border-block: 1px solid var(--mk-line); padding-block: .8rem; }
+.markazor-prose summary { cursor: pointer; font-weight: 600; }
+.markazor-prose details[open] summary { margin-block-end: 1rem; }
+.markazor-prose .footnotes {
+  border-top: 1px solid var(--mk-line);
+  font-size: .88em;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+}
+.markazor-prose .footnotes hr { display: none; }
+.markazor-prose [id] { scroll-margin-block: 2rem; }
+.markazor-prose [id]:target { background: var(--mk-accent-soft, #e2e9ea); }
+.markazor-prose .task-list-item { list-style: none; }
+.markazor-prose .task-list-item input { margin-inline: -1.25em .4em; }
+.markazor-contents {
+  border-block: 1px solid var(--mk-line, #d6d3c8);
+  color: var(--mk-muted, #66665d);
+  font: .82rem/1.6 var(--mk-font-body, system-ui, sans-serif);
+  padding-block: 1rem;
+}
+.markazor-contents summary { color: var(--mk-ink); cursor: pointer; font-weight: 600; }
+.markazor-contents summary span { color: var(--mk-muted); font-size: .7rem; margin-left: .5rem; }
+.markazor-contents nav { display: grid; gap: .2rem; margin-top: 1rem; }
+.markazor-contents a { border-left: 2px solid transparent; padding: .35rem .65rem; text-decoration: none; }
+.markazor-contents a:hover,
+.markazor-contents a[aria-current="location"] { border-color: var(--mk-accent); color: var(--mk-accent); }
+.markazor-contents .is-subsection { padding-inline-start: 1.5rem; }
+.markazor-reader-article > :is(header, nav) { margin-inline: auto; width: min(100%, 48rem); }
+@media (min-width: 1150px) {
+  .markazor-reading-layout.has-contents {
+    align-items: start;
+    gap: 3rem;
+    grid-template-columns: minmax(10rem, 12rem) minmax(0, 42rem);
+    max-width: 57rem;
+  }
+  .markazor-contents { max-height: calc(100vh - 4rem); overflow-y: auto; position: sticky; top: 2rem; }
+}
+@media (hover: none) {
+  .markazor-prose .markazor-heading-link { opacity: .6; }
+}
+@media (max-width: 760px) {
+  html[data-markazor-static]:not(.markazor-enhanced) .site-header nav { display: grid; }
+  html[data-markazor-static]:not(.markazor-enhanced) .site-menu-toggle { display: none; }
+}
+@media (max-width: 520px) {
+  .markazor-prose h2 { font-size: 1.6rem; }
+  .markazor-prose h3 { font-size: 1.3rem; }
+  .markazor-prose pre { padding: 1rem; }
+}
+@media print {
+  .markazor-contents, .markazor-code-toolbar, .markazor-heading-link, .markazor-table-hint { display: none !important; }
+  .markazor-reading-layout.has-contents { display: block; max-width: none; }
+  .markazor-prose { color: black; font-size: 11pt; }
+  .markazor-prose pre, .markazor-prose pre code { background: white; color: black; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .markazor-prose pre { border: 1px solid #aaa; }
+  .markazor-prose [class^="hljs-"] { color: black; }
+  .markazor-table-scroll { overflow: visible; }
+  .markazor-prose table { table-layout: fixed; width: 100%; }
+  .markazor-prose :is(th, td) { overflow-wrap: anywhere; }
+  .markazor-prose :is(h2, h3, h4, h5, h6) { break-after: avoid; }
+  .markazor-prose :is(p, li) { orphans: 3; widows: 3; }
+}

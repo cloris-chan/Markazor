@@ -7,6 +7,4 @@ tags: [intro, markazor]
 category: General
 ---
 
-# Hello World
-
 This file is compiled into `Markazor.Generated.SiteIndex`.

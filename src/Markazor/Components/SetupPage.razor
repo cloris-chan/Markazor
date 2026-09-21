@@ -12,6 +12,7 @@
 <div class="markazor-shell">
     <header class="markazor-page-header">
         <div>
+            <p class="markazor-eyebrow">Start something of your own</p>
             <h1>Setup</h1>
             <p>Connect the GitHub App and authorize this browser.</p>
         </div>
@@ -136,7 +137,7 @@
 
             @if (Session.AccessTokenExpiresAtUtc is not null)
             {
-                <p class="markazor-muted">Access expires at @Session.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.CurrentCulture).</p>
+                <p class="markazor-muted">Access expires at @Session.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.InvariantCulture).</p>
             }
 
             <div class="markazor-actions">

@@ -28,8 +28,8 @@ const fromBlazor = Annotation.define();
 const markazorTheme = EditorView.theme(
   {
     "&": {
-      backgroundColor: "#fffdf8",
-      color: "#151719",
+      backgroundColor: "var(--mk-surface)",
+      color: "var(--mk-ink)",
       height: "100%"
     },
     "&.cm-focused": {
@@ -39,7 +39,7 @@ const markazorTheme = EditorView.theme(
       fontFamily: 'ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace'
     },
     ".cm-content": {
-      caretColor: "#0aa882",
+      caretColor: "var(--mk-accent)",
       fontSize: "0.95rem",
       lineHeight: "1.55",
       minHeight: "28rem",
@@ -49,36 +49,36 @@ const markazorTheme = EditorView.theme(
       padding: "0 0.75rem"
     },
     ".cm-gutters": {
-      backgroundColor: "#eef3ef",
-      borderRight: "1px solid rgba(21, 23, 25, 0.14)",
-      color: "#6d777a"
+      backgroundColor: "var(--mk-soft)",
+      borderRight: "1px solid var(--mk-line)",
+      color: "var(--mk-muted)"
     },
     ".cm-activeLine": {
-      backgroundColor: "rgba(10, 168, 130, 0.08)"
+      backgroundColor: "var(--mk-accent-soft)"
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "rgba(10, 168, 130, 0.12)",
-      color: "#151719"
+      backgroundColor: "var(--mk-accent-soft)",
+      color: "var(--mk-ink)"
     },
     ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
-      backgroundColor: "rgba(10, 168, 130, 0.24)"
+      backgroundColor: "var(--mk-selection)"
     },
     ".cm-cursor": {
-      borderLeftColor: "#0aa882"
+      borderLeftColor: "var(--mk-accent)"
     },
     ".cm-matchingBracket, .cm-nonmatchingBracket": {
-      backgroundColor: "rgba(56, 103, 214, 0.13)",
-      outline: "1px solid rgba(56, 103, 214, 0.45)"
+      backgroundColor: "var(--mk-accent-soft)",
+      outline: "1px solid var(--mk-accent)"
     },
     ".cm-foldGutter span": {
       cursor: "pointer"
     },
     ".cm-searchMatch": {
-      backgroundColor: "rgba(217, 131, 36, 0.22)",
-      outline: "1px solid rgba(217, 131, 36, 0.5)"
+      backgroundColor: "var(--mk-warning-soft)",
+      outline: "1px solid var(--mk-warning)"
     },
     ".cm-searchMatch.cm-searchMatch-selected": {
-      backgroundColor: "rgba(227, 82, 103, 0.22)"
+      backgroundColor: "var(--mk-selection)"
     }
   },
   { dark: false }
@@ -267,8 +267,6 @@ function formatSelection(view, command) {
     case "heading":
     case "heading2":
       return setHeadingLevel(view, 2);
-    case "heading1":
-      return setHeadingLevel(view, 1);
     case "heading3":
       return setHeadingLevel(view, 3);
     case "quote":

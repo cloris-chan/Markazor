@@ -125,9 +125,9 @@ public sealed class MarkazorReaderServiceTests
         ArticleMeta article = Assert.IsType<ArticleMeta>(reader.FindArticle("newest"));
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        string html = await reader.LoadSafeHtmlAsync(article, cancellationToken);
+        string html = (await reader.LoadContentAsync(article, cancellationToken)).Html;
 
-        Assert.Contains("<h1>Hello</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("<h2 id=\"mk-hello\">Hello", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -195,7 +195,7 @@ public sealed class MarkazorReaderServiceTests
     private sealed class MarkdownClient : HttpClient
     {
         public MarkdownClient(string markdown)
-#pragma warning disable CA2000 // HttpClient owns and disposes the handler.
+#pragma warning disable CA2000
             : base(new MarkdownHandler(markdown), disposeHandler: true)
 #pragma warning restore CA2000
         {

@@ -6,7 +6,7 @@ public sealed class MarkazorSiteOptions
 
     public string Description { get; set; } = "A repository-native site powered by Markazor.";
 
-    public string Language { get; set; } = "en";
+    public Uri? BaseUrl { get; set; }
 
     public int PageSize { get; set; } = 10;
 }

@@ -59,6 +59,9 @@ jobs:
       - name: Test
         run: dotnet test Markazor.slnx --configuration Release --no-build
 
+      - name: Test service worker
+        run: node --test tests/service-worker.test.mjs
+
       - name: Pack
         shell: pwsh
         run: ./build/Pack-Markazor.ps1 -Version '${{ steps.version.outputs.value }}'

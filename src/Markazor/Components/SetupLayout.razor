@@ -2,6 +2,14 @@
 
 <div class="markazor-setup-layout">
     <MarkazorHead />
-    @Body
+    <a class="markazor-skip-link" href="#setup-content">Skip to setup</a>
+    <nav class="markazor-setup-masthead" aria-label="Setup navigation">
+        <a class="markazor-setup-brand" href="/"><img src="/_content/Markazor/markazor-mark.svg" alt="" width="40" height="40" />Markazor</a>
+        <span>Your next chapter starts here.</span>
+        <a href="/studio">Studio <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
+    </nav>
+    <main id="setup-content" tabindex="-1">
+        @Body
+    </main>
     <PwaUpdatePrompt />
 </div>

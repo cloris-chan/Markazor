@@ -3,42 +3,50 @@
 <section class="markazor-reader-list" aria-label="@AriaLabel">
     @if (Page.TotalItems == 0)
     {
-        <p class="markazor-reader-empty">@EmptyMessage</p>
+        <div class="markazor-reader-empty" role="status">
+            <MarkazorIcon Kind="MarkazorIconKind.Bookmark" Class="markazor-empty-mark" />
+            <h2>Nothing here just yet.</h2>
+            <p>@EmptyMessage</p>
+        </div>
     }
     else
     {
-        @foreach (ArticleMeta article in Page.Articles)
+        @for (int index = 0; index < Page.Articles.Count; index++)
         {
-            <article class="markazor-reader-card @ArticleKindClass(article)">
-                <div class="markazor-reader-meta">
-                    <span class="markazor-reader-kind">@ArticleKindLabel(article)</span>
-                    <time datetime="@article.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">
-                        @article.PublishedAtUtc.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)
-                    </time>
-                    @if (!string.IsNullOrWhiteSpace(article.Category))
-                    {
-                        <a href="@TaxonomyLink("/categories", "category", article.Category)">
-                            @article.Category
-                        </a>
-                    }
-                </div>
-                <h2><a href="@article.Route">@article.Title</a></h2>
-                @if (!string.IsNullOrWhiteSpace(article.Summary))
-                {
-                    <p>@article.Summary</p>
-                }
-                @if (article.Tags.Count > 0)
-                {
-                    <ul class="markazor-reader-tags" aria-label="Tags">
-                        @foreach (string tag in article.Tags)
+            ArticleMeta article = Page.Articles[index];
+            <article class="markazor-reader-card @ArticleKindClass(article)" @key="article.RelativePath">
+                <span class="markazor-reader-entry-number" aria-hidden="true">@((index + 1 + ((Page.PageNumber - 1) * Page.PageSize)).ToString("D2", CultureInfo.InvariantCulture))</span>
+                <div class="markazor-reader-entry">
+                    <div class="markazor-reader-meta">
+                        <span class="markazor-reader-kind">@ArticleKindLabel(article)</span>
+                        <time datetime="@article.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">
+                            @article.PublishedAtUtc.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)
+                        </time>
+                        @if (!string.IsNullOrWhiteSpace(article.Category))
                         {
-                            <li><a href="@TaxonomyLink("/tags", "tag", tag)">#@tag</a></li>
+                            <a href="@MarkazorReaderRoutes.Category(article.Category)">
+                                @article.Category
+                            </a>
                         }
-                    </ul>
-                }
-                <a class="markazor-reader-more" href="@article.Route" aria-label="@($"Read {article.Title}")">
-                    Read
-                </a>
+                    </div>
+                    <h2><a href="@article.Route">@article.Title</a></h2>
+                    @if (!string.IsNullOrWhiteSpace(article.Summary))
+                    {
+                        <p>@article.Summary</p>
+                    }
+                    @if (article.Tags.Count > 0)
+                    {
+                        <ul class="markazor-reader-tags" aria-label="Tags">
+                            @foreach (string tag in article.Tags)
+                            {
+                                <li><a href="@MarkazorReaderRoutes.Tag(tag)">#@tag</a></li>
+                            }
+                        </ul>
+                    }
+                    <a class="markazor-reader-more" href="@article.Route" aria-label="@($"Read {article.Title}")">
+                        Read @ArticleKindLabel(article).ToLowerInvariant() <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" />
+                    </a>
+                </div>
             </article>
         }
     }
@@ -71,12 +79,7 @@
 
     [Parameter, EditorRequired]
     public Func<int, string> PageLinkFactory { get; set; } =
-        static page => "/?page=" + page.ToString(CultureInfo.InvariantCulture);
-
-    private static string TaxonomyLink(string path, string parameter, string value)
-    {
-        return $"{path}?{parameter}={Uri.EscapeDataString(value)}";
-    }
+        static page => MarkazorReaderRoutes.Page("/", page);
 
     private static string ArticleKindClass(ArticleMeta article)
     {

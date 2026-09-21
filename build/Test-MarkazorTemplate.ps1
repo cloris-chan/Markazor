@@ -643,11 +643,24 @@ if (Test-StringContains -Text $emptyPublishedIndexText -Value '#[.{fingerprint}]
     throw 'Default published index.html must not contain unresolved framework fingerprint placeholders.'
 }
 
-if (-not (Test-StringContains -Text $emptyPublishedIndexText -Value '_framework/blazor.webassembly.js')) {
-    throw 'Default published index.html must reference the net9-compatible Blazor WebAssembly boot script.'
+if (Test-StringContains -Text $emptyPublishedIndexText -Value '_framework/blazor.webassembly.js') {
+    throw 'Default public index.html must be fully static and must not reference the Blazor WebAssembly boot script.'
 }
 
-$postMarkdownPath = Join-Path 'posts' 'hello-world.md'
+if (-not (Test-StringContains -Text $emptyPublishedIndexText -Value 'markazor-reader.js')) {
+    throw 'Default public index.html must load the static reader enhancement module.'
+}
+
+$emptyPublishedApp = Join-Path (Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') '_markazor') 'app.html'
+if (-not (Test-Path -LiteralPath $emptyPublishedApp)) {
+    throw "Published web output is missing the Markazor application shell: $emptyPublishedApp"
+}
+
+if (-not (Test-StringContains -Text (Get-Content -Raw -LiteralPath $emptyPublishedApp) -Value '_framework/blazor.webassembly.js')) {
+    throw 'The Markazor application shell must retain the Blazor WebAssembly boot script.'
+}
+
+$postMarkdownPath = Join-Path 'posts' 'C# hello%.md'
 $noteMarkdownPath = Join-Path 'notes' 'first-note.md'
 $draftMarkdownPath = Join-Path 'drafts' 'private-notes.md'
 $assetPath = Join-Path 'assets' 'smoke-asset.txt'
@@ -716,7 +729,7 @@ slug: hello-world
 title: Hello World
 summary: First Markazor post.
 publishedAt: 2026-06-03T00:00:00Z
-tags: [intro, markazor]
+tags: [intro, markazor, C#]
 category: General
 ---
 
@@ -860,9 +873,14 @@ foreach ($expectedFunctionRoute in @('auth/github/start', 'auth/github/callback'
     }
 }
 
-$publicPost = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'posts' 'hello-world.md')
+$publicPost = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') (Join-Path 'content' $postMarkdownPath)
 if (-not (Test-Path -LiteralPath $publicPost)) {
     throw "Published output is missing public post markdown: $publicPost"
+}
+
+$publishedReservedTagPage = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'tags') 'c#') 'index.html'
+if (-not (Test-Path -LiteralPath $publishedReservedTagPage)) {
+    throw "Published output is missing the static taxonomy page for a reserved-character tag: $publishedReservedTagPage"
 }
 
 $publicNote = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'notes' 'first-note.md')
@@ -908,12 +926,27 @@ if (-not (Test-StringContains -Text (Get-Content -Raw -LiteralPath $publishedFun
 }
 
 $publishedIndex = Join-Path (Join-Path $webPublishPath 'wwwroot') 'index.html'
-if (-not (Test-StringContains -Text (Get-Content -Raw -LiteralPath $publishedIndex) -Value 'data-smoke-shell="custom"')) {
+$publishedIndexText = Get-Content -Raw -LiteralPath $publishedIndex
+if (-not (Test-StringContains -Text $publishedIndexText -Value 'data-smoke-shell="custom"')) {
     throw 'Published index.html did not use the full public shell override.'
 }
 
-if (Test-StringContains -Text (Get-Content -Raw -LiteralPath $publishedIndex) -Value '#[.{fingerprint}]') {
+if (Test-StringContains -Text $publishedIndexText -Value '#[.{fingerprint}]') {
     throw 'Published index.html must not contain unresolved framework fingerprint placeholders.'
+}
+
+if (Test-StringContains -Text $publishedIndexText -Value '_framework/blazor.webassembly.js') {
+    throw 'Published public index.html must not reference the Blazor WebAssembly boot script.'
+}
+
+$publishedApp = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'app.html'
+$publishedAppText = Get-Content -Raw -LiteralPath $publishedApp
+if (-not (Test-StringContains -Text $publishedAppText -Value 'data-smoke-shell="custom"')) {
+    throw 'Published Markazor application shell did not retain the public shell override.'
+}
+
+if (-not (Test-StringContains -Text $publishedAppText -Value '_framework/blazor.webassembly.js')) {
+    throw 'Published Markazor application shell must retain the Blazor WebAssembly boot script.'
 }
 
 $publishedFavicon = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'assets') 'site-icon.png'
@@ -960,12 +993,12 @@ if (Test-StringContains -Text $publishedServiceWorkerText -Value 'await self.ski
     throw 'Published service-worker.js must not automatically skip waiting during install.'
 }
 
-if (-not (Test-StringContains -Text $publishedServiceWorkerText -Value 'return await fetch(event.request);' -Comparison ([System.StringComparison]::Ordinal))) {
-    throw 'Published service-worker.js must await network fetches so rejected navigation requests are handled.'
+if (-not (Test-StringContains -Text $publishedServiceWorkerText -Value 'const page = self.markazorRoutes[path];' -Comparison ([System.StringComparison]::Ordinal))) {
+    throw 'Published service-worker.js must route static navigations through the generated route map.'
 }
 
-if (-not (Test-StringContains -Text $publishedServiceWorkerText -Value 'The site shell is not available offline yet.' -Comparison ([System.StringComparison]::Ordinal))) {
-    throw 'Published service-worker.js must return a deterministic navigation fallback when the network fails before the app shell is cached.'
+if (-not (Test-StringContains -Text $publishedServiceWorkerText -Value "cache.match('/404.html')" -Comparison ([System.StringComparison]::Ordinal))) {
+    throw 'Published service-worker.js must use the static 404 page for unknown offline navigations.'
 }
 
 $serviceWorkerAssetsText = Get-Content -Raw -LiteralPath $serviceWorkerAssets
@@ -980,6 +1013,14 @@ if (Test-StringContains -Text $serviceWorkerAssetsText -Value 'staticwebapp.conf
 
 if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/notes/first-note.md' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
     throw 'service-worker-assets.js must contain public note content paths.'
+}
+
+if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/C# hello%.md' -Comparison ([System.StringComparison]::Ordinal))) {
+    throw 'service-worker-assets.js must retain the SDK manifest path for reserved-character post filenames.'
+}
+
+if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value 'tags/c#/index.html' -Comparison ([System.StringComparison]::Ordinal))) {
+    throw 'service-worker-assets.js must contain the static taxonomy page for a reserved-character tag.'
 }
 
 if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value 'assets/smoke-asset.txt' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {

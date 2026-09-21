@@ -1,7 +1,5 @@
-// Caution! Be sure you understand the caveats before publishing an application with
-// offline support. See https://aka.ms/blazor-offline-considerations
-
 self.importScripts('./service-worker-assets.js');
+self.importScripts('./_markazor/routes.js');
 self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
@@ -13,12 +11,19 @@ self.addEventListener('message', event => {
 
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
-const offlineAssetsInclude = [ /\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /\.json$/, /\.css$/, /\.woff$/, /\.png$/, /\.jpe?g$/, /\.gif$/, /\.ico$/, /\.blat$/, /\.dat$/, /\.webmanifest$/, /\.md$/ ];
+const offlineAssetsInclude = [ /\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /\.json$/, /\.css$/, /\.woff2?$/, /\.png$/, /\.svg$/, /\.webp$/, /\.jpe?g$/, /\.gif$/, /\.ico$/, /\.blat$/, /\.dat$/, /\.webmanifest$/, /\.md$/ ];
 const offlineAssetsExclude = [ /^service-worker\.js$/, /(^|\/)_markazor\/content\/drafts\//, /(^|\/)staticwebapp\.config\.json$/ ];
 
-const base = "/";
-const baseUrl = new URL(base, self.origin);
-const manifestUrlList = self.assetsManifest.assets.map(asset => new URL(asset.url, baseUrl).href);
+const baseUrl = new URL('/', self.origin);
+const manifestUrlList = new Set(self.assetsManifest.assets.map(asset => toAssetUrl(asset.url).href));
+
+function toAssetUrl(path) {
+    const encodedPath = path
+        .split('/')
+        .map(segment => encodeURIComponent(segment))
+        .join('/');
+    return new URL(encodedPath, baseUrl);
+}
 
 async function onInstall(event) {
     console.info('Service worker: Install');
@@ -26,7 +31,7 @@ async function onInstall(event) {
     const assetsRequests = self.assetsManifest.assets
         .filter(asset => offlineAssetsInclude.some(pattern => pattern.test(asset.url)))
         .filter(asset => !offlineAssetsExclude.some(pattern => pattern.test(asset.url)))
-        .map(asset => new Request(asset.url, { integrity: asset.hash, cache: 'no-cache' }));
+        .map(asset => new Request(toAssetUrl(asset.url).href, { integrity: asset.hash, cache: 'no-cache' }));
     await caches.open(cacheName).then(cache => cache.addAll(assetsRequests));
 }
 
@@ -41,35 +46,33 @@ async function onActivate(event) {
 }
 
 async function onFetch(event) {
-    let cachedResponse = null;
-    let shouldServeIndexHtml = false;
-    if (event.request.method === 'GET') {
-        shouldServeIndexHtml = event.request.mode === 'navigate'
-            && !manifestUrlList.some(url => url === event.request.url);
-
-        const request = shouldServeIndexHtml ? 'index.html' : event.request;
-        const cache = await caches.open(cacheName);
-        cachedResponse = await cache.match(request);
+    const request = event.request;
+    const url = new URL(request.url);
+    if (request.method !== 'GET' || url.origin !== self.origin || url.pathname.startsWith('/api/')) {
+        return fetch(request);
     }
-
-    if (cachedResponse) {
-        return cachedResponse;
-    }
-
-    try {
-        return await fetch(event.request);
-    } catch {
-        if (shouldServeIndexHtml) {
-            return new Response('The site shell is not available offline yet.', {
-                status: 503,
-                statusText: 'Service Unavailable',
-                headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-            });
+    const cache = await caches.open(cacheName);
+    if (request.mode === 'navigate') {
+        const path = url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : '/';
+        const page = self.markazorRoutes[path];
+        const admin = /^\/(?:studio|setup|auth)(?:\/|$)/.test(path);
+        const target = page || (admin ? '/_markazor/app.html' : null);
+        if (target) {
+            const response = await cache.match(target);
+            if (response) return response;
+            return fetch(new URL(target, baseUrl));
         }
-
-        return new Response('', {
-            status: 503,
-            statusText: 'Service Unavailable'
-        });
+    } else if (manifestUrlList.has(url.href)) {
+        const response = await cache.match(request);
+        if (response) return response;
+    }
+    try {
+        return await fetch(request);
+    } catch {
+        if (request.mode === 'navigate') {
+            const missing = await cache.match('/404.html');
+            if (missing) return new Response(await missing.text(), {status: 404, headers: {'Content-Type': 'text/html; charset=utf-8'}});
+        }
+        return new Response('This resource is not available offline.', {status: 503, headers: {'Content-Type': 'text/plain; charset=utf-8'}});
     }
 }
