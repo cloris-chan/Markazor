@@ -97,6 +97,49 @@ public sealed class MarkazorComponentTests
     }
 
     [Fact]
+    public void StudioPageFollowsLocationChangesBetweenSections()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IMarkazorClientSession>(new FakeSession());
+        context.Services.AddSingleton<IMarkazorSetupDiagnosticsService>(
+            new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
+        context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
+        context.Services.AddSingleton<IMarkazorContentCatalog>(new FakeCatalog());
+        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
+        context.Services.AddSingleton<IMarkazorEditorService>(new FakeEditor());
+        Microsoft.AspNetCore.Components.NavigationManager navigation =
+            context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo("/studio/settings");
+
+        IRenderedComponent<StudioPage> component = context.Render<StudioPage>();
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Equal("Settings", component.Find("h1").TextContent);
+            Assert.Equal("page", component.Find("a[href='/studio/settings']").GetAttribute("aria-current"));
+        });
+
+        navigation.NavigateTo("/studio/write");
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Equal("Write", component.Find("h1").TextContent);
+            Assert.Equal("page", component.Find("a[href='/studio/write']").GetAttribute("aria-current"));
+            Assert.Null(component.Find("a[href='/studio/settings']").GetAttribute("aria-current"));
+        });
+
+        navigation.NavigateTo("/studio/settings");
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Equal("Settings", component.Find("h1").TextContent);
+            Assert.Equal("page", component.Find("a[href='/studio/settings']").GetAttribute("aria-current"));
+            Assert.Null(component.Find("a[href='/studio/write']").GetAttribute("aria-current"));
+        });
+    }
+
+    [Fact]
     public void ArticleListRendersMetadataTaxonomyAndPagination()
     {
         using BunitContext context = new();

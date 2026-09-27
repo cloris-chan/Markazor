@@ -3,6 +3,7 @@
 @page "/studio/write"
 @layout StudioLayout
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <PageTitle>@PageTitle</PageTitle>
 <a class="markazor-skip-link" href="#studio-content">Skip to workspace</a>
@@ -52,6 +53,16 @@
 @code {
     private StudioSection ActiveSection => ResolveSection(Navigation.ToBaseRelativePath(Navigation.Uri));
 
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
     private string PageTitle => $"{SectionTitle} - Markazor Studio";
 
     private string SectionTitle => ActiveSection switch
@@ -83,5 +94,10 @@
     {
         Settings,
         Write,
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= HandleLocationChanged;
     }
 }
