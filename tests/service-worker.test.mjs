@@ -27,7 +27,7 @@ function createWorker() {
     '/_markazor/content/drafts/private.md',
   ];
   const events = new Map();
-  const state = { network: [], installed: [], deleted: [], claimed: false, skipped: false };
+  const state = { network: [], installed: [], deleted: [], claimed: false, skipped: false, online: false };
   const worker = {
     origin,
     assetsManifest: { version: 'current', assets: manifestAssets.map(url => ({ url })) },
@@ -66,12 +66,13 @@ function createWorker() {
       const url = String(input.url || input);
       state.network.push(url);
       if (url.includes('/api/') || !url.startsWith(origin)) return new Response('Network response');
+      if (state.online) return new Response('Network navigation');
       throw new TypeError('Offline');
     },
   });
   vm.runInContext(source, context);
   const request = (path, overrides = {}) => context.onFetch({ request: { url: new URL(path, origin).href, method: 'GET', mode: 'navigate', ...overrides } });
-  return { context, events, request, state };
+  return { context, entries, events, request, state };
 }
 
 test('offline navigation returns the requested article, including a trailing slash or query', async () => {
@@ -96,6 +97,15 @@ test('Studio navigation uses the application shell', async () => {
   const response = await request('/studio/write?markazor-preview=1');
   assert.equal(response.redirected, false);
   assert.equal(await response.text(), 'Studio shell');
+});
+
+test('known routes with a cache miss fetch the canonical navigation URL', async () => {
+  const { entries, request, state } = createWorker();
+  entries.delete('/posts/article/index.html');
+  state.online = true;
+  const response = await request('/posts/article');
+  assert.equal(await response.text(), 'Network navigation');
+  assert.deepEqual(state.network, ['https://journal.example/posts/article']);
 });
 
 test('unknown offline routes return a real 404 response', async () => {
