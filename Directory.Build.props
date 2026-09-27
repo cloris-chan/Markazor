@@ -23,7 +23,7 @@
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <VersionPrefix>0.2.0</VersionPrefix>
-    <VersionSuffix>preview.1</VersionSuffix>
+    <VersionSuffix>preview.2</VersionSuffix>
     <Authors>Markazor contributors</Authors>
     <Company>Markazor</Company>
     <PackageProjectUrl>https://github.com/cloris-chan/Markazor</PackageProjectUrl>
