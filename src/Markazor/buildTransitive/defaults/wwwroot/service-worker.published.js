@@ -25,6 +25,23 @@ function toAssetUrl(path) {
     return new URL(encodedPath, baseUrl);
 }
 
+function createNavigationResponse(response) {
+    if (!response.redirected) {
+        return response;
+    }
+    const headers = [];
+    response.headers.forEach((value, name) => {
+        if (name !== 'content-encoding' && name !== 'content-length') {
+            headers.push([name, value]);
+        }
+    });
+    return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+    });
+}
+
 async function onInstall(event) {
     console.info('Service worker: Install');
 
@@ -59,8 +76,7 @@ async function onFetch(event) {
         const target = page || (admin ? '/_markazor/app.html' : null);
         if (target) {
             const response = await cache.match(target);
-            if (response) return response;
-            return fetch(new URL(target, baseUrl));
+            if (response) return createNavigationResponse(response);
         }
     } else if (manifestUrlList.has(url.href)) {
         const response = await cache.match(request);

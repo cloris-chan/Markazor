@@ -8,13 +8,13 @@ const source = await readFile(new URL('../src/Markazor/buildTransitive/defaults/
 function createWorker() {
   const origin = 'https://journal.example';
   const entries = new Map([
-    ['/index.html', 'Home'],
-    ['/posts/article/index.html', 'Article'],
-    ['/tags/c%23/index.html', 'C# collection'],
-    ['/_markazor/content/posts/C%23%20hello%25.md', '# Reserved filename'],
-    ['/_markazor/app.html', 'Studio shell'],
-    ['/404.html', 'Page not found'],
-    ['/site.css', 'body {}'],
+    ['/index.html', { body: 'Home', redirected: true, encoded: true }],
+    ['/posts/article/index.html', { body: 'Article', redirected: true, encoded: true }],
+    ['/tags/c%23/index.html', { body: 'C# collection', redirected: true, encoded: true }],
+    ['/_markazor/content/posts/C%23%20hello%25.md', { body: '# Reserved filename', redirected: false }],
+    ['/_markazor/app.html', { body: 'Studio shell', redirected: true, encoded: true }],
+    ['/404.html', { body: 'Page not found', redirected: false }],
+    ['/site.css', { body: 'body {}', redirected: false }],
   ]);
   const manifestAssets = [
     '/index.html',
@@ -50,7 +50,11 @@ function createWorker() {
         return {
           async match(input) {
             const path = new URL(typeof input === 'string' ? input : input.url, origin).pathname;
-            return entries.has(path) ? new Response(entries.get(path)) : undefined;
+            const entry = entries.get(path);
+            if (!entry) return undefined;
+            const response = new Response(entry.body, entry.encoded ? { headers: { 'Content-Encoding': 'br', 'Content-Length': '123', 'Content-Type': 'text/html' } } : undefined);
+            if (entry.redirected) Object.defineProperty(response, 'redirected', { value: true });
+            return response;
           },
           async addAll(requests) { state.installed = requests.map(request => request.url); },
         };
@@ -72,15 +76,26 @@ function createWorker() {
 
 test('offline navigation returns the requested article, including a trailing slash or query', async () => {
   const { request, state } = createWorker();
-  assert.equal(await (await request('/posts/article/?view=reading')).text(), 'Article');
-  assert.equal(await (await request('/')).text(), 'Home');
-  assert.equal(await (await request('/tags/c%23')).text(), 'C# collection');
+  const article = await request('/posts/article/?view=reading');
+  const home = await request('/');
+  const collection = await request('/tags/c%23');
+  assert.equal(article.redirected, false);
+  assert.equal(home.redirected, false);
+  assert.equal(collection.redirected, false);
+  assert.equal(article.headers.get('content-encoding'), null);
+  assert.equal(article.headers.get('content-length'), null);
+  assert.equal(article.headers.get('content-type'), 'text/html');
+  assert.equal(await article.text(), 'Article');
+  assert.equal(await home.text(), 'Home');
+  assert.equal(await collection.text(), 'C# collection');
   assert.equal(state.network.length, 0);
 });
 
 test('Studio navigation uses the application shell', async () => {
   const { request } = createWorker();
-  assert.equal(await (await request('/studio/write?markazor-preview=1')).text(), 'Studio shell');
+  const response = await request('/studio/write?markazor-preview=1');
+  assert.equal(response.redirected, false);
+  assert.equal(await response.text(), 'Studio shell');
 });
 
 test('unknown offline routes return a real 404 response', async () => {
