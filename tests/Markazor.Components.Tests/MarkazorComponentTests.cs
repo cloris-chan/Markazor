@@ -387,18 +387,135 @@ public sealed class MarkazorComponentTests
             Assert.Contains("callback_urls%5B%5D=http%3A%2F%2Flocalhost%2Fstudio%2Fsetup%2Fgithub-callback", component.Markup, StringComparison.Ordinal);
             Assert.Contains("setup_url=http%3A%2F%2Flocalhost%2Fstudio%2Fsetup", component.Markup, StringComparison.Ordinal);
             Assert.Contains("webhook_active=false", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("request_oauth_on_install=false", component.Markup, StringComparison.Ordinal);
             Assert.Contains("contents=write", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("Only select repositories: owner/repo", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("Only select repositories", component.Find("#setup-authorize").TextContent, StringComparison.Ordinal);
+            Assert.Contains("owner/repo", component.Find("#setup-authorize").TextContent, StringComparison.Ordinal);
             Assert.Contains("Client ID", component.Markup, StringComparison.Ordinal);
             Assert.Contains("GitHub App Client ID", component.Markup, StringComparison.Ordinal);
             Assert.Contains("Client secret", component.Markup, StringComparison.Ordinal);
             Assert.Contains("GITHUB_APP_CLIENT_SECRET", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("Required SWA secret", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("Recommended SWA secret", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("protects OAuth state and refresh cookies independently", component.Markup, StringComparison.Ordinal);
+            Assert.Equal(4, component.FindAll(".markazor-setup-step").Count);
+            Assert.Contains("Environment variables", component.Find("#setup-secret").TextContent, StringComparison.Ordinal);
+            Assert.Contains("MARKAZOR_AUTH_COOKIE_SECRET", component.Markup, StringComparison.Ordinal);
             Assert.Contains("Open Settings", component.Markup, StringComparison.Ordinal);
-            Assert.DoesNotContain("Save Settings", component.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain(component.FindAll("button"), button => button.TextContent.Trim() == "Save Settings");
         });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SetupAndSettingsRestoreSignInBeforeRepositoryIsConfigured(bool openSettings)
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        FakeSession session = CreateUnconfiguredSession(restoreSession: true);
+        FakeDiagnosticsService diagnostics = new(CreateDiagnostics(ready: true, canPush: true));
+        context.Services.AddSingleton<IMarkazorClientSession>(session);
+        context.Services.AddSingleton<IMarkazorSetupDiagnosticsService>(diagnostics);
+        context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
+
+        if (openSettings)
+        {
+            IRenderedComponent<StudioSettingsPanel> component = context.Render<StudioSettingsPanel>();
+            component.WaitForAssertion(() => Assert.Contains("Public Settings", component.Markup, StringComparison.Ordinal));
+        }
+        else
+        {
+            IRenderedComponent<SetupPage> component = context.Render<SetupPage>();
+            component.WaitForAssertion(() =>
+            {
+                Assert.False(component.FindAll("button").Single(button => button.TextContent.Trim() == "Open Settings").HasAttribute("disabled"));
+                Assert.True(component.FindAll("button").Single(button => button.TextContent.Trim() == "Open Write").HasAttribute("disabled"));
+            });
+        }
+
+        Assert.True(session.IsAuthenticated);
+        Assert.True(session.GetAccessTokenCount > 0);
+        Assert.Equal(0, diagnostics.RunCount);
+    }
+
+    [Fact]
+    public void SetupRemembersClientIdForAuthorizationAndSettings()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        BunitJSModuleInterop module = context.JSInterop.SetupModule("./_content/Markazor/markazor-setup.js");
+        JSRuntimeInvocationHandler<string> rememberedClientId = module.Setup<string>("getLocalValue", "clientId");
+        rememberedClientId.SetResult("remembered-client");
+        FakeSession session = CreateUnconfiguredSession(restoreSession: true);
+        context.Services.AddSingleton<IMarkazorClientSession>(session);
+        context.Services.AddSingleton<IMarkazorSetupDiagnosticsService>(
+            new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
+        context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
+
+        IRenderedComponent<SetupPage> setup = context.Render<SetupPage>();
+        setup.WaitForAssertion(() => Assert.Equal("remembered-client", GetInput(setup, "GitHub App Client ID").GetAttribute("value")));
+        SetInput(setup, "GitHub App Client ID", " edited-client ");
+        setup.FindAll("button").Single(button => button.TextContent.Trim() == "Authorize again").Click();
+        setup.WaitForAssertion(() =>
+        {
+            Assert.Equal("edited-client", session.LastAuthorizationRequest?.ClientId);
+            Assert.Contains(module.Invocations["setLocalValue"], invocation =>
+                invocation.Arguments.SequenceEqual(new object?[] { "clientId", "edited-client" }));
+        });
+
+        rememberedClientId.SetResult("edited-client");
+        IRenderedComponent<StudioSettingsPanel> settings = context.Render<StudioSettingsPanel>();
+        settings.WaitForAssertion(() =>
+        {
+            Assert.Equal("edited-client", GetInput(settings, "GitHub App Client ID").GetAttribute("value"));
+            Assert.Equal("main", GetInput(settings, "Default Branch").GetAttribute("value"));
+            Assert.Contains("http://localhost/", settings.Find("textarea").GetAttribute("value"), StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public void SetupRechecksSecretWithoutDiscardingClientId()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        FakeSession session = CreateUnconfiguredSession();
+        session.SetupStatus = session.SetupStatus! with
+        {
+            MissingSettings = [.. session.SetupStatus!.MissingSettings, "GITHUB_APP_CLIENT_SECRET"],
+        };
+        context.Services.AddSingleton<IMarkazorClientSession>(session);
+        context.Services.AddSingleton<IMarkazorSetupDiagnosticsService>(
+            new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
+        IRenderedComponent<SetupPage> component = context.Render<SetupPage>();
+
+        SetInput(component, "GitHub App Client ID", "bootstrap-client");
+        Assert.True(component.FindAll("button").Single(button => button.TextContent.Trim() == "Authorize GitHub").HasAttribute("disabled"));
+        session.SetupStatus = session.SetupStatus! with
+        {
+            MissingSettings = ["github.clientId", "repository.owner", "repository.name"],
+        };
+        component.FindAll("button").Single(button => button.TextContent.Trim() == "Check again").Click();
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Equal("bootstrap-client", GetInput(component, "GitHub App Client ID").GetAttribute("value"));
+            Assert.Contains("Secret found", component.Find("#setup-secret").TextContent, StringComparison.Ordinal);
+            Assert.False(component.FindAll("button").Single(button => button.TextContent.Trim() == "Authorize GitHub").HasAttribute("disabled"));
+            Assert.Contains("Step 3 of 4", component.Markup, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public void SetupUsesDeployedClientIdInsteadOfAnOldBrowserValue()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        BunitJSModuleInterop module = context.JSInterop.SetupModule("./_content/Markazor/markazor-setup.js");
+        module.Setup<string>("getLocalValue", "clientId").SetResult("old-client");
+        context.Services.AddSingleton<IMarkazorClientSession>(new FakeSession(isAuthenticated: false));
+        context.Services.AddSingleton<IMarkazorSetupDiagnosticsService>(
+            new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
+
+        IRenderedComponent<SetupPage> component = context.Render<SetupPage>();
+        component.WaitForAssertion(() => Assert.Equal("client-id", GetInput(component, "GitHub App Client ID").GetAttribute("value")));
     }
 
     [Fact]
@@ -449,6 +566,21 @@ public sealed class MarkazorComponentTests
 
         component.WaitForAssertion(() =>
             Assert.Equal("http://localhost/studio/setup?auth=github", navigation.Uri));
+    }
+
+    [Fact]
+    public void GitHubCallbackOffersReturnToSetupWhenSignInIsCancelled()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IMarkazorClientSession>(new FakeSession(isAuthenticated: false));
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo("/studio/setup/github-callback?error=access_denied");
+
+        IRenderedComponent<GitHubCallbackPage> component = context.Render<GitHubCallbackPage>();
+
+        Assert.Equal("/studio/setup", component.Find("a").GetAttribute("href"));
+        Assert.Contains("try again", component.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1041,9 +1173,12 @@ public sealed class MarkazorComponentTests
     private sealed class FakeDiagnosticsService(
         MarkazorRepositoryDiagnostics diagnostics) : IMarkazorSetupDiagnosticsService
     {
+        public int RunCount { get; private set; }
+
         public Task<MarkazorRepositoryDiagnostics> RunAsync(
             CancellationToken cancellationToken = default)
         {
+            RunCount++;
             return Task.FromResult(diagnostics);
         }
     }
@@ -1069,9 +1204,16 @@ public sealed class MarkazorComponentTests
     private sealed class FakeSession(
         bool isAuthenticated = true,
         Exception? loadSetupException = null,
-        IReadOnlyList<string>? missingSettings = null) : IMarkazorClientSession
+        IReadOnlyList<string>? missingSettings = null,
+        bool restoreSession = false) : IMarkazorClientSession
     {
-        public MarkazorSetupStatus? SetupStatus { get; } = new(
+        private bool authenticated = isAuthenticated;
+
+        public int GetAccessTokenCount { get; private set; }
+
+        public MarkazorGitHubAuthorizationRequest? LastAuthorizationRequest { get; private set; }
+
+        public MarkazorSetupStatus? SetupStatus { get; set; } = new(
             Ready: true,
             MissingSettings: missingSettings ?? [],
             Site: new MarkazorSitePublicSettings
@@ -1088,15 +1230,15 @@ public sealed class MarkazorComponentTests
                 "src/Api",
                 "wwwroot"));
 
-        public string? AccessToken => isAuthenticated ? "token" : null;
+        public string? AccessToken => authenticated ? "token" : null;
 
-        public DateTimeOffset? AccessTokenExpiresAtUtc => isAuthenticated
+        public DateTimeOffset? AccessTokenExpiresAtUtc => authenticated
             ? DateTimeOffset.UtcNow.AddHours(1)
             : null;
 
         public bool IsReady => true;
 
-        public bool IsAuthenticated => isAuthenticated;
+        public bool IsAuthenticated => authenticated;
 
         public Task<MarkazorSetupStatus?> LoadSetupStatusAsync(CancellationToken cancellationToken = default)
         {
@@ -1112,6 +1254,7 @@ public sealed class MarkazorComponentTests
             MarkazorGitHubAuthorizationRequest? request = null,
             CancellationToken cancellationToken = default)
         {
+            LastAuthorizationRequest = request;
             return Task.FromResult(new MarkazorGitHubAuthorizationResponse(
                 new Uri("https://github.test/authorize"),
                 DateTimeOffset.UtcNow.AddMinutes(10)));
@@ -1131,7 +1274,9 @@ public sealed class MarkazorComponentTests
 
         public Task<string?> GetAccessTokenAsync(CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(isAuthenticated ? "token" : null);
+            GetAccessTokenCount++;
+            authenticated |= restoreSession;
+            return Task.FromResult(AccessToken);
         }
 
         public Task<MarkazorGitHubClientResult<T>> ExecuteGitHubAsync<T>(
@@ -1140,6 +1285,19 @@ public sealed class MarkazorComponentTests
         {
             throw new NotSupportedException();
         }
+    }
+
+    private static FakeSession CreateUnconfiguredSession(bool restoreSession = false)
+    {
+        FakeSession session = new(isAuthenticated: false, restoreSession: restoreSession);
+        session.SetupStatus = session.SetupStatus! with
+        {
+            Ready = false,
+            MissingSettings = ["github.clientId", "repository.owner", "repository.name"],
+            GitHub = new MarkazorGitHubSettings { ClientId = string.Empty },
+            Repository = new MarkazorRepositoryStatus(string.Empty, string.Empty, "main"),
+        };
+        return session;
     }
 
     private sealed class FakeCatalog : IMarkazorContentCatalog

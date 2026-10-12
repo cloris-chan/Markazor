@@ -5,6 +5,17 @@ namespace Markazor.Components;
 internal static class MarkazorSetupStorage
 {
     public const string AuthReturnPathLocalStorageKey = "authReturnPath";
+    public const string ClientIdLocalStorageKey = "clientId";
+
+    public static Task<string?> LoadClientIdAsync(IJSObjectReference? module)
+    {
+        return GetLocalValueAsync(module, ClientIdLocalStorageKey);
+    }
+
+    public static Task SaveClientIdAsync(IJSObjectReference? module, string clientId)
+    {
+        return SetLocalValueAsync(module, ClientIdLocalStorageKey, clientId);
+    }
 
     public static Task<string?> LoadAuthorizationReturnPathAsync(IJSObjectReference? module)
     {

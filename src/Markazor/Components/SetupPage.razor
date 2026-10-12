@@ -15,226 +15,218 @@
     <header class="markazor-page-header">
         <div>
             <h1>Setup</h1>
-            <p>Connect the GitHub App and authorize this browser.</p>
+            <p>@NextStepDescription</p>
         </div>
-        <span class="markazor-status-pill @ReadyClass">@ReadyText</span>
+        <div class="markazor-header-actions">
+            <span class="markazor-status-pill @ReadyClass" role="status">@ReadyText</span>
+            <div class="markazor-actions">
+                <button type="button" @onclick="ReloadAsync" disabled="@isBusy">Check again</button>
+            </div>
+        </div>
     </header>
 
     @if (isLoading)
     {
-        <p class="markazor-muted">Checking setup...</p>
+        <p class="markazor-muted" role="status">Checking your site...</p>
     }
     else if (!string.IsNullOrWhiteSpace(errorMessage))
     {
-        <p class="markazor-alert">@errorMessage</p>
+        <div class="markazor-panel" role="alert">
+            <p class="markazor-alert">@errorMessage</p>
+            @if (!string.IsNullOrWhiteSpace(errorDetails))
+            {
+                <details class="markazor-setup-help">
+                    <summary>Error details</summary>
+                    <p class="markazor-muted">@errorDetails</p>
+                </details>
+            }
+        </div>
     }
 
     @if (status is not null)
     {
-        <section class="markazor-panel">
+        <section id="setup-app" class="markazor-panel markazor-setup-step" aria-labelledby="setup-app-title">
             <div class="markazor-section-header">
-                <h2>Environment</h2>
-                <button type="button" @onclick="ReloadAsync" disabled="@isBusy">Run checks</button>
+                <h2 id="setup-app-title"><span class="markazor-setup-number">1</span> Create a GitHub App</h2>
+                <span class="markazor-status-pill @(HasEffectiveClientId ? "is-ready" : "is-waiting")">@(HasEffectiveClientId ? "Client ID added" : "Client ID needed")</span>
             </div>
 
-            @if (MissingStaticWebAppsSecrets.Count == 0)
-            {
-                <p class="markazor-success">All required Static Web Apps secrets are present.</p>
-            }
-            else
-            {
-                <ul class="markazor-token-list">
-                    @foreach (string setting in MissingStaticWebAppsSecrets)
-                    {
-                        <li>@setting</li>
-                    }
-                </ul>
-            }
-
-            <dl class="markazor-kv">
-                <dt>Required SWA secret</dt>
-                <dd><code>GITHUB_APP_CLIENT_SECRET</code> is required for GitHub OAuth token exchange.</dd>
-                <dt>Recommended SWA secret</dt>
-                <dd><code>MARKAZOR_AUTH_COOKIE_SECRET</code> protects OAuth state and refresh cookies independently. If it is omitted, Markazor falls back to <code>GITHUB_APP_CLIENT_SECRET</code>.</dd>
-                <dt>Public settings</dt>
-                <dd>After authorization, use Settings to save <code>markazor.settings.json</code>.</dd>
-            </dl>
-        </section>
-
-        <section class="markazor-panel">
-            <div class="markazor-section-header">
-                <h2>GitHub App</h2>
-                <div class="markazor-inline-actions">
-                    <a class="markazor-button-link" href="@GitHubAppCreateUrl" target="_blank" rel="noopener noreferrer">Create App</a>
-                    @if (CanCreateOrganizationApp)
-                    {
-                        <a class="markazor-button-link is-secondary" href="@GitHubOrganizationAppCreateUrl" target="_blank" rel="noopener noreferrer">Create Org App</a>
-                    }
-                </div>
+            <p class="markazor-muted">Create an app in the GitHub account that owns your repository. The button fills in its settings; choose a unique name on GitHub, then create the app.</p>
+            <div class="markazor-actions">
+                <a class="markazor-button-link" href="@GitHubAppCreateUrl" target="_blank" rel="noopener noreferrer">Create App</a>
+                @if (CanCreateOrganizationApp)
+                {
+                    <a class="markazor-button-link is-secondary" href="@GitHubOrganizationAppCreateUrl" target="_blank" rel="noopener noreferrer">Create Org App</a>
+                }
             </div>
-
-            <p class="markazor-muted">Create the app under the account that owns this site repository. The links prefill safe defaults; the App name and Description are only suggestions and can be changed.</p>
-
-            <dl class="markazor-kv">
-                <dt>Owner</dt>
-                <dd>@Display(status.Repository.Owner)</dd>
-                <dt>App name</dt>
-                <dd>@GitHubAppSuggestedName</dd>
-                <dt>Description</dt>
-                <dd>@GitHubAppDescription</dd>
-                <dt>Homepage URL</dt>
-                <dd><code>@SiteBaseUrl</code></dd>
-                <dt>Callback URL</dt>
-                <dd><code>@GitHubCallbackUrl</code></dd>
-                <dt>Setup URL</dt>
-                <dd><code>@SetupUrl</code></dd>
-                <dt>Redirect on update</dt>
-                <dd>Enabled</dd>
-                <dt>Visibility</dt>
-                <dd>Private to the app owner</dd>
-                <dt>Webhook</dt>
-                <dd>Inactive</dd>
-                <dt>Repository permission</dt>
-                <dd>Contents: Read and write</dd>
-                <dt>Installation</dt>
-                <dd>Only select repositories: @ConfiguredRepositoryFullName</dd>
-            </dl>
-
-            <ol class="markazor-checklist">
-                <li>Create the GitHub App, then copy its <code>Client ID</code> into the temporary field below.</li>
-                <li>Generate a <code>Client secret</code> and add it to Static Web Apps environment variables as <code>GITHUB_APP_CLIENT_SECRET</code>.</li>
-                <li>Recommended: add a separate long random Static Web Apps environment variable named <code>MARKAZOR_AUTH_COOKIE_SECRET</code>.</li>
-                <li>Install the GitHub App on <code>@ConfiguredRepositoryFullName</code>, return here, then authorize GitHub.</li>
-            </ol>
-        </section>
-
-        <section class="markazor-panel">
-            <div class="markazor-section-header">
-                <h2>Browser Client ID</h2>
-                <span class="markazor-status-pill @(HasEffectiveClientId ? "is-ready" : "is-waiting")">@ClientIdStatusText</span>
-            </div>
-
-            <p class="markazor-muted">This value is used only for the next authorization request. Save the canonical Client ID later from Studio settings.</p>
 
             <label class="markazor-field">
                 <span>GitHub App Client ID</span>
-                <input value="@localClientId"
-                       @oninput="OnClientIdInputAsync"
-                       autocomplete="off"
-                       spellcheck="false" />
+                <input value="@localClientId" @oninput="OnClientIdInputAsync" autocomplete="off" spellcheck="false" placeholder="Paste the Client ID" />
+                <small>After creating the app, copy Client ID from its General page. App ID is a different field.</small>
             </label>
 
-            @if (!string.IsNullOrWhiteSpace(clientIdMessage))
-            {
-                <p class="markazor-success">@clientIdMessage</p>
-            }
+            <details class="markazor-setup-help">
+                <summary>App settings and organization setup</summary>
+                <div class="markazor-setup-help-body">
+                    <p class="markazor-muted">Choose a unique app name, then select Create GitHub App. If the name is taken, add your account name.</p>
+                    <p class="markazor-muted">For an organization, open its Settings → Developer settings → GitHub Apps → New GitHub App and use these values.</p>
+                    <dl class="markazor-kv markazor-setup-values">
+                        <dt>Homepage URL</dt>
+                        <dd><code>@SiteBaseUrl</code><button type="button" aria-label="Copy Homepage URL" @onclick='() => CopyAsync("Homepage URL", SiteBaseUrl)'>Copy</button></dd>
+                        <dt>Callback URL</dt>
+                        <dd><code>@GitHubCallbackUrl</code><button type="button" aria-label="Copy Callback URL" @onclick='() => CopyAsync("Callback URL", GitHubCallbackUrl)'>Copy</button></dd>
+                        <dt>Setup URL</dt>
+                        <dd><code>@SetupUrl</code><button type="button" aria-label="Copy Setup URL" @onclick='() => CopyAsync("Setup URL", SetupUrl)'>Copy</button></dd>
+                        <dt>Contents permission</dt>
+                        <dd>Repository permissions → Contents → Read and write</dd>
+                        <dt>Webhook</dt>
+                        <dd>Clear Active.</dd>
+                        <dt>Request user authorization during installation</dt>
+                        <dd>Leave unchecked. You will authorize in step 3.</dd>
+                        <dt>Where can this app be installed?</dt>
+                        <dd>Only on this account</dd>
+                        <dt>Redirect on update</dt>
+                        <dd>Enabled</dd>
+                    </dl>
+                    @if (!string.IsNullOrWhiteSpace(copyMessage))
+                    {
+                        <p class="markazor-muted" role="status">@copyMessage</p>
+                    }
+                </div>
+            </details>
         </section>
 
-        <section class="markazor-panel">
+        <section id="setup-secret" class="markazor-panel markazor-setup-step" aria-labelledby="setup-secret-title">
             <div class="markazor-section-header">
-                <h2>GitHub Authorization</h2>
-                <span class="markazor-status-pill @(Session.IsAuthenticated ? "is-ready" : "is-waiting")">@AuthText</span>
+                <h2 id="setup-secret-title"><span class="markazor-setup-number">2</span> Add the secret to Azure</h2>
+                <span class="markazor-status-pill @(HasClientSecret ? "is-ready" : "is-waiting")">@(HasClientSecret ? "Secret found" : "Secret needed")</span>
             </div>
 
-            @if (Session.AccessTokenExpiresAtUtc is not null)
+            @if (HasClientSecret)
             {
-                <p class="markazor-muted">Access expires at @Session.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.InvariantCulture).</p>
+                <p class="markazor-success"><code>GITHUB_APP_CLIENT_SECRET</code> is configured in Azure.</p>
             }
-
-            <div class="markazor-actions">
-                <button type="button" @onclick="AuthorizeAsync" disabled="@(!CanAuthorize)">Authorize GitHub</button>
-                <button type="button" @onclick="RefreshAuthAsync" disabled="@(!CanRefreshSession)">Refresh Session</button>
-                <button type="button" @onclick="OpenSettings" disabled="@(!CanOpenSettings)">Open Settings</button>
-                <button type="button" @onclick="OpenWrite" disabled="@(!CanOpenWrite)">Open Write</button>
-            </div>
-
-            @if (!string.IsNullOrWhiteSpace(AuthorizationDisabledReason))
-            {
-                <p class="markazor-warning">@AuthorizationDisabledReason</p>
-            }
+            <details class="markazor-setup-help" open="@(!HasClientSecret)">
+                <summary>How to add the secret</summary>
+                <div class="markazor-setup-help-body">
+                    <ol class="markazor-checklist">
+                        <li>In your GitHub App's General page, select <strong>Generate a new client secret</strong> and copy the value.</li>
+                        <li>Open your Static Web App in the <a href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer">Azure portal</a>. Go to <strong>Settings → Environment variables</strong>, select your site's environment, then <strong>+ Add</strong>.</li>
+                    </ol>
+                    <dl class="markazor-kv">
+                        <dt>Name</dt>
+                        <dd><code>GITHUB_APP_CLIENT_SECRET</code></dd>
+                        <dt>Value</dt>
+                        <dd>The Client secret you just copied.</dd>
+                    </dl>
+                    <p class="markazor-muted">Select <strong>Apply</strong>, then <strong>Apply</strong> again to save. Return here and choose <strong>Check again</strong>.</p>
+                    <p class="markazor-muted">Keep this secret in Azure environment variables. The site only asks for the public Client ID.</p>
+                </div>
+            </details>
+            <details class="markazor-setup-help">
+                <summary>Optional: separate sign-in cookie secret</summary>
+                <div class="markazor-setup-help-body">
+                    <p class="markazor-muted">Add <code>MARKAZOR_AUTH_COOKIE_SECRET</code> in the same Azure environment with a long, random value. It protects sign-in cookies; when omitted, Markazor uses the Client secret instead.</p>
+                </div>
+            </details>
         </section>
 
-        <section class="markazor-grid">
-            <div class="markazor-panel">
-                <h2>Repository</h2>
-                <dl class="markazor-kv">
-                    <dt>Owner</dt>
-                    <dd>@Display(status.Repository.Owner)</dd>
-                    <dt>Name</dt>
-                    <dd>@Display(status.Repository.Name)</dd>
-                    <dt>Configured branch</dt>
-                    <dd>@Display(status.Repository.DefaultBranch)</dd>
-                    <dt>GitHub default</dt>
-                    <dd>@Display(diagnostics?.GitHubDefaultBranch)</dd>
-                </dl>
-            </div>
-
-            <div class="markazor-panel">
-                <h2>Repository Paths</h2>
-                <dl class="markazor-kv">
-                    <dt>Drafts</dt>
-                    <dd>@MarkazorRepositoryPaths.DraftsRoot</dd>
-                    <dt>Posts</dt>
-                    <dd>@MarkazorRepositoryPaths.PostsRoot</dd>
-                    <dt>Notes</dt>
-                    <dd>@MarkazorRepositoryPaths.NotesRoot</dd>
-                    <dt>Assets</dt>
-                    <dd>@MarkazorRepositoryPaths.AssetsRoot</dd>
-                    <dt>Public</dt>
-                    <dd>@MarkazorRepositoryPaths.PublicRoot</dd>
-                </dl>
-            </div>
-
-            <div class="markazor-panel">
-                <h2>Static Web Apps</h2>
-                <dl class="markazor-kv">
-                    <dt>App</dt>
-                    <dd>@status.ExpectedStaticWebAppsBuildSettings.AppLocation</dd>
-                    <dt>API</dt>
-                    <dd>@status.ExpectedStaticWebAppsBuildSettings.ApiLocation</dd>
-                    <dt>Output</dt>
-                    <dd>@status.ExpectedStaticWebAppsBuildSettings.OutputLocation</dd>
-                </dl>
-            </div>
-        </section>
-
-        <section class="markazor-panel">
+        <section id="setup-authorize" class="markazor-panel markazor-setup-step" aria-labelledby="setup-authorize-title">
             <div class="markazor-section-header">
-                <h2>Repository Diagnostics</h2>
-                <span class="markazor-status-pill @(diagnostics?.Ready == true ? "is-ready" : "is-waiting")">@DiagnosticsText</span>
+                <h2 id="setup-authorize-title"><span class="markazor-setup-number">3</span> Connect your repository</h2>
+                <span class="markazor-status-pill @(Session.IsAuthenticated ? "is-ready" : "is-waiting")">@(Session.IsAuthenticated ? "Signed in" : "Authorization needed")</span>
             </div>
 
-            @if (diagnostics is null)
+            @if (Session.IsAuthenticated)
             {
-                <p class="markazor-muted">Authorize GitHub to verify repository access.</p>
+                <p class="markazor-success">You're signed in. Continue to step 4.</p>
+            }
+            <details class="markazor-setup-help" open="@(!Session.IsAuthenticated || diagnostics is { Ready: false })">
+                <summary>Install or reconnect your app</summary>
+                <div class="markazor-setup-help-body">
+                    <ol class="markazor-checklist">
+                        <li>In your GitHub App, open <strong>Install App</strong>. Choose <strong>Only select repositories</strong>, select <strong>@ConfiguredRepositoryFullName</strong>, then install.</li>
+                        <li>Return here and authorize GitHub with an account that can write to that repository.</li>
+                    </ol>
+                    <div class="markazor-actions">
+                        <button type="button" @onclick="AuthorizeAsync" disabled="@(!CanAuthorize)">@(Session.IsAuthenticated ? "Authorize again" : "Authorize GitHub")</button>
+                    </div>
+                    @if (!isBusy && !string.IsNullOrWhiteSpace(AuthorizationDisabledReason))
+                    {
+                        <p class="markazor-muted">@AuthorizationDisabledReason</p>
+                    }
+                </div>
+            </details>
+        </section>
+
+        <section id="setup-settings" class="markazor-panel markazor-setup-step" aria-labelledby="setup-settings-title">
+            <div class="markazor-section-header">
+                <h2 id="setup-settings-title"><span class="markazor-setup-number">4</span> Save settings and start writing</h2>
+                <span class="markazor-status-pill @(CanOpenWrite ? "is-ready" : "is-waiting")">@(CanOpenWrite ? "Ready to write" : diagnostics is { Ready: false } ? "Check repository" : Session.IsAuthenticated ? "Save settings" : "After authorization")</span>
+            </div>
+
+            @if (CanOpenWrite)
+            {
+                <p class="markazor-success">Your repository is connected. Open Write to create your first draft.</p>
+            }
+            else if (diagnostics is { Ready: false })
+            {
+                <p class="markazor-muted">Fix the repository check below, then choose <strong>Check again</strong>.</p>
             }
             else
             {
-                <dl class="markazor-kv">
-                    <dt>Repository</dt>
-                    <dd>@CheckText(diagnostics.RepositoryAccessible)</dd>
-                    <dt>Read permission</dt>
-                    <dd>@CheckText(diagnostics.CanPull)</dd>
-                    <dt>Push permission</dt>
-                    <dd>@CheckText(diagnostics.CanPush)</dd>
-                    <dt>Branch</dt>
-                    <dd>@CheckText(diagnostics.BranchAccessible)</dd>
-                    <dt>Tree</dt>
-                    <dd>@CheckText(diagnostics.TreeReadable)</dd>
-                </dl>
-
-                @foreach (string error in diagnostics.Errors)
-                {
-                    <p class="markazor-alert">@error</p>
-                }
-
-                @foreach (string warning in diagnostics.Warnings)
-                {
-                    <p class="markazor-warning">@warning</p>
-                }
+                <p class="markazor-muted">Open Settings after authorization. Add your site title and description, confirm the site URL, and enter the repository you connected to Azure.</p>
+                <p class="markazor-muted">Choose <strong>Save Settings</strong> and wait for the Azure deployment to finish. Return here and <strong>Check again</strong>; Write opens once repository checks pass.</p>
+            }
+            <div class="markazor-actions">
+                <button type="button" @onclick="OpenSettings" disabled="@(!CanOpenSettings)">Open Settings</button>
+                <button type="button" @onclick="OpenWrite" disabled="@(!CanOpenWrite)">Open Write</button>
+            </div>
+            @if (diagnostics is not null && !diagnostics.Ready)
+            {
+                <p class="markazor-warning">@RepositoryHelp</p>
             }
         </section>
+
+        <details class="markazor-panel markazor-settings-diagnostics markazor-setup-details">
+            <summary><span>Connection details</span><span class="markazor-status-pill @(diagnostics?.Ready == true ? "is-ready" : "is-waiting")">@DiagnosticsText</span></summary>
+            <div class="markazor-setup-help-body">
+                @if (diagnostics is null)
+                {
+                    <p class="markazor-muted">Repository checks run after authorization and after your settings are deployed.</p>
+                }
+                else
+                {
+                    <dl class="markazor-kv">
+                        <dt>Repository access</dt><dd>@CheckText(diagnostics.RepositoryAccessible)</dd>
+                        <dt>Read permission</dt><dd>@CheckText(diagnostics.CanPull)</dd>
+                        <dt>Write permission</dt><dd>@CheckText(diagnostics.CanPush)</dd>
+                        <dt>Branch access</dt><dd>@CheckText(diagnostics.BranchAccessible)</dd>
+                        <dt>File listing</dt><dd>@CheckText(diagnostics.TreeReadable)</dd>
+                    </dl>
+                    @foreach (string error in diagnostics.Errors)
+                    {
+                        <p class="markazor-alert">@error</p>
+                    }
+                    @foreach (string warning in diagnostics.Warnings)
+                    {
+                        <p class="markazor-warning">@warning</p>
+                    }
+                }
+                <dl class="markazor-kv">
+                    <dt>Repository</dt><dd>@ConfiguredRepositoryFullName</dd>
+                    <dt>Branch</dt><dd>@Display(status.Repository.DefaultBranch)</dd>
+                    <dt>Settings file</dt><dd>@(status.SettingsFileExists ? "Deployed" : "Not deployed yet")</dd>
+                    <dt>App location</dt><dd><code>@status.ExpectedStaticWebAppsBuildSettings.AppLocation</code></dd>
+                    <dt>API location</dt><dd><code>@status.ExpectedStaticWebAppsBuildSettings.ApiLocation</code></dd>
+                    <dt>Output location</dt><dd><code>@status.ExpectedStaticWebAppsBuildSettings.OutputLocation</code></dd>
+                </dl>
+            </div>
+        </details>
     }
+
+    <p class="markazor-muted markazor-setup-footer"><a href="https://github.com/cloris-chan/Markazor/blob/main/docs/user-guide.md#3-finish-setup-in-studio" target="_blank" rel="noopener noreferrer">Read the setup walkthrough</a></p>
 </div>
 
 @code {
@@ -243,133 +235,115 @@
     private bool isBusy;
     private bool isLoading = true;
     private string? errorMessage;
+    private string? errorDetails;
     private string localClientId = string.Empty;
-    private string? clientIdMessage;
+    private bool clientIdEdited;
+    private string? copyMessage;
     private IJSObjectReference? setupModule;
 
     private bool CanAuthorize => string.IsNullOrWhiteSpace(AuthorizationDisabledReason);
 
-    private bool CanRefreshSession => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
-        && !isBusy;
-
     private bool CanOpenSettings => MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
-        && Session.IsAuthenticated
-        && !isBusy;
+        && Session.IsAuthenticated && !isBusy;
 
     private bool CanOpenWrite => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
-        && Session.IsAuthenticated
-        && diagnostics?.Ready == true;
+        && Session.IsAuthenticated && diagnostics?.Ready == true && !isBusy;
 
     private bool CanCreateOrganizationApp => !string.IsNullOrWhiteSpace(status?.Repository.Owner);
 
     private bool HasEffectiveClientId => !string.IsNullOrWhiteSpace(EffectiveClientId);
 
-    private string ReadyText => diagnostics?.Ready == true ? "Ready" : "Needs attention";
+    private bool HasClientSecret => status is not null
+        && !status.MissingSettings.Contains("GITHUB_APP_CLIENT_SECRET", StringComparer.Ordinal);
 
-    private string ReadyClass => diagnostics?.Ready == true ? "is-ready" : "is-waiting";
+    private int CurrentStep => !HasEffectiveClientId ? 1 : !HasClientSecret ? 2
+        : !Session.IsAuthenticated ? 3 : 4;
 
-    private string AuthText => Session.IsAuthenticated ? "Authorized" : "Signed out";
+    private string ReadyText => isLoading ? "Checking..." : status is null ? "Unavailable"
+        : CanOpenWrite ? "Ready to write" : $"Step {CurrentStep} of 4";
 
-    private string DiagnosticsText => diagnostics?.Ready == true ? "Passed" : "Not passed";
+    private string ReadyClass => CanOpenWrite ? "is-ready" : "is-waiting";
 
-    private string ClientIdStatusText => HasEffectiveClientId ? "Available" : "Required";
-
-    private IReadOnlyList<string> MissingStaticWebAppsSecrets => status?.MissingSettings
-        .Where(static setting => string.Equals(setting, "GITHUB_APP_CLIENT_SECRET", StringComparison.Ordinal))
-        .ToArray() ?? [];
-
-    private string SiteBaseUrl => ResolveSiteBaseUrl();
-
-    private string EffectiveClientId => string.IsNullOrWhiteSpace(localClientId)
-        ? status?.GitHub.ClientId.Trim() ?? string.Empty
-        : localClientId.Trim();
-
-    private string? AuthorizationDisabledReason
-    {
-        get
+    private string NextStepDescription => isLoading ? "Connect GitHub to start writing from your browser."
+        : status is null ? "Check that your first Azure deployment has finished, then try again."
+        : CanOpenWrite ? "Setup is complete. Your writing workspace is ready."
+        : CurrentStep switch
         {
-            if (isBusy)
-            {
-                return "Setup is busy.";
-            }
+            1 => "Start by creating a GitHub App and adding its Client ID below.",
+            2 => "Next, add the Client secret in Azure and check again.",
+            3 => "Install the app on your site repository, then authorize GitHub.",
+            _ => diagnostics is { Ready: false }
+                ? "Review the repository check in step 4, then check again."
+                : "Save your site settings, wait for deployment, then check again.",
+        };
 
-            if (status is null)
-            {
-                return "Setup status has not loaded yet.";
-            }
+    private string DiagnosticsText => diagnostics is null ? "Not checked"
+        : diagnostics.Ready ? "Passed" : "Needs attention";
 
-            if (!MarkazorSetupReadiness.HasAuthorizationConfiguration(status))
-            {
-                return "GITHUB_APP_CLIENT_SECRET must be configured in Static Web Apps before authorization.";
-            }
+    private string RepositoryHelp => diagnostics?.RepositoryAccessible != true
+        ? "Check the repository owner and name in Settings, and make sure the GitHub App is installed on that repository (step 3)."
+        : diagnostics.CanPull != true || diagnostics.CanPush != true
+        ? "Give the GitHub App Contents: Read and write permission, then approve the updated installation. Authorize again with an account that has write access."
+        : diagnostics.BranchAccessible != true
+        ? $"Check that the branch '{status?.Repository.DefaultBranch}' exists and matches the branch entered in Settings."
+        : "The repository's file listing could not be read. Check again; connection details below show the error.";
 
-            if (MarkazorSetupReadiness.IsPersistedGitHubClientIdMissing(status)
-                && string.IsNullOrWhiteSpace(EffectiveClientId))
-            {
-                return "Paste the GitHub App Client ID before starting authorization.";
-            }
+    private string SiteBaseUrl => status?.Site.PrimaryBaseUrl?.ToString() ?? Navigation.BaseUri;
 
-            return null;
-        }
-    }
+    private string EffectiveClientId => localClientId.Trim();
+
+    private string? AuthorizationDisabledReason => isBusy ? "Checking your setup..."
+        : status is null ? "Load your setup status first."
+        : !HasEffectiveClientId ? "Finish step 1: paste your GitHub App Client ID."
+        : !MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
+        ? "Finish step 2: add the Azure secret, then choose Check again."
+        : null;
 
     private string GitHubAppCreateUrl => BuildGitHubAppRegistrationUrl("https://github.com/settings/apps/new");
 
-    private string GitHubOrganizationAppCreateUrl => string.IsNullOrWhiteSpace(status?.Repository.Owner)
-        ? GitHubAppCreateUrl
-        : BuildGitHubAppRegistrationUrl($"https://github.com/organizations/{Uri.EscapeDataString(status.Repository.Owner)}/settings/apps/new");
+    private string GitHubOrganizationAppCreateUrl => BuildGitHubAppRegistrationUrl(
+        $"https://github.com/organizations/{Uri.EscapeDataString(status?.Repository.Owner ?? string.Empty)}/settings/apps/new");
 
-    private string GitHubAppSuggestedName => string.IsNullOrWhiteSpace(status?.Repository.Name)
-        ? "Markazor Site"
-        : $"Markazor {status.Repository.Name}";
-
-    private string GitHubAppDescription => $"Repository-native Markazor Studio for {ConfiguredRepositoryFullName}.";
+    private string GitHubAppSuggestedName
+    {
+        get
+        {
+            string name = string.IsNullOrWhiteSpace(status?.Repository.Name) ? "Markazor Site" : $"Markazor {status.Repository.Name}";
+            return name[..Math.Min(34, name.Length)];
+        }
+    }
 
     private string GitHubCallbackUrl => new Uri(new Uri(SiteBaseUrl), "studio/setup/github-callback").ToString();
 
     private string SetupUrl => new Uri(new Uri(SiteBaseUrl), "studio/setup").ToString();
 
-    private string ConfiguredRepositoryFullName
-    {
-        get
-        {
-            if (status is null
-                || string.IsNullOrWhiteSpace(status.Repository.Owner)
-                || string.IsNullOrWhiteSpace(status.Repository.Name))
-            {
-                return "the configured repository";
-            }
-
-            return status.Repository.Owner + "/" + status.Repository.Name;
-        }
-    }
+    private string ConfiguredRepositoryFullName => string.IsNullOrWhiteSpace(status?.Repository.Owner)
+        || string.IsNullOrWhiteSpace(status.Repository.Name)
+        ? "the repository you deployed to Azure" : status.Repository.Owner + "/" + status.Repository.Name;
 
     private string BuildGitHubAppRegistrationUrl(string baseUrl)
     {
         KeyValuePair<string, string>[] parameters =
         [
             new("name", GitHubAppSuggestedName),
-            new("description", GitHubAppDescription),
+            new("description", $"Markazor Studio for {ConfiguredRepositoryFullName}."),
             new("url", SiteBaseUrl),
             new("callback_urls[]", GitHubCallbackUrl),
+            new("request_oauth_on_install", "false"),
             new("setup_url", SetupUrl),
             new("setup_on_update", "true"),
             new("public", "false"),
             new("webhook_active", "false"),
             new("contents", "write"),
         ];
-
-        string query = string.Join("&", parameters.Select(static parameter =>
+        return baseUrl + "?" + string.Join("&", parameters.Select(static parameter =>
             $"{Uri.EscapeDataString(parameter.Key)}={Uri.EscapeDataString(parameter.Value)}"));
-
-        return baseUrl + "?" + query;
     }
 
     protected override async Task OnInitializedAsync()
     {
         bool returnedFromGitHub = Navigation.Uri.Contains("auth=github", StringComparison.OrdinalIgnoreCase);
         await ReloadAsync().ConfigureAwait(false);
-
         if (returnedFromGitHub)
         {
             Navigation.NavigateTo("/studio/setup", replace: true);
@@ -381,21 +355,37 @@
         isBusy = true;
         isLoading = true;
         errorMessage = null;
-
+        errorDetails = null;
+        diagnostics = null;
         try
         {
             status = await Session.LoadSetupStatusAsync().ConfigureAwait(false);
-            diagnostics = null;
+            if (!clientIdEdited)
+            {
+                IJSObjectReference? module = await EnsureSetupModuleAsync().ConfigureAwait(false);
+                localClientId = !string.IsNullOrWhiteSpace(status?.GitHub.ClientId)
+                    ? status.GitHub.ClientId.Trim()
+                    : await MarkazorSetupStorage.LoadClientIdAsync(module).ConfigureAwait(false) ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(status?.GitHub.ClientId))
+                {
+                    await MarkazorSetupStorage.SaveClientIdAsync(module, string.Empty).ConfigureAwait(false);
+                }
+            }
 
-            if (MarkazorSetupReadiness.HasRepositoryConfiguration(status)
-                && await Session.GetAccessTokenAsync().ConfigureAwait(false) is not null)
+            // Restore sign-in even before the first repository settings file exists.
+            if (MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
+                && await Session.GetAccessTokenAsync().ConfigureAwait(false) is not null
+                && MarkazorSetupReadiness.HasRepositoryConfiguration(status))
             {
                 diagnostics = await DiagnosticsService.RunAsync().ConfigureAwait(false);
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
-            errorMessage = DescribeLoadFailure(ex);
+            errorMessage = status is null
+                ? "Setup could not reach the site API. Check that the Azure deployment finished, then choose Check again."
+                : "The connection check could not finish. Check your internet connection, then choose Check again.";
+            errorDetails = ex.Message;
         }
         finally
         {
@@ -407,38 +397,46 @@
     private async Task OnClientIdInputAsync(ChangeEventArgs args)
     {
         localClientId = args.Value?.ToString() ?? string.Empty;
-        clientIdMessage = string.IsNullOrWhiteSpace(localClientId)
-            ? null
-            : "Ready for this authorization request.";
+        clientIdEdited = true;
+        await MarkazorSetupStorage.SaveClientIdAsync(
+            await EnsureSetupModuleAsync().ConfigureAwait(false), EffectiveClientId).ConfigureAwait(false);
+    }
 
-        await Task.CompletedTask.ConfigureAwait(false);
+    private async Task CopyAsync(string label, string value)
+    {
+        IJSObjectReference? module = await EnsureSetupModuleAsync().ConfigureAwait(false);
+        bool copied = false;
+        if (module is not null)
+        {
+            try
+            {
+                copied = await module.InvokeAsync<bool>("copyText", value).ConfigureAwait(false);
+            }
+            catch (JSException)
+            {
+            }
+        }
+        copyMessage = copied ? $"{label} copied." : $"Select and copy the {label} above; your browser could not copy it automatically.";
     }
 
     private async Task AuthorizeAsync()
     {
         isBusy = true;
         errorMessage = null;
-
+        errorDetails = null;
         try
         {
-            MarkazorGitHubAuthorizationRequest request = new(
-                string.IsNullOrWhiteSpace(EffectiveClientId) ? null : EffectiveClientId,
-                new Uri(SiteBaseUrl));
             IJSObjectReference? module = await EnsureSetupModuleAsync().ConfigureAwait(false);
-            await MarkazorSetupStorage.SaveAuthorizationReturnPathAsync(
-                module,
-                "/studio/setup?auth=github").ConfigureAwait(false);
+            await MarkazorSetupStorage.SaveClientIdAsync(module, EffectiveClientId).ConfigureAwait(false);
+            await MarkazorSetupStorage.SaveAuthorizationReturnPathAsync(module, "/studio/setup?auth=github").ConfigureAwait(false);
+            MarkazorGitHubAuthorizationRequest request = new(EffectiveClientId, new Uri(SiteBaseUrl));
             Uri authorizationUrl = (await Session.StartGitHubAuthorizationAsync(request).ConfigureAwait(false)).AuthorizationUrl;
             Navigation.NavigateTo(authorizationUrl.ToString(), forceLoad: true);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
-            errorMessage = ex.Message;
-            isBusy = false;
-        }
-        catch (InvalidOperationException ex)
-        {
-            errorMessage = ex.Message;
+            errorMessage = "GitHub authorization could not start. Check that the Client ID and Azure secret belong to the same app, then try again.";
+            errorDetails = ex.Message;
             isBusy = false;
         }
     }
@@ -449,79 +447,24 @@
         {
             return setupModule;
         }
-
         try
         {
-            setupModule = await JavaScript.InvokeAsync<IJSObjectReference>(
-                "import",
-                "./_content/Markazor/markazor-setup.js").ConfigureAwait(false);
-
+            setupModule = await JavaScript.InvokeAsync<IJSObjectReference>("import", "./_content/Markazor/markazor-setup.js").ConfigureAwait(false);
             return setupModule;
         }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-        catch (JSException)
+        catch (Exception ex) when (ex is InvalidOperationException or JSException)
         {
             return null;
         }
     }
 
-    private async Task RefreshAuthAsync()
-    {
-        isBusy = true;
-        errorMessage = null;
+    private void OpenSettings() => Navigation.NavigateTo("/studio/settings");
 
-        try
-        {
-            bool refreshed = await Session.RefreshAccessTokenAsync().ConfigureAwait(false);
-            diagnostics = refreshed
-                ? await DiagnosticsService.RunAsync().ConfigureAwait(false)
-                : null;
-            errorMessage = refreshed ? null : "No active GitHub authorization cookie was found.";
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
-        {
-            errorMessage = DescribeLoadFailure(ex);
-        }
-        finally
-        {
-            isBusy = false;
-        }
-    }
+    private void OpenWrite() => Navigation.NavigateTo("/studio/write");
 
-    private string ResolveSiteBaseUrl()
-    {
-        return status?.Site.PrimaryBaseUrl?.ToString() ?? Navigation.BaseUri;
-    }
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "Not set" : value;
 
-    private void OpenSettings()
-    {
-        Navigation.NavigateTo("/studio/settings");
-    }
-
-    private void OpenWrite()
-    {
-        Navigation.NavigateTo("/studio/write");
-    }
-
-    private static string Display(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? "Not available" : value;
-    }
-
-    private static string CheckText(bool value)
-    {
-        return value ? "Passed" : "Failed";
-    }
-
-    private static string DescribeLoadFailure(Exception exception)
-    {
-        return exception is TaskCanceledException
-            ? "The Markazor API did not respond before the request timed out. Check the Static Web Apps Functions deployment."
-            : exception.Message;
-    }
+    private static string CheckText(bool value) => value ? "Passed" : "Failed";
 
     public async ValueTask DisposeAsync()
     {

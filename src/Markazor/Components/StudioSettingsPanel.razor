@@ -63,7 +63,7 @@
                 <span class="markazor-status-pill @SettingsFormClass">@SettingsFormText</span>
             </div>
 
-            <p class="markazor-muted">Saving commits these settings to GitHub.</p>
+            <p class="markazor-muted">@(status.SettingsFileExists ? "Save changes to your GitHub repository." : "Add your site details and the repository connected to Azure.")</p>
 
             <div class="markazor-settings-form">
                 <label class="markazor-field markazor-field-wide">
@@ -73,7 +73,7 @@
                               rows="3"
                               autocomplete="url"
                               spellcheck="false"></textarea>
-                    <small>One URL per line. Put the primary Static Web Apps URL first.</small>
+                    <small>Your deployed site URL. One per line; put the primary URL first.</small>
                 </label>
 
                 <label class="markazor-field markazor-site-title-field">
@@ -104,6 +104,7 @@
                            @oninput="OnGitHubClientIdInput"
                            autocomplete="off"
                            spellcheck="false" />
+                    <small>The public Client ID from Setup.</small>
                 </label>
 
                 <label class="markazor-field">
@@ -112,6 +113,7 @@
                            @oninput="OnRepositoryOwnerInput"
                            autocomplete="off"
                            spellcheck="false" />
+                    <small>For github.com/alex/journal, enter alex.</small>
                 </label>
 
                 <label class="markazor-field">
@@ -120,6 +122,7 @@
                            @oninput="OnRepositoryNameInput"
                            autocomplete="off"
                            spellcheck="false" />
+                    <small>For github.com/alex/journal, enter journal.</small>
                 </label>
 
                 <label class="markazor-field">
@@ -128,6 +131,7 @@
                            @oninput="OnDefaultBranchInput"
                            autocomplete="off"
                            spellcheck="false" />
+                    <small>The branch Azure deploys, usually main.</small>
                 </label>
 
                 <label class="markazor-field">
@@ -143,6 +147,10 @@
 
             <div class="markazor-actions">
                 <button type="button" @onclick="SaveSettingsAsync" disabled="@(!CanSaveSettings)">Save Settings</button>
+                @if (settingsSaved)
+                {
+                    <button type="button" @onclick="OpenSetup" disabled="@isBusy">Check setup</button>
+                }
             </div>
 
             @if (!isBusy && !settingsSaved && string.IsNullOrWhiteSpace(settingsMessage)
@@ -176,7 +184,7 @@
 
                 @if (diagnostics is null)
                 {
-                    <p class="markazor-muted">Refresh after authorization to verify repository access.</p>
+                    <p class="markazor-muted">Save your repository settings and wait for Azure to deploy them, then return to Setup and choose Check again.</p>
                 }
                 else
                 {
@@ -232,17 +240,18 @@
 
     private string ReadyText => isLoading ? "Checking..."
         : !string.IsNullOrWhiteSpace(errorMessage) ? "Unavailable"
-        : isLocalPreview ? "Local preview" : IsWorkspaceVisible
-        ? (diagnostics?.Ready == true ? "Ready" : "Needs attention")
-        : "Authorization required";
+        : isLocalPreview ? "Local preview" : !IsWorkspaceVisible ? "Authorization required"
+        : !MarkazorSetupReadiness.HasRepositoryConfiguration(status)
+        ? (settingsSaved ? "Waiting for deployment" : "Add site details")
+        : diagnostics is null ? "Not checked" : diagnostics.Ready ? "Ready" : "Needs attention";
 
     private string ReadyClass => !isLoading && string.IsNullOrWhiteSpace(errorMessage)
         && IsWorkspaceVisible && diagnostics?.Ready == true ? "is-ready" : "is-waiting";
 
-    private string DiagnosticsText => diagnostics?.Ready == true ? "Passed" : "Not passed";
+    private string DiagnosticsText => diagnostics is null ? "Not checked" : diagnostics.Ready ? "Passed" : "Needs attention";
 
-    private bool NeedsDiagnosticsAttention => diagnostics is null || !diagnostics.Ready
-        || diagnostics.Errors.Count > 0 || diagnostics.Warnings.Count > 0;
+    private bool NeedsDiagnosticsAttention => diagnostics is not null && (!diagnostics.Ready
+        || diagnostics.Errors.Count > 0 || diagnostics.Warnings.Count > 0);
 
     private string SettingsFormText => settingsFormDirty
         ? "Unsaved changes"
@@ -412,7 +421,7 @@
                 : await Session.LoadSetupStatusAsync().ConfigureAwait(false);
             if (!settingsFormDirty)
             {
-                settingsForm = CreateRepositorySettingsForm();
+                settingsForm = await CreateRepositorySettingsFormAsync().ConfigureAwait(false);
             }
 
             diagnostics = null;
@@ -421,8 +430,9 @@
             {
                 diagnostics = MarkazorLocalPreview.CreateDiagnostics();
             }
-            else if (MarkazorSetupReadiness.HasRepositoryConfiguration(status)
-                && await Session.GetAccessTokenAsync().ConfigureAwait(false) is not null)
+            else if (MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
+                && await Session.GetAccessTokenAsync().ConfigureAwait(false) is not null
+                && MarkazorSetupReadiness.HasRepositoryConfiguration(status))
             {
                 diagnostics = await DiagnosticsService.RunAsync().ConfigureAwait(false);
             }
@@ -470,8 +480,8 @@
 
             settingsMessage = result.Succeeded
                 ? string.IsNullOrWhiteSpace(result.CommitSha)
-                    ? result.Message ?? "Settings already match the repository."
-                    : $"Saved settings in commit {result.CommitSha[..Math.Min(7, result.CommitSha.Length)]}. Static Web Apps will redeploy the updated site configuration."
+                    ? "These settings are already saved. Return to Setup to check the connection."
+                    : "Settings saved. Wait for the Azure deployment to finish, then return to Setup to check the connection."
                 : result.Message ?? "Unable to save settings.";
         }
         finally
@@ -623,11 +633,27 @@
         return Task.CompletedTask;
     }
 
-    private MarkazorSettingsForm CreateRepositorySettingsForm()
+    private async Task<MarkazorSettingsForm> CreateRepositorySettingsFormAsync()
     {
-        return status?.SettingsFileExists == true
+        MarkazorSettingsForm form = status?.SettingsFileExists == true
             ? MarkazorSettingsForm.FromStatus(status)
-            : MarkazorSettingsForm.Empty;
+            : MarkazorSettingsForm.Empty with
+            {
+                SiteBaseUrls = status?.Site.PrimaryBaseUrl?.ToString() ?? Navigation.BaseUri,
+                GitHubClientId = status?.GitHub.ClientId ?? string.Empty,
+                DefaultBranch = status?.Repository.DefaultBranch ?? "main",
+            };
+
+        if (string.IsNullOrWhiteSpace(form.GitHubClientId))
+        {
+            form = form with
+            {
+                GitHubClientId = await MarkazorSetupStorage.LoadClientIdAsync(
+                    await EnsureSetupModuleAsync().ConfigureAwait(false)).ConfigureAwait(false) ?? string.Empty,
+            };
+        }
+
+        return form;
     }
 
     private void OpenSetup()

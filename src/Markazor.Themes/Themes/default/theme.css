@@ -1020,17 +1020,9 @@ input[type=radio] {
 .markazor-conflict textarea {
   border-color: var(--mk-line-strong);
 }
-.markazor-setup-shell {
-  counter-reset: setup-section;
-}
-.markazor-setup-shell > .markazor-panel {
-  counter-increment: setup-section;
-}
-.markazor-setup-shell > .markazor-panel .markazor-section-header h2::before {
+.markazor-setup-number {
   color: var(--mk-editorial);
-  content: counter(setup-section, decimal-leading-zero);
   font: 0.7rem var(--mk-font-mono);
-  margin-right: 1rem;
 }
 .markazor-checklist {
   gap: 0.85rem;

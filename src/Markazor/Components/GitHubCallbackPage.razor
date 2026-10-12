@@ -13,12 +13,26 @@
     <section class="markazor-panel">
         <h1>GitHub Authorization</h1>
         <p class="@MessageClass">@message</p>
+        @if (failed)
+        {
+            <div class="markazor-actions">
+                <a class="markazor-button-link" href="/studio/setup">Return to Setup</a>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(errorDetails))
+            {
+                <details class="markazor-setup-help">
+                    <summary>Error details</summary>
+                    <p class="markazor-muted">@errorDetails</p>
+                </details>
+            }
+        }
     </section>
 </div>
 
 @code {
     private string message = "Completing GitHub authorization...";
     private bool failed;
+    private string? errorDetails;
     private IJSObjectReference? setupModule;
 
     private string MessageClass => failed ? "markazor-alert" : "markazor-muted";
@@ -30,7 +44,7 @@
         if (!query.TryGetValue("code", out string? code) || !query.TryGetValue("state", out string? state))
         {
             failed = true;
-            message = "GitHub did not return an authorization code and state.";
+            message = "GitHub sign-in was not completed. Return to Setup and choose Authorize GitHub to try again.";
 
             return;
         }
@@ -43,27 +57,18 @@
             if (!completed)
             {
                 failed = true;
-                message = "GitHub authorization could not be completed.";
+                message = "GitHub sign-in could not be completed. Return to Setup, check the app's Client ID and Azure secret, then authorize again.";
 
                 return;
             }
 
             Navigation.NavigateTo(await GetReturnPathAsync().ConfigureAwait(false), replace: true);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException or FormatException)
         {
             failed = true;
-            message = ex.Message;
-        }
-        catch (InvalidOperationException ex)
-        {
-            failed = true;
-            message = ex.Message;
-        }
-        catch (FormatException ex)
-        {
-            failed = true;
-            message = ex.Message;
+            message = "The site could not finish GitHub sign-in. Return to Setup and try again.";
+            errorDetails = ex.Message;
         }
     }
 

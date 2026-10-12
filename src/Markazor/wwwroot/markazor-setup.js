@@ -14,3 +14,12 @@ export function setLocalValue(key, value) {
 
   window.localStorage.setItem(storageKey, value);
 }
+
+export async function copyText(value) {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    return false;
+  }
+}

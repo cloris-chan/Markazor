@@ -26,7 +26,7 @@ If you created the site locally, push it to GitHub before creating the Static We
 
 ### 2. Create Azure Static Web Apps
 
-Create an Azure Static Web Apps resource for the site repository. For a site named `MarkazorSite`, use:
+Create an Azure Static Web Apps resource for the site repository. Choose the **Blazor** build preset. For a site named `MarkazorSite`, use:
 
 ```text
 app_location: src/MarkazorSite.Web
@@ -40,21 +40,16 @@ Wait for the first deployment to complete.
 
 ### 3. Finish Setup in the Browser
 
-Open the deployed site and go to `/studio/setup`, or choose **Setup** in Studio. This page is available before GitHub authorization and guides you through GitHub App creation, Client ID entry, Static Web Apps environment variables, and GitHub authorization. Use `/studio/setup/github-callback` as the GitHub App callback URL. After authorization, continue in Studio Settings to save the public repository settings.
+Open `/studio/setup` on the deployed site, or choose **Setup** in Studio. Follow the four numbered steps:
 
-Required Static Web Apps environment variable:
+1. **Create a GitHub App.** The Create App button fills in the required settings. Paste the app's public Client ID into Setup.
+2. **Add the secret to Azure.** Save the app's Client secret as `GITHUB_APP_CLIENT_SECRET` under the Static Web App's **Settings → Environment variables**, then choose **Check again** in Setup.
+3. **Connect your repository.** Install the app on the site repository and choose **Authorize GitHub**.
+4. **Save settings and start writing.** Open Settings, enter your site details and repository, then Save Settings. Wait for deployment, return to Setup, and Check again to enable Write.
 
-```text
-GITHUB_APP_CLIENT_SECRET=...
-```
+The Client ID carries over to Settings in the same browser. A separate `MARKAZOR_AUTH_COOKIE_SECRET` is optional. Keep secrets in Azure environment variables.
 
-Recommended Static Web Apps environment variable:
-
-```text
-MARKAZOR_AUTH_COOKIE_SECRET=...
-```
-
-For the full walkthrough, see [User Guide](https://github.com/cloris-chan/Markazor/blob/main/docs/user-guide.md).
+For field examples and help with each step, see the [User Guide](https://github.com/cloris-chan/Markazor/blob/main/docs/user-guide.md#3-finish-setup-in-studio).
 
 ## How It Works
 
