@@ -113,7 +113,7 @@ internal sealed class MarkdownArticle
 {
     private static readonly DateTimeOffset UnixEpoch = new(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-    private MarkdownArticle(string slug, string title, string summary, DateTimeOffset publishedAtUtc, IReadOnlyList<string> tags, string? category, string relativePath, string contentPath, string route, string kind)
+    private MarkdownArticle(string slug, string title, string summary, DateTimeOffset publishedAtUtc, IReadOnlyList<string> tags, string? category, string relativePath, string contentPath, string route)
     {
         Slug = slug;
         Title = title;
@@ -124,7 +124,6 @@ internal sealed class MarkdownArticle
         RelativePath = relativePath;
         ContentPath = contentPath;
         Route = route;
-        Kind = kind;
         IsDraft = false;
     }
 
@@ -146,8 +145,6 @@ internal sealed class MarkdownArticle
 
     public string Route { get; }
 
-    public string Kind { get; }
-
     public bool IsDraft { get; }
 
     public static MarkdownArticleResult Parse(AdditionalText file, AnalyzerConfigOptions options, System.Threading.CancellationToken cancellationToken)
@@ -161,9 +158,7 @@ internal sealed class MarkdownArticle
 
         IReadOnlyDictionary<string, string> metadata = FrontMatter.Parse(text.ToString());
         string relativePath = MarkazorContentPath.NormalizeAdditionalFilePath(file.Path, options);
-        string? kind = MarkazorContentPath.GetPublishedKind(relativePath);
-
-        if (kind is null)
+        if (!MarkazorContentPath.IsPublishedPath(relativePath))
         {
             return new MarkdownArticleResult(file.Path, null, hasPublishedDraftFlag: false);
         }
@@ -175,10 +170,10 @@ internal sealed class MarkdownArticle
         DateTimeOffset publishedAtUtc = ParsePublishedAt(Get(metadata, "publishedAt") ?? Get(metadata, "date"));
         string[] tags = ParseTags(Get(metadata, "tags"));
         bool hasPublishedDraftFlag = bool.TryParse(Get(metadata, "draft"), out bool isDraft) && isDraft;
-        string route = MarkazorContentPath.CreateRoute(kind, slug);
+        string route = MarkazorContentPath.CreateRoute(slug);
         string contentPath = MarkazorContentPath.CreateContentPath(relativePath);
 
-        return new MarkdownArticleResult(file.Path, new MarkdownArticle(slug, title, summary, publishedAtUtc, tags, category, relativePath, contentPath, route, kind), hasPublishedDraftFlag);
+        return new MarkdownArticleResult(file.Path, new MarkdownArticle(slug, title, summary, publishedAtUtc, tags, category, relativePath, contentPath, route), hasPublishedDraftFlag);
     }
 
     private static string? Get(IReadOnlyDictionary<string, string> metadata, string key)
@@ -210,15 +205,11 @@ internal sealed class MarkdownArticle
 
 internal static class MarkazorContentPath
 {
-    private const string NoteKind = "note";
-    private const string NotesSegment = "notes";
-    private const string PostKind = "post";
     private const string PostsSegment = "posts";
 
     private static readonly char SitePathSeparator = Path.AltDirectorySeparatorChar;
     private static readonly string SitePathSeparatorText = SitePathSeparator.ToString();
     private static readonly string PublishedPostRoot = string.Concat(PostsSegment, SitePathSeparatorText);
-    private static readonly string PublishedNoteRoot = string.Concat(NotesSegment, SitePathSeparatorText);
 
     public static string NormalizeAdditionalFilePath(string path, AnalyzerConfigOptions options)
     {
@@ -232,20 +223,12 @@ internal static class MarkazorContentPath
             [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
             StringSplitOptions.RemoveEmptyEntries);
         int postsSegmentIndex = FindSegment(segments, PostsSegment);
-        int notesSegmentIndex = FindSegment(segments, NotesSegment);
-        int publishedSegmentIndex = SelectPublishedSegmentIndex(postsSegmentIndex, notesSegmentIndex);
-
-        return publishedSegmentIndex >= 0 ? CombineSitePath(segments.Skip(publishedSegmentIndex)) : Path.GetFileName(filePath);
+        return postsSegmentIndex >= 0 ? CombineSitePath(segments.Skip(postsSegmentIndex)) : Path.GetFileName(filePath);
     }
 
-    public static string? GetPublishedKind(string relativePath)
+    public static bool IsPublishedPath(string relativePath)
     {
-        if (relativePath.StartsWith(PublishedPostRoot, StringComparison.OrdinalIgnoreCase))
-        {
-            return PostKind;
-        }
-
-        return relativePath.StartsWith(PublishedNoteRoot, StringComparison.OrdinalIgnoreCase) ? NoteKind : null;
+        return relativePath.StartsWith(PublishedPostRoot, StringComparison.OrdinalIgnoreCase);
     }
 
     public static string GetFileNameWithoutExtension(string path)
@@ -253,11 +236,9 @@ internal static class MarkazorContentPath
         return Path.GetFileNameWithoutExtension(path);
     }
 
-    public static string CreateRoute(string kind, string slug)
+    public static string CreateRoute(string slug)
     {
-        string routeRoot = string.Equals(kind, NoteKind, StringComparison.Ordinal) ? NotesSegment : PostsSegment;
-
-        return string.Concat(SitePathSeparatorText, CombineSitePath(routeRoot, Uri.EscapeDataString(slug)));
+        return string.Concat(SitePathSeparatorText, CombineSitePath(PostsSegment, Uri.EscapeDataString(slug)));
     }
 
     public static string CreateContentPath(string relativePath)
@@ -320,21 +301,6 @@ internal static class MarkazorContentPath
         }
 
         return -1;
-    }
-
-    private static int SelectPublishedSegmentIndex(int postsSegmentIndex, int notesSegmentIndex)
-    {
-        if (postsSegmentIndex < 0)
-        {
-            return notesSegmentIndex;
-        }
-
-        if (notesSegmentIndex < 0)
-        {
-            return postsSegmentIndex;
-        }
-
-        return Math.Min(postsSegmentIndex, notesSegmentIndex);
     }
 
     private static string CombineSitePath(string firstSegment, string secondSegment)
@@ -725,7 +691,6 @@ internal static class SiteIndexSourceWriter
             AppendArgument(builder, "RelativePath", Literal(article.RelativePath));
             AppendArgument(builder, "Route", Literal(article.Route));
             AppendArgument(builder, "IsDraft", article.IsDraft ? "true" : "false");
-            AppendArgument(builder, "Kind", Literal(article.Kind));
             AppendArgument(builder, "ContentPath", Literal(article.ContentPath), closeConstructor: true);
         }
 

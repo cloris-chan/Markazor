@@ -46,14 +46,9 @@ internal static class StaticSiteGenerator
         List<ArticleMeta> articles = [];
         Dictionary<string, string> markdownFiles = new(StringComparer.Ordinal);
         HashSet<string> articleRoutes = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string kind in new[] { "posts", "notes" })
+        string directory = Path.Combine(source, "posts");
+        if (Directory.Exists(directory))
         {
-            string directory = Path.Combine(source, kind);
-            if (!Directory.Exists(directory))
-            {
-                continue;
-            }
-
             EnumerationOptions enumeration = new() { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, MatchCasing = MatchCasing.CaseInsensitive };
             foreach (string file in Directory.EnumerateFiles(directory, "*.md", enumeration).Order(StringComparer.Ordinal))
             {
@@ -161,8 +156,7 @@ internal static class StaticSiteGenerator
     {
         List<StaticPage> pages = [];
         AddListing(MarkazorReaderPageKind.Home, null, "/", reader.Site.Name, reader.Site.Description, reader.GetArticles());
-        AddListing(MarkazorReaderPageKind.Posts, null, "/posts", "Posts", "Long-form articles and release notes.", reader.GetPosts());
-        AddListing(MarkazorReaderPageKind.Notes, null, "/notes", "Notes", "Short updates, field notes, and working thoughts.", reader.GetNotes());
+        AddListing(MarkazorReaderPageKind.Posts, null, "/posts", "Posts", "Published articles, updates, and stories.", reader.GetArticles());
         pages.Add(new(MarkazorReaderPageKind.Categories, null, 1, "/categories", "Categories", reader.Site.Description));
         pages.Add(new(MarkazorReaderPageKind.Tags, null, 1, "/tags", "Tags", reader.Site.Description));
         pages.Add(new(MarkazorReaderPageKind.Archive, null, 1, "/archive", "Archive", "Published articles grouped by month."));
@@ -178,8 +172,7 @@ internal static class StaticSiteGenerator
 
         foreach (ArticleMeta article in articles)
         {
-            MarkazorReaderPageKind kind = article.Kind == MarkazorArticleKind.Note ? MarkazorReaderPageKind.Note : MarkazorReaderPageKind.Post;
-            pages.Add(new(kind, article.Slug, 1, article.Route, article.Title, article.Summary, article));
+            pages.Add(new(MarkazorReaderPageKind.Post, article.Slug, 1, article.Route, article.Title, article.Summary, article));
         }
 
         return pages;
@@ -328,7 +321,7 @@ internal static class StaticSiteGenerator
         JsonObject fallback = configuration["navigationFallback"]?.AsObject() ?? new JsonObject();
         fallback["rewrite"] = "/_markazor/app.html";
         JsonArray exclude = fallback["exclude"]?.AsArray() ?? [];
-        foreach (string pattern in new[] { "/posts/*", "/notes/*", "/tags/*", "/categories/*", "/page/*", "/_markazor/*", "/sitemap.xml" })
+        foreach (string pattern in new[] { "/posts/*", "/tags/*", "/categories/*", "/page/*", "/_markazor/*", "/sitemap.xml" })
         {
             if (!exclude.Any(item => item?.GetValue<string>() == pattern))
             {

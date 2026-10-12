@@ -241,10 +241,6 @@ if (match.Success)
     <AdditionalFiles Include="$(_MarkazorContentRoot)\posts\**\*.md" Link="posts\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(MarkazorEnableSourceGenerator)' == 'true' and Exists('$(_MarkazorContentRoot)\notes')">
-    <AdditionalFiles Include="$(_MarkazorContentRoot)\notes\**\*.md" Link="notes\%(RecursiveDir)%(Filename)%(Extension)" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(MarkazorEnableSourceGenerator)' == 'true' and Exists('$(_MarkazorSettingsFile)')">
     <AdditionalFiles Include="$(_MarkazorSettingsFile)" Link="public\markazor.settings.json" />
   </ItemGroup>
@@ -255,10 +251,6 @@ if (match.Success)
 
   <ItemGroup Condition="'$(MarkazorGenerateWebRoot)' == 'true' and Exists('$(_MarkazorContentRoot)\posts')">
     <Watch Include="$(_MarkazorContentRoot)\posts\**\*.md" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MarkazorGenerateWebRoot)' == 'true' and Exists('$(_MarkazorContentRoot)\notes')">
-    <Watch Include="$(_MarkazorContentRoot)\notes\**\*.md" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MarkazorGenerateWebRoot)' == 'true' and Exists('$(_MarkazorContentRoot)\drafts')">
@@ -353,22 +345,10 @@ if (match.Success)
       </_MarkazorStagedPostContent>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(MarkazorPublishContent)' == 'true' and Exists('$(_MarkazorContentRoot)\notes')">
-      <_MarkazorNoteContent Include="$(_MarkazorContentRoot)\notes\**\*" />
-      <_MarkazorNoteContentWithPath Include="@(_MarkazorNoteContent)"
-                                    Condition="'@(_MarkazorNoteContent)' != ''">
-        <RelativePath>$([MSBuild]::MakeRelative('$(_MarkazorContentRoot)', '%(_MarkazorNoteContent.Identity)'))</RelativePath>
-      </_MarkazorNoteContentWithPath>
-      <_MarkazorStagedNoteContent Include="@(_MarkazorNoteContentWithPath->'$(MarkazorGeneratedWebRoot)_markazor\content\%(RelativePath)')"
-                                  Condition="'@(_MarkazorNoteContentWithPath)' != ''">
-        <SourcePath>%(_MarkazorNoteContentWithPath.Identity)</SourcePath>
-      </_MarkazorStagedNoteContent>
-    </ItemGroup>
-
-    <Copy SourceFiles="@(_MarkazorStagedPostContent->'%(SourcePath)');@(_MarkazorStagedNoteContent->'%(SourcePath)')"
-          DestinationFiles="@(_MarkazorStagedPostContent);@(_MarkazorStagedNoteContent)"
+    <Copy SourceFiles="@(_MarkazorStagedPostContent->'%(SourcePath)')"
+          DestinationFiles="@(_MarkazorStagedPostContent)"
           SkipUnchangedFiles="true"
-          Condition="'@(_MarkazorStagedPostContent);@(_MarkazorStagedNoteContent)' != ';'" />
+          Condition="'@(_MarkazorStagedPostContent)' != ''" />
 
     <ItemGroup Condition="'$(MarkazorPublishAssets)' == 'true' and Exists('$(_MarkazorAssetRoot)')">
       <_MarkazorAsset Include="$(_MarkazorAssetRoot)\**\*" />

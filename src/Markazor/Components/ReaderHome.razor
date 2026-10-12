@@ -12,9 +12,8 @@
         }
     </div>
     <aside class="reader-colophon" aria-label="Browse content">
-        <nav class="reader-colophon-index" aria-label="Content types">
+        <nav class="reader-colophon-index" aria-label="Published articles">
             <a href="/posts"><span>Posts <small>@postCount.ToString("D2", CultureInfo.InvariantCulture)</small></span><MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
-            <a href="/notes"><span>Notes <small>@noteCount.ToString("D2", CultureInfo.InvariantCulture)</small></span><MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
         </nav>
     </aside>
 </section>
@@ -33,12 +32,10 @@
 
     private MarkazorArticlePage articlePage = default!;
     private int postCount;
-    private int noteCount;
 
     protected override void OnInitialized()
     {
-        postCount = Reader.GetPosts().TotalItems;
-        noteCount = Reader.GetNotes().TotalItems;
+        postCount = Reader.GetArticles().TotalItems;
     }
 
     protected override void OnParametersSet() => articlePage = Reader.GetArticles(Page);

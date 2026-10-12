@@ -24,7 +24,6 @@ public sealed class ContentPathPolicy
 
         return IsUnderRoot(normalizedPath, MarkazorRepositoryPaths.DraftsRoot)
             || IsUnderRoot(normalizedPath, MarkazorRepositoryPaths.PostsRoot)
-            || IsUnderRoot(normalizedPath, MarkazorRepositoryPaths.NotesRoot)
             || IsUnderRoot(normalizedPath, MarkazorRepositoryPaths.AssetsRoot)
             || IsUnderRoot(normalizedPath, MarkazorRepositoryPaths.PublicRoot);
     }

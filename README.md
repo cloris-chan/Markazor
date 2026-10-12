@@ -1,12 +1,12 @@
 # Markazor
 
-**Markazor is a browser-first, self-owned Blazor WebAssembly site framework for posts, notes, and static publishing on GitHub and Azure Static Web Apps.**
+**Markazor is a browser-first, self-owned Blazor WebAssembly site framework for articles and static publishing on GitHub and Azure Static Web Apps.**
 
 Markazor generates complete public HTML at build time, with a Blazor WebAssembly Studio for setup, settings, and writing, and an Azure Functions setup/auth API. `Markazor.SourceGen` indexes public Markdown; the packaged static builder renders the shared reader components with article content and search/share metadata. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
 
-All durable state stays in accounts you control: source code, posts, notes, drafts, media, public settings, the GitHub App, and the deployment workflow live in your GitHub and Azure resources. Browser edits become ordinary Git commits; public content is indexed at build time, while `drafts/**` stays out of publish output and service worker assets.
+All durable state stays in accounts you control: source code, posts, drafts, media, public settings, the GitHub App, and the deployment workflow live in your GitHub and Azure resources. Browser edits become ordinary Git commits; public content is indexed at build time, while `drafts/**` stays out of publish output and service worker assets.
 
-User-owned content stays outside generated `src/**`: Markdown lives in repository-root `posts/`, `notes/`, and `drafts/`; media lives in `assets/`; public overrides and settings live in `public/`. Advanced users still get standard .NET Blazor and Functions projects for local customization, without adopting a hosted CMS backend or control plane.
+User-owned content stays outside generated `src/**`: Markdown lives in repository-root `posts/` and `drafts/`; media lives in `assets/`; public overrides and settings live in `public/`. Advanced users still get standard .NET Blazor and Functions projects for local customization, without adopting a hosted CMS backend or control plane.
 
 ## Quick Start
 
@@ -77,7 +77,7 @@ Generated Web projects opt into `MarkazorEnableSiteBuild`. During build, Markazo
 flowchart LR
     P["public/**<br/>user overlay"] --> G["generated site root<br/>obj/.../markazor/site"]
     A["assets/**<br/>repository media"] --> G
-    C["posts/** + notes/**<br/>public Markdown"] --> SG["Markazor.SourceGen<br/>content index"]
+    C["posts/**<br/>public Markdown"] --> SG["Markazor.SourceGen<br/>content index"]
     C --> G
     D["Markazor defaults<br/>index, manifest, service worker,<br/>staticwebapp.config.json"] --> G
     S["public/markazor.settings.json"] --> G
@@ -105,7 +105,7 @@ sequenceDiagram
     GH->>R: Create ordinary Git commit
     R->>W: Push triggers deployment workflow
     W->>SG: Build Web project and generate content index
-    SG-->>W: Public posts and notes index
+    SG-->>W: Public articles index
     W->>S: Deploy static app and Functions API
     S-->>B: Public reader updates after deployment
 ```
@@ -121,7 +121,7 @@ Markazor keeps secrets in Azure Static Web Apps environment variables, public se
 | User browser | Temporary GitHub App Client ID entry, short-lived access token, protected refresh cookie | Calls the Functions API for setup/auth and GitHub REST API for content operations. |
 | Azure Static Web Apps | Functions API, `GITHUB_APP_CLIENT_SECRET`, `MARKAZOR_AUTH_COOKIE_SECRET` | Exchanges OAuth codes and issues/verifies protected cookies. |
 | GitHub App | selected-repository installation, Contents read/write permission | Grants the browser session scoped repository access after authorization. |
-| GitHub repository | posts, notes, drafts, assets, `public/markazor.settings.json`, public overlays, source code, workflow | Receives ordinary commits for content, assets, and public settings changes. |
+| GitHub repository | posts, drafts, assets, `public/markazor.settings.json`, public overlays, source code, workflow | Receives ordinary commits for content, assets, and public settings changes. |
 
 The GitHub App Client ID is not a secret and can be stored in `public/markazor.settings.json`. The Client Secret belongs in Static Web Apps environment variables. `MARKAZOR_AUTH_COOKIE_SECRET` is recommended as a separate long random value for OAuth cookie protection.
 
@@ -133,7 +133,6 @@ Generated sites use fixed repository-root folders:
 src/{SiteName}.Web/        Blazor WebAssembly reader and Studio UI
 src/{SiteName}.Functions/  Azure Functions API for setup status and GitHub OAuth
 posts/                     Public posts, created when content is written
-notes/                     Public notes, created when content is written
 drafts/                    Private drafts, created when drafts are written
 assets/                    Markdown-referenced media assets
 public/                    Public web root overlay and markazor.settings.json

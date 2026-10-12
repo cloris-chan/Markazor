@@ -474,7 +474,7 @@ if (Test-Path -LiteralPath $contentPath) {
     throw 'Generated template must not include content/ initially.'
 }
 
-foreach ($rootName in @('posts', 'notes', 'drafts', 'assets', 'public')) {
+foreach ($rootName in @('posts', 'drafts', 'assets', 'public')) {
     $rootPath = Join-Path $generatedPath $rootName
     if (Test-Path -LiteralPath $rootPath) {
         throw "Generated template must not include $rootName/ initially."
@@ -663,8 +663,8 @@ if (-not (Test-StringContains -Text (Get-Content -Raw -LiteralPath $emptyPublish
 }
 
 $postMarkdownPath = Join-Path 'posts' 'C# hello%.md'
-$noteMarkdownPath = Join-Path 'notes' 'first-note.md'
-$draftMarkdownPath = Join-Path 'drafts' 'private-notes.md'
+$secondPostMarkdownPath = Join-Path 'posts' 'first-update.md'
+$draftMarkdownPath = Join-Path 'drafts' 'work-in-progress.md'
 $assetPath = Join-Path 'assets' 'smoke-asset.txt'
 $publicIndexPath = Join-Path 'public' 'index.html'
 $publicCssPath = Join-Path (Join-Path 'public' 'styles') 'site.css'
@@ -740,32 +740,31 @@ category: General
 This file is compiled into `Markazor.Generated.SiteIndex`.
 '@
 
-Write-SmokeFile -RelativePath $noteMarkdownPath -Content @'
+Write-SmokeFile -RelativePath $secondPostMarkdownPath -Content @'
 ---
-slug: first-note
-title: First Note
-summary: A short note published beside the site posts.
+slug: first-update
+title: First Update
+summary: A short update published alongside longer articles.
 publishedAt: 2026-06-06T08:00:00Z
-tags: [notes, markazor]
-category: Notes
+tags: [writing, markazor]
+category: Writing
 ---
 
-Notes are for short-form updates that still belong in the public, versioned content history.
+Short updates and longer articles share the same public content history.
 '@
 
 Write-SmokeFile -RelativePath $draftMarkdownPath -Content @'
 ---
-slug: private-notes
-title: Private notes
-kind: note
+slug: work-in-progress
+title: Work in progress
 summary: This draft must never appear in the published site.
 publishedAt: 2026-06-06T00:00:00Z
 tags: [private]
-category: Notes
+category: Writing
 draft: true
 ---
 
-# Private notes
+# Work in progress
 
 This file is available to the authenticated editor through GitHub, not to public readers.
 '@
@@ -781,7 +780,7 @@ $expectedWatchSources = @(
     (Convert-ToSlashPath -Path (Join-Path $generatedPath $publicCssPath)),
     (Convert-ToSlashPath -Path (Join-Path $generatedPath $publicJsPath)),
     (Convert-ToSlashPath -Path (Join-Path $generatedPath $postMarkdownPath)),
-    (Convert-ToSlashPath -Path (Join-Path $generatedPath $noteMarkdownPath)),
+    (Convert-ToSlashPath -Path (Join-Path $generatedPath $secondPostMarkdownPath)),
     (Convert-ToSlashPath -Path (Join-Path $generatedPath $draftMarkdownPath))
 )
 
@@ -885,9 +884,9 @@ if (-not (Test-Path -LiteralPath $publishedReservedTagPage)) {
     throw "Published output is missing the static taxonomy page for a reserved-character tag: $publishedReservedTagPage"
 }
 
-$publicNote = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'notes' 'first-note.md')
-if (-not (Test-Path -LiteralPath $publicNote)) {
-    throw "Published output is missing public note markdown: $publicNote"
+$secondPublicPost = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'posts' 'first-update.md')
+if (-not (Test-Path -LiteralPath $secondPublicPost)) {
+    throw "Published output is missing public article markdown: $secondPublicPost"
 }
 
 $publicAsset = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'assets') 'smoke-asset.txt'
@@ -971,7 +970,7 @@ if (-not (Test-Path -LiteralPath $publishedRobots)) {
     throw 'Published web output is missing an arbitrary public overlay file.'
 }
 
-$draftFile = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'drafts' 'private-notes.md')
+$draftFile = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'drafts' 'work-in-progress.md')
 if (Test-Path -LiteralPath $draftFile) {
     throw "Published output must not include draft markdown: $draftFile"
 }
@@ -1005,7 +1004,7 @@ if (-not (Test-StringContains -Text $publishedServiceWorkerText -Value "cache.ma
 
 $serviceWorkerAssetsText = Get-Content -Raw -LiteralPath $serviceWorkerAssets
 if ((Test-StringContains -Text $serviceWorkerAssetsText -Value 'drafts/' -Comparison ([System.StringComparison]::OrdinalIgnoreCase)) -or
-    (Test-StringContains -Text $serviceWorkerAssetsText -Value 'private-notes.md' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
+    (Test-StringContains -Text $serviceWorkerAssetsText -Value 'work-in-progress.md' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
     throw 'service-worker-assets.js must not contain draft content paths.'
 }
 
@@ -1013,8 +1012,8 @@ if (Test-StringContains -Text $serviceWorkerAssetsText -Value 'staticwebapp.conf
     throw 'service-worker-assets.js must not contain staticwebapp.config.json because Azure Static Web Apps handles it as deployment configuration.'
 }
 
-if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/notes/first-note.md' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
-    throw 'service-worker-assets.js must contain public note content paths.'
+if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/first-update.md' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
+    throw 'service-worker-assets.js must contain public article content paths.'
 }
 
 if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/C# hello%.md' -Comparison ([System.StringComparison]::Ordinal))) {

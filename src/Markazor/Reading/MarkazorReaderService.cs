@@ -8,8 +8,6 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
     private readonly HttpClient httpClient;
     private readonly IMarkazorMarkdownRenderer markdownRenderer;
     private readonly IReadOnlyList<ArticleMeta> publishedArticles;
-    private readonly IReadOnlyList<ArticleMeta> publishedNotes;
-    private readonly IReadOnlyList<ArticleMeta> publishedPosts;
 
     public MarkazorReaderService(HttpClient httpClient, IMarkazorMarkdownRenderer markdownRenderer, MarkazorOptions options)
     {
@@ -21,8 +19,6 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
         this.markdownRenderer = markdownRenderer;
         Site = options.Site;
         publishedArticles = [.. options.Articles.Where(static article => !article.IsDraft).OrderByDescending(static article => article.PublishedAtUtc).ThenBy(static article => article.RelativePath, StringComparer.Ordinal),];
-        publishedPosts = FilterByKind(publishedArticles, MarkazorArticleKind.Post);
-        publishedNotes = FilterByKind(publishedArticles, MarkazorArticleKind.Note);
     }
 
     public MarkazorSiteOptions Site { get; }
@@ -30,16 +26,6 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
     public MarkazorArticlePage GetArticles(int pageNumber = 1)
     {
         return CreatePage(publishedArticles, pageNumber);
-    }
-
-    public MarkazorArticlePage GetPosts(int pageNumber = 1)
-    {
-        return CreatePage(publishedPosts, pageNumber);
-    }
-
-    public MarkazorArticlePage GetNotes(int pageNumber = 1)
-    {
-        return CreatePage(publishedNotes, pageNumber);
     }
 
     public MarkazorArticlePage GetCategory(string category, int pageNumber = 1)
@@ -62,13 +48,6 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
 
         return FindArticle(publishedArticles, slug);
-    }
-
-    public ArticleMeta? FindArticle(string slug, string kind)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(slug);
-
-        return FindArticle(FilterByKind(publishedArticles, kind), slug);
     }
 
     public IReadOnlyList<MarkazorTaxonomyItem> GetCategories()
@@ -109,13 +88,6 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
 
         return CreateNavigation(publishedArticles, slug);
-    }
-
-    public MarkazorArticleNavigation GetNavigation(string slug, string kind)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(slug);
-
-        return CreateNavigation(FilterByKind(publishedArticles, kind), slug);
     }
 
     private static MarkazorArticleNavigation CreateNavigation(IReadOnlyList<ArticleMeta> articles, string slug)
@@ -165,13 +137,6 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
         }
 
         return -1;
-    }
-
-    private static IReadOnlyList<ArticleMeta> FilterByKind(IReadOnlyList<ArticleMeta> articles, string kind)
-    {
-        string normalizedKind = MarkazorArticleKind.Normalize(kind);
-
-        return [.. articles.Where(article => string.Equals(article.Kind, normalizedKind, StringComparison.Ordinal))];
     }
 
     private static IReadOnlyList<MarkazorTaxonomyItem> AggregateTaxonomy(IEnumerable<string> values)

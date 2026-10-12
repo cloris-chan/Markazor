@@ -375,31 +375,6 @@
   gap: 0.4rem;
 }
 
-.markazor-content-kind-picker {
-  background: var(--mk-soft);
-  border: 1px solid var(--mk-line);
-  border-radius: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin: 0;
-  padding: 0.55rem 0.65rem 0.65rem;
-}
-
-.markazor-content-kind-picker legend {
-  color: var(--mk-muted);
-  font-size: 0.9rem;
-  padding: 0 0.25rem;
-}
-
-.markazor-content-kind-picker label {
-  align-items: center;
-  color: var(--mk-ink);
-  display: inline-flex;
-  font-size: 0.9rem;
-  gap: 0.35rem;
-}
-
 .markazor-new-draft label,
 .markazor-field {
   color: var(--mk-ink);
@@ -435,12 +410,6 @@
   border-color: var(--mk-accent);
   outline: 1px solid var(--mk-accent);
   outline-offset: 0;
-}
-
-.markazor-content-kind-picker input[type="radio"] {
-  border: 0;
-  padding: 0;
-  width: auto;
 }
 
 .markazor-field textarea {
@@ -690,17 +659,6 @@
   overflow-wrap: anywhere;
 }
 
-.markazor-article-kind {
-  background: var(--mk-positive-soft);
-  border: 1px solid var(--mk-positive);
-  border-radius: 0;
-  color: var(--mk-positive);
-  flex: 0 0 auto;
-  font-size: 0.72rem;
-  line-height: 1;
-  padding: 0.25rem 0.45rem;
-}
-
 .markazor-publish-selected {
   background: var(--mk-positive);
   border: 0;
@@ -811,23 +769,21 @@
 }
 
 .markazor-metadata-primary {
-  grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 0.55fr) minmax(9rem, auto);
+  grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 0.55fr);
 }
 
 .markazor-metadata-secondary {
   grid-template-columns: minmax(11rem, 0.8fr) minmax(6rem, auto) minmax(10rem, 0.9fr) minmax(12rem, 1.1fr);
 }
 
-.markazor-metadata-toolbar .markazor-field,
-.markazor-metadata-toolbar .markazor-metadata-kind {
+.markazor-metadata-toolbar .markazor-field {
   border-bottom: 1px solid var(--mk-line);
   border-right: 1px solid var(--mk-line);
   min-width: 0;
   padding: 0.55rem 0.65rem;
 }
 
-.markazor-metadata-toolbar .markazor-field > span,
-.markazor-metadata-toolbar .markazor-metadata-kind legend {
+.markazor-metadata-toolbar .markazor-field > span {
   color: var(--mk-muted);
   font-size: 0.72rem;
   font-weight: 700;
@@ -849,22 +805,6 @@
 .markazor-metadata-toolbar .markazor-path-field {
   align-items: center;
   grid-template-columns: 4rem minmax(0, 1fr);
-}
-
-.markazor-metadata-toolbar .markazor-metadata-kind {
-  background: var(--mk-soft);
-  border-left: 0;
-  border-radius: 0;
-  border-top: 0;
-  margin: 0;
-}
-
-.markazor-metadata-toolbar .markazor-metadata-kind {
-  align-content: end;
-}
-
-.markazor-metadata-toolbar .markazor-metadata-kind label {
-  font-size: 0.82rem;
 }
 
 .markazor-metadata-toolbar .markazor-checkbox-field {
@@ -1020,10 +960,6 @@
     grid-template-columns: minmax(0, 1fr) minmax(9rem, 0.6fr);
   }
 
-  .markazor-metadata-kind {
-    grid-column: 1 / -1;
-  }
-
   .markazor-metadata-secondary {
     grid-template-columns: minmax(12rem, 1fr) minmax(6rem, auto);
   }
@@ -1065,10 +1001,6 @@
 
   .markazor-document-actions button {
     width: 100%;
-  }
-
-  .markazor-metadata-toolbar .markazor-metadata-kind {
-    align-content: start;
   }
 
   .markazor-metadata-toolbar .markazor-checkbox-field {
@@ -1209,15 +1141,6 @@
   flex-wrap: wrap;
   font-size: 0.875rem;
   gap: 0.75rem;
-}
-
-.markazor-reader-kind {
-  border: 1px solid var(--mk-line);
-  border-radius: 999px;
-  color: var(--mk-accent);
-  font-size: 0.75rem;
-  line-height: 1;
-  padding: 0.28rem 0.5rem;
 }
 
 .markazor-reader-meta a,

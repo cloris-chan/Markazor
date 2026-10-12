@@ -9,17 +9,11 @@ public interface IMarkazorReaderService
 
     MarkazorArticlePage GetArticles(int pageNumber = 1);
 
-    MarkazorArticlePage GetPosts(int pageNumber = 1);
-
-    MarkazorArticlePage GetNotes(int pageNumber = 1);
-
     MarkazorArticlePage GetCategory(string category, int pageNumber = 1);
 
     MarkazorArticlePage GetTag(string tag, int pageNumber = 1);
 
     ArticleMeta? FindArticle(string slug);
-
-    ArticleMeta? FindArticle(string slug, string kind);
 
     IReadOnlyList<MarkazorTaxonomyItem> GetCategories();
 
@@ -28,8 +22,6 @@ public interface IMarkazorReaderService
     IReadOnlyList<MarkazorArchiveGroup> GetArchive();
 
     MarkazorArticleNavigation GetNavigation(string slug);
-
-    MarkazorArticleNavigation GetNavigation(string slug, string kind);
 
     Task<MarkdownRenderResult> LoadContentAsync(ArticleMeta article, CancellationToken cancellationToken = default);
 }

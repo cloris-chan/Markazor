@@ -5,7 +5,6 @@ namespace Markazor.Content;
 public static class MarkdownContent
 {
     private const string DraftsSegment = "drafts";
-    private const string NotesSegment = "notes";
     private const string PostsSegment = "posts";
 
     private static readonly char SitePathSeparator = Path.AltDirectorySeparatorChar;
@@ -16,7 +15,6 @@ public static class MarkdownContent
         "category",
         "date",
         "draft",
-        "kind",
         "publishedAt",
         "slug",
         "summary",
@@ -32,7 +30,7 @@ public static class MarkdownContent
         FrontMatterDocument split = SplitFrontMatter(markdown);
         ArticleMeta article = ParseArticleMeta(relativePath, markdown);
 
-        MarkdownDocumentMetadata documentMetadata = new(article.Slug, article.Title, article.Kind, article.Summary, article.PublishedAtUtc, article.IsDraft, article.Tags, article.Category, GetAdditionalFrontMatterLines(split.FrontMatterLines));
+        MarkdownDocumentMetadata documentMetadata = new(article.Slug, article.Title, article.Summary, article.PublishedAtUtc, article.IsDraft, article.Tags, article.Category, GetAdditionalFrontMatterLines(split.FrontMatterLines));
 
         return new MarkdownDocument(documentMetadata, split.HasFrontMatter ? split.Body : markdown);
     }
@@ -47,7 +45,6 @@ public static class MarkdownContent
             "---",
             "slug: " + FormatFrontMatterScalar(metadata.Slug),
             "title: " + FormatQuotedFrontMatterScalar(metadata.Title),
-            "kind: " + MarkazorArticleKind.Normalize(metadata.Kind),
             "summary: " + FormatQuotedFrontMatterScalar(metadata.Summary),
             "publishedAt: " + FormatPublishedAt(metadata.PublishedAtUtc),
             "draft: " + (metadata.IsDraft ? "true" : "false"),
@@ -130,7 +127,6 @@ public static class MarkdownContent
         string normalizedPath = NormalizeSitePath(relativePath);
         Dictionary<string, string> metadata = ParseFrontMatter(markdown);
         string slug = Get(metadata, "slug") ?? Path.GetFileNameWithoutExtension(normalizedPath);
-        string kind = InferKind(normalizedPath, Get(metadata, "kind"));
         string title = Get(metadata, "title") ?? slug;
         string summary = Get(metadata, "summary") ?? string.Empty;
         string? category = Get(metadata, "category");
@@ -138,16 +134,14 @@ public static class MarkdownContent
         string[] tags = ParseTags(Get(metadata, "tags"));
         bool isDraft = bool.TryParse(Get(metadata, "draft"), out bool draft) ? draft : IsUnderRootSegment(normalizedPath, DraftsSegment);
 
-        return new ArticleMeta(slug, title, summary, publishedAtUtc, tags, category, normalizedPath, CreateRoute(kind, slug), isDraft, kind);
+        return new ArticleMeta(slug, title, summary, publishedAtUtc, tags, category, normalizedPath, CreateRoute(slug), isDraft);
     }
 
-    public static bool TryCreatePublishedPathFromDraft(string draftPath, string markdown, string draftRoot, string postRoot, string noteRoot, out string? publishedPath)
+    public static bool TryCreatePublishedPathFromDraft(string draftPath, string draftRoot, string postRoot, out string? publishedPath)
     {
-        ArgumentNullException.ThrowIfNull(markdown);
-
         publishedPath = null;
 
-        if (string.IsNullOrWhiteSpace(draftPath) || string.IsNullOrWhiteSpace(draftRoot) || string.IsNullOrWhiteSpace(postRoot) || string.IsNullOrWhiteSpace(noteRoot))
+        if (string.IsNullOrWhiteSpace(draftPath) || string.IsNullOrWhiteSpace(draftRoot) || string.IsNullOrWhiteSpace(postRoot))
         {
             return false;
         }
@@ -170,13 +164,7 @@ public static class MarkdownContent
             return false;
         }
 
-        Dictionary<string, string> metadata = ParseFrontMatter(markdown);
-        string kind = Get(metadata, "kind") is { } frontMatterKind
-            ? MarkazorArticleKind.Normalize(frontMatterKind)
-            : MarkazorArticleKind.Post;
-        string publishedRoot = string.Equals(kind, MarkazorArticleKind.Note, StringComparison.Ordinal) ? NormalizeSiteRoot(noteRoot) : NormalizeSiteRoot(postRoot);
-
-        publishedPath = publishedRoot + suffix;
+        publishedPath = NormalizeSiteRoot(postRoot) + suffix;
 
         return true;
     }
@@ -340,20 +328,6 @@ public static class MarkdownContent
         ];
     }
 
-    private static string InferKind(string normalizedPath, string? frontMatterKind)
-    {
-        if (IsUnderRootSegment(normalizedPath, PostsSegment))
-        {
-            return MarkazorArticleKind.Post;
-        }
-
-        return IsUnderRootSegment(normalizedPath, NotesSegment)
-            ? MarkazorArticleKind.Note
-            : frontMatterKind is not null
-                ? MarkazorArticleKind.Normalize(frontMatterKind)
-                : MarkazorArticleKind.Post;
-    }
-
     private static bool IsUnderRootSegment(string normalizedPath, string rootSegment)
     {
         string root = string.Concat(rootSegment, SitePathSeparatorText);
@@ -361,13 +335,9 @@ public static class MarkdownContent
         return normalizedPath.StartsWith(root, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string CreateRoute(string kind, string slug)
+    private static string CreateRoute(string slug)
     {
-        string routeRoot = string.Equals(kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
-            ? NotesSegment
-            : PostsSegment;
-
-        return string.Concat(SitePathSeparatorText, CombineSitePath(routeRoot, Uri.EscapeDataString(slug)));
+        return string.Concat(SitePathSeparatorText, CombineSitePath(PostsSegment, Uri.EscapeDataString(slug)));
     }
 
     private static string NormalizeSitePath(string path)

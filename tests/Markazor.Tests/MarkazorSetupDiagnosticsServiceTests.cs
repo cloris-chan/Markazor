@@ -85,7 +85,7 @@ public sealed class MarkazorSetupDiagnosticsServiceTests
               "truncated":false,
               "tree":[
                 {"path":"posts/hello.md","mode":"100644","type":"blob","sha":"blob-1"},
-                {"path":"notes/quick.md","mode":"100644","type":"blob","sha":"blob-2"},
+                {"path":"posts/quick.md","mode":"100644","type":"blob","sha":"blob-2"},
                 {"path":"assets/seed.png","mode":"100644","type":"blob","sha":"blob-3"}
               ]
             }

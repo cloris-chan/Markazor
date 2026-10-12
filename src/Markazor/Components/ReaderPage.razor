@@ -9,7 +9,7 @@
 {
     <ReaderHome Page="PageNumber" />
 }
-else if (Kind is MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note)
+else if (Kind == MarkazorReaderPageKind.Post)
 {
     @if (article is null)
     {
@@ -17,13 +17,13 @@ else if (Kind is MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note)
             <p class="reader-eyebrow">404</p>
             <h1>@Title</h1>
             <p>The article may have moved or is not published.</p>
-            <a href="@ArticleRoot">Return to all @(Kind == MarkazorReaderPageKind.Note ? "notes" : "posts")</a>
+            <a href="/posts">Return to all posts</a>
         </section>
     }
     else
     {
         <ArticleView Article="article" Content="content" IsLoading="@(loadState == ArticleLoadState.Loading)" LoadFailed="@(loadState == ArticleLoadState.Failed)"
-                     Navigation="navigation" BackLinkHref="@ArticleRoot" BackLinkText="@(Kind == MarkazorReaderPageKind.Note ? "All notes" : "All posts")" />
+                     Navigation="navigation" BackLinkHref="/posts" BackLinkText="All posts" />
     }
 }
 else
@@ -85,12 +85,10 @@ else
     private CancellationTokenSource? loading;
     private ArticleLoadState loadState;
 
-    private string ArticleRoot => Kind == MarkazorReaderPageKind.Note ? "/notes" : "/posts";
-
     private string Title => Kind switch
     {
         MarkazorReaderPageKind.Home => Reader.Site.Name,
-        MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note => article?.Title ?? "Article not found",
+        MarkazorReaderPageKind.Post => article?.Title ?? "Article not found",
         MarkazorReaderPageKind.Tags => string.IsNullOrEmpty(Value) ? "Tags" : "#" + Value,
         MarkazorReaderPageKind.Categories => string.IsNullOrEmpty(Value) ? "Categories" : Value,
         _ => Kind.ToString(),
@@ -100,9 +98,8 @@ else
 
     private string Description => Kind switch
     {
-        MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note => article?.Summary ?? string.Empty,
-        MarkazorReaderPageKind.Posts => "Long-form articles and release notes.",
-        MarkazorReaderPageKind.Notes => "Short updates, field notes, and working thoughts.",
+        MarkazorReaderPageKind.Post => article?.Summary ?? string.Empty,
+        MarkazorReaderPageKind.Posts => "Published articles, updates, and stories.",
         MarkazorReaderPageKind.Archive => "Published articles grouped by month.",
         _ => Reader.Site.Description,
     };
@@ -112,12 +109,11 @@ else
         loading?.Cancel();
         loading?.Dispose();
         loading = null;
-        if (Kind is MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note)
+        if (Kind == MarkazorReaderPageKind.Post)
         {
-            string articleKind = Kind == MarkazorReaderPageKind.Note ? MarkazorArticleKind.Note : MarkazorArticleKind.Post;
-            article = string.IsNullOrWhiteSpace(Value) ? null : Reader.FindArticle(Value, articleKind);
+            article = string.IsNullOrWhiteSpace(Value) ? null : Reader.FindArticle(Value);
             content = MarkdownRenderResult.Empty;
-            navigation = article is null ? new(null, null) : Reader.GetNavigation(article.Slug, articleKind);
+            navigation = article is null ? new(null, null) : Reader.GetNavigation(article.Slug);
             if (article is null)
             {
                 return;
@@ -147,8 +143,6 @@ else
         {
             articlePage = Kind switch
             {
-                MarkazorReaderPageKind.Posts => Reader.GetPosts(PageNumber),
-                MarkazorReaderPageKind.Notes => Reader.GetNotes(PageNumber),
                 MarkazorReaderPageKind.Tags when !string.IsNullOrEmpty(Value) => Reader.GetTag(Value, PageNumber),
                 MarkazorReaderPageKind.Categories when !string.IsNullOrEmpty(Value) => Reader.GetCategory(Value, PageNumber),
                 _ => Reader.GetArticles(PageNumber),
@@ -159,7 +153,6 @@ else
     private string CreatePageLink(int number) => MarkazorReaderRoutes.Page(Kind switch
     {
         MarkazorReaderPageKind.Posts => "/posts",
-        MarkazorReaderPageKind.Notes => "/notes",
         MarkazorReaderPageKind.Tags => MarkazorReaderRoutes.Tag(Value!),
         MarkazorReaderPageKind.Categories => MarkazorReaderRoutes.Category(Value!),
         _ => "/",

@@ -1,7 +1,7 @@
 {
   "site": {
     "name": "Markazor Minimal Site",
-    "description": "Notes on building a small, repository-native publishing workflow.",
+    "description": "Articles on building a small, repository-native publishing workflow.",
     "baseUrls": [
       "https://example.test"
     ]

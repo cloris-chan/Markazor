@@ -58,18 +58,18 @@ public sealed class SiteIndexGeneratorTests
                 # Newer Post
                 """),
             new(
-                RepositoryPath("notes", "field-note.md"),
+                RepositoryPath("posts", "field-update.md"),
                 """
                 ---
-                slug: field-note
-                title: Field Note
-                summary: A compact public note.
+                slug: field-update
+                title: Field Update
+                summary: A compact public article.
                 publishedAt: 2026-06-04T07:00:00Z
-                tags: [notes]
-                category: Notes
+                tags: [writing]
+                category: Writing
                 ---
 
-                # Field Note
+                # Field Update
                 """),
             new(
                 RepositoryPath("drafts", "draft.md"),
@@ -93,13 +93,12 @@ public sealed class SiteIndexGeneratorTests
             articles,
             article =>
             {
-                Assert.Equal("field-note", article.Slug);
-                Assert.Equal("Field Note", article.Title);
-                Assert.Equal("Notes", article.Category);
-                Assert.Equal(RoutePath("notes", "field-note"), article.Route);
-                Assert.Equal(RepositoryContentPath("notes", "field-note.md"), article.RelativePath);
-                Assert.Equal(["notes"], article.Tags);
-                Assert.Equal(MarkazorArticleKind.Note, article.Kind);
+                Assert.Equal("field-update", article.Slug);
+                Assert.Equal("Field Update", article.Title);
+                Assert.Equal("Writing", article.Category);
+                Assert.Equal(RoutePath("posts", "field-update"), article.Route);
+                Assert.Equal(RepositoryContentPath("posts", "field-update.md"), article.RelativePath);
+                Assert.Equal(["writing"], article.Tags);
                 Assert.False(article.IsDraft);
             },
             article =>
@@ -111,7 +110,6 @@ public sealed class SiteIndexGeneratorTests
                 Assert.Equal(RoutePath("posts", "newer-post"), article.Route);
                 Assert.Equal(RepositoryContentPath("posts", "newer.md"), article.RelativePath);
                 Assert.Equal(["release"], article.Tags);
-                Assert.Equal(MarkazorArticleKind.Post, article.Kind);
                 Assert.False(article.IsDraft);
             },
             article =>
@@ -119,7 +117,6 @@ public sealed class SiteIndexGeneratorTests
                 Assert.Equal("older-post", article.Slug);
                 Assert.Equal("General", article.Category);
                 Assert.Equal(["intro", "markazor"], article.Tags);
-                Assert.Equal(MarkazorArticleKind.Post, article.Kind);
                 Assert.False(article.IsDraft);
             });
         Assert.Empty(execution.Diagnostics);
@@ -144,7 +141,6 @@ public sealed class SiteIndexGeneratorTests
         Assert.Equal(RepositoryContentPath("posts", "plain-file.md"), article.RelativePath);
         Assert.Equal("/_markazor/content/posts/plain-file.md", article.ContentPath);
         Assert.Equal(RoutePath("posts", "plain-file"), article.Route);
-        Assert.Equal(MarkazorArticleKind.Post, article.Kind);
         Assert.Equal(new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero), article.PublishedAtUtc);
         Assert.False(article.IsDraft);
         Assert.Empty(execution.Diagnostics);
@@ -155,34 +151,14 @@ public sealed class SiteIndexGeneratorTests
     {
         TestAdditionalText[] additionalTexts =
         [
-            new(RepositoryPath("posts", "C# notes%.md"), "# Reserved filename"),
+            new(RepositoryPath("posts", "C# writing%.md"), "# Reserved filename"),
         ];
 
         GeneratorExecution execution = RunGenerator(additionalTexts);
         ArticleMeta article = Assert.Single(LoadArticles(execution.OutputCompilation));
 
-        Assert.Equal(RepositoryContentPath("posts", "C# notes%.md"), article.RelativePath);
-        Assert.Equal("/_markazor/content/posts/C%23%20notes%25.md", article.ContentPath);
-        Assert.Empty(execution.Diagnostics);
-    }
-
-    [Fact]
-    public void UsesNoteDefaultsFromRepositoryRootWhenFrontMatterIsMissing()
-    {
-        TestAdditionalText[] additionalTexts =
-        [
-            new(RepositoryPath("notes", "plain-note.md"), "# Plain Note"),
-        ];
-
-        GeneratorExecution execution = RunGenerator(additionalTexts);
-        ArticleMeta article = Assert.Single(LoadArticles(execution.OutputCompilation));
-
-        Assert.Equal("plain-note", article.Slug);
-        Assert.Equal("plain-note", article.Title);
-        Assert.Equal(RepositoryContentPath("notes", "plain-note.md"), article.RelativePath);
-        Assert.Equal(RoutePath("notes", "plain-note"), article.Route);
-        Assert.Equal(MarkazorArticleKind.Note, article.Kind);
-        Assert.False(article.IsDraft);
+        Assert.Equal(RepositoryContentPath("posts", "C# writing%.md"), article.RelativePath);
+        Assert.Equal("/_markazor/content/posts/C%23%20writing%25.md", article.ContentPath);
         Assert.Empty(execution.Diagnostics);
     }
 
@@ -207,7 +183,6 @@ public sealed class SiteIndexGeneratorTests
         Assert.Equal("linked-post", article.Slug);
         Assert.Equal(RepositoryContentPath("posts", "linked-post.md"), article.RelativePath);
         Assert.Equal(RoutePath("posts", "linked-post"), article.Route);
-        Assert.Equal(MarkazorArticleKind.Post, article.Kind);
         Assert.Empty(execution.Diagnostics);
     }
 
@@ -217,7 +192,7 @@ public sealed class SiteIndexGeneratorTests
         TestAdditionalText[] additionalTexts =
         [
             new(
-                RepositoryPath("notes", "hidden.md"),
+                RepositoryPath("posts", "hidden.md"),
                 """
                 ---
                 title: Hidden

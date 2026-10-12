@@ -1,4 +1,4 @@
-# Markazor Minimal Site + Notes
+# Markazor Minimal Site
 
 This sample uses semantic project names instead of Azure Static Web Apps defaults.
 
@@ -34,12 +34,12 @@ Use `/studio/setup/github-callback` as the GitHub App callback URL and `/studio/
 
 The sample includes `public/markazor.settings.json` for the site title, description, URLs, repository, public GitHub Client ID, and theme. Setup is available before authorization. Settings can also upload a PNG site icon to `assets/site-icon.png`.
 
-`/studio/write` uses the live GitHub tree as the content list source of truth and only enriches matching files with build-time `SiteIndex` metadata. It supports single-file create/update/delete, asset upload, dirty-document navigation guards, remote/local recovery after SHA conflicts, and multi-select draft publishing. New drafts are stored as flat `drafts/*.md` files; `kind: post` publishes to `posts/`, and `kind: note` publishes to `notes/`. Publishing happens in one atomic Git commit; a branch-head conflict is recalculated and retried once. A successful publish still needs the Azure-generated Static Web Apps workflow to deploy the new public site version.
+`/studio/write` uses the live GitHub tree as the content list source of truth and only enriches matching files with build-time `SiteIndex` metadata. It supports single-file create/update/delete, asset upload, dirty-document navigation guards, remote/local recovery after SHA conflicts, and multi-select draft publishing. New drafts are stored as flat `drafts/*.md` files and publish to `posts/`. Publishing happens in one atomic Git commit; a branch-head conflict is recalculated and retried once. A successful publish still needs the Azure-generated Static Web Apps workflow to deploy the new public site version.
 
-Public reader routes are `/`, `/posts`, `/posts/{slug}`, `/notes`, `/notes/{slug}`, `/categories`, `/categories/{name}`, `/tags`, `/tags/{name}`, and `/archive`. Lists use path-based pagination such as `/page/2` and `/posts/page/2`. The home page shows the mixed latest writing feed. Configure the site title, description, URLs, theme, and PNG site icon through `/studio/settings`. The current interface and date formatting are English.
+Public reader routes are `/`, `/posts`, `/posts/{slug}`, `/categories`, `/categories/{name}`, `/tags`, `/tags/{name}`, and `/archive`. Lists use path-based pagination such as `/page/2` and `/posts/page/2`. The home page shows the latest articles. Configure the site title, description, URLs, theme, and PNG site icon through `/studio/settings`. The current interface and date formatting are English.
 
 The build emits complete public HTML using the shared reader components. `/posts/the-shape-of-a-good-page` is a reading specimen covering headings, nested lists, code, wide tables, captioned images, and repeated footnotes.
 
-Only `posts/**` and `notes/**` are compiled and published. `drafts/**` stays out of the browser bundle and public static files, and is available only to the authenticated editor through GitHub. Repository assets under `assets/**` are published to `/assets/**`, while public Markdown is staged under `/_markazor/content/**`. Published content under `posts/**` or `notes/**` with `draft: true` fails the build with `MZ001`.
+Only `posts/**` is compiled and published. `drafts/**` stays out of the browser bundle and public static files, and is available only to the authenticated editor through GitHub. Repository assets under `assets/**` are published to `/assets/**`, while public Markdown is staged under `/_markazor/content/**`. Published content under `posts/**` with `draft: true` fails the build with `MZ001`.
 
 The published PWA caches generated public HTML and public Markdown for offline reading. When a new deployment installs a waiting service worker, the site displays an explicit Reload prompt instead of replacing the running app automatically. The Static Web Apps configuration also applies no-store to all Studio paths, revalidates public Markdown, and supplies security headers plus a static 404 response.

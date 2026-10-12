@@ -312,18 +312,6 @@ input[type=radio] {
 .markazor-reader-meta a {
   color: var(--mk-muted);
 }
-.markazor-reader-kind {
-  border: 0;
-  border-radius: 0;
-  color: var(--mk-accent);
-  font: 600 0.6rem/1.5 var(--mk-font-mono);
-  letter-spacing: 0.06em;
-  padding: 0;
-  text-transform: uppercase;
-}
-.is-note .markazor-reader-kind {
-  color: var(--mk-editorial);
-}
 .markazor-reader-card h2 {
   font: 400 clamp(1.7rem, 2.5vw, 2.35rem)/1.17 var(--mk-font-display);
   letter-spacing: -0.035em;
@@ -865,8 +853,7 @@ input[type=radio] {
   color: var(--mk-muted);
 }
 .markazor-field input[type=checkbox],
-.markazor-field input[type=radio],
-.markazor-content-kind-picker input[type=radio] {
+.markazor-field input[type=radio] {
   min-height: auto;
 }
 .markazor-settings-form {
@@ -897,18 +884,6 @@ input[type=radio] {
 .markazor-sidebar-metrics strong {
   font: 1.6rem/1 var(--mk-font-display);
 }
-.markazor-content-kind-picker {
-  background: var(--mk-soft);
-  border-color: var(--mk-line);
-  gap: 1rem;
-}
-.markazor-content-kind-picker legend {
-  font-size: 0.7rem;
-}
-.markazor-content-kind-picker label {
-  font-size: 0.75rem;
-  min-height: 1.75rem;
-}
 .markazor-article-list {
   max-height: 28rem;
   padding: 0.15rem;
@@ -926,12 +901,6 @@ input[type=radio] {
 }
 .markazor-article-title {
   font-size: 0.8rem;
-}
-.markazor-article-kind {
-  background: var(--mk-accent-soft);
-  border: 0;
-  color: var(--mk-accent);
-  font: 0.6rem var(--mk-font-mono);
 }
 .markazor-article-list small {
   font: 0.6rem/1.6 var(--mk-font-mono);
@@ -964,13 +933,11 @@ input[type=radio] {
 .markazor-metadata-toolbar {
   background: var(--mk-soft);
 }
-.markazor-metadata-toolbar .markazor-field,
-.markazor-metadata-toolbar .markazor-metadata-kind {
+.markazor-metadata-toolbar .markazor-field {
   border-color: var(--mk-line);
   padding: 0.75rem;
 }
-.markazor-metadata-toolbar .markazor-field > span,
-.markazor-metadata-toolbar .markazor-metadata-kind legend {
+.markazor-metadata-toolbar .markazor-field > span {
   font: 0.6rem/1.5 var(--mk-font-mono);
 }
 .markazor-metadata-toolbar .markazor-field input,
@@ -980,9 +947,6 @@ input[type=radio] {
 }
 .markazor-metadata-toolbar .markazor-checkbox-field input {
   min-height: auto;
-}
-.markazor-metadata-toolbar .markazor-metadata-kind {
-  background: transparent;
 }
 .markazor-authoring-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));

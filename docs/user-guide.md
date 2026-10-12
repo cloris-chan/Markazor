@@ -115,7 +115,7 @@ Wait for the deployment to succeed in GitHub **Actions**, then choose **Check se
 ## 4. Write Your First Post
 
 1. Open **Write** and expand **New draft**.
-2. Choose **Post** or **Note**, enter a title, keep the suggested slug, and select **New Draft**. The slug becomes part of the published URL.
+2. Enter a title, keep the suggested slug, and select **New Draft**. The slug becomes part of the published URL.
 3. Write in Markdown and use the preview to check the result. **Document details** lets you change the title, slug, and other metadata.
 4. Choose **Save** to keep the draft, or **Publish** to make it public.
 5. Wait for the Azure deployment to finish, then open the public site.
@@ -129,8 +129,6 @@ Generated sites use this root layout after content is written or settings are sa
 ```text
 posts/
   your-post.md
-notes/
-  your-note.md
 drafts/
   your-draft.md
 assets/
@@ -146,13 +144,12 @@ public/
 Public content:
 
 - `posts/**`
-- `notes/**`
 
 Unpublished drafts:
 
 - `drafts/**`
 
-Repository assets under `assets/**` are published to `/assets/**`. Public Markdown is staged internally under `/_markazor/content/**`, so reader routes like `/posts/{slug}` and `/notes/{slug}` do not collide with raw Markdown files. The build also renders complete HTML for public pages, including the article body, title, contents links, and metadata. Taxonomy and pagination use path-based routes such as `/tags/design` and `/posts/page/2`.
+Repository assets under `assets/**` are published to `/assets/**`. Public Markdown is staged internally under `/_markazor/content/**`, so reader routes like `/posts/{slug}` do not collide with raw Markdown files. The build also renders complete HTML for public pages, including the article body, title, contents links, and metadata. Taxonomy and pagination use path-based routes such as `/tags/design` and `/posts/page/2`.
 
 Write the article title in front matter and start body sections with `##`. Studio preview and published articles share the same safe Markdown renderer and typography. The current UI and date formatting are English; there is no site-language setting.
 
@@ -166,7 +163,7 @@ These `public/**` paths are reserved and rejected:
 - `public/assets/**`
 - `public/service-worker-assets.js`
 
-Generated Markazor sites keep the Web project under `src/{SiteName}.Web`; the build derives the repository root from that layout and uses fixed root folders: `posts/`, `notes/`, `drafts/`, `assets/`, and `public/`.
+Generated Markazor sites keep the Web project under `src/{SiteName}.Web`; the build derives the repository root from that layout and uses fixed root folders: `posts/`, `drafts/`, `assets/`, and `public/`.
 
 Drafts are not copied into publish output and do not appear in service worker assets.
 

@@ -79,7 +79,7 @@ public sealed class MarkazorEditorServiceTests
     }
 
     [Fact]
-    public async Task BatchPublishRejectsNestedDraftKindFolder()
+    public async Task BatchPublishRejectsNestedDraftFolder()
     {
         using EditorHandler handler = new();
         handler.Enqueue(
@@ -95,7 +95,7 @@ public sealed class MarkazorEditorServiceTests
               "sha":"tree-1",
               "truncated":false,
               "tree":[
-                {"path":"drafts/notes/idea.md","mode":"100644","type":"blob","sha":"blob-1"}
+                {"path":"drafts/archive/idea.md","mode":"100644","type":"blob","sha":"blob-1"}
               ]
             }
             """);
@@ -103,7 +103,7 @@ public sealed class MarkazorEditorServiceTests
         MarkazorEditorService editor = new(session, new FakeCatalog());
 
         MarkazorBatchPublishResult result = await editor.PublishDraftsAsync(
-            ["drafts/notes/idea.md"],
+            ["drafts/archive/idea.md"],
             TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
@@ -114,7 +114,7 @@ public sealed class MarkazorEditorServiceTests
     }
 
     [Fact]
-    public async Task BatchPublishCreatesNoteDestinationFromFrontMatterKind()
+    public async Task BatchPublishMovesSingleDraftIntoPosts()
     {
         using EditorHandler handler = new();
         handler.Enqueue(
@@ -134,7 +134,7 @@ public sealed class MarkazorEditorServiceTests
               ]
             }
             """);
-        handler.Enqueue(HttpStatusCode.OK, Blob("blob-1", "Idea", MarkazorArticleKind.Note));
+        handler.Enqueue(HttpStatusCode.OK, Blob("blob-1", "Idea"));
         handler.Enqueue(
             HttpStatusCode.Created,
             """
@@ -142,7 +142,7 @@ public sealed class MarkazorEditorServiceTests
               "sha":"tree-2",
               "truncated":false,
               "tree":[
-                {"path":"notes/idea.md","mode":"100644","type":"blob","sha":"note-1"}
+                {"path":"posts/idea.md","mode":"100644","type":"blob","sha":"post-1"}
               ]
             }
             """);
@@ -159,7 +159,7 @@ public sealed class MarkazorEditorServiceTests
 
         Assert.True(result.Succeeded);
         MarkazorEditorDocument document = Assert.Single(result.PublishedDocuments);
-        Assert.Equal("notes/idea.md", document.Path);
+        Assert.Equal("posts/idea.md", document.Path);
     }
 
     [Fact]
@@ -694,12 +694,11 @@ public sealed class MarkazorEditorServiceTests
                 : """{"message":"Reference update failed"}""");
     }
 
-    private static string Blob(string sha, string title, string kind = MarkazorArticleKind.Post)
+    private static string Blob(string sha, string title)
     {
         string markdown = $$"""
             ---
             title: {{title}}
-            kind: {{kind}}
             draft: true
             ---
 

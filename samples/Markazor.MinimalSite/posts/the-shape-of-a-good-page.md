@@ -45,13 +45,13 @@ Nested thoughts have their own place:
 The language label comes from the fenced code block. Known languages receive a restrained highlight palette. The copy control copies the original code, and an unfamiliar language remains readable as plain text.
 
 ```csharp
-public sealed record ReadingNote(string Title, string Body);
+public sealed record ReadingEntry(string Title, string Body);
 
-var note = new ReadingNote(
+var entry = new ReadingEntry(
     "A small observation",
     "A public article should be readable before an application starts.");
 
-Console.WriteLine(note.Title);
+Console.WriteLine(entry.Title);
 ```
 
 ```json
@@ -73,10 +73,10 @@ article-title | publication-date | collection | language | permanent-address | r
 
 Alignment belongs to the content: labels stay on the left, measurements on the right. Wide tables have their own scrolling region, with a hint when more columns are out of view.
 
-| Collection | Articles | Notes | Drafts | Last reviewed | Reading format | Delivery | Owner |
+| Collection | Articles | References | Drafts | Last reviewed | Reading format | Delivery | Owner |
 | :--- | ---: | ---: | ---: | :--- | :--- | :--- | :--- |
 | Journal | 12 | 8 | 3 | September 21, 2026 | Long-form and short-form | Static HTML | Author |
-| Workbench | 7 | 15 | 2 | September 20, 2026 | Technical notes and examples | Static HTML | Author |
+| Workbench | 7 | 15 | 2 | September 20, 2026 | Technical articles and examples | Static HTML | Author |
 | Field studies | 4 | 6 | 1 | September 19, 2026 | Observations and references | Static HTML | Author |
 
 These rows are specimen data for checking the layout, not statistics about this website.

@@ -1,9 +1,0 @@
-@page "/notes/{Value}"
-@using Markazor.Reading
-
-<ReaderPage Kind="MarkazorReaderPageKind.Note" Value="@Value" />
-
-@code {
-    [Parameter]
-    public string? Value { get; set; }
-}

@@ -24,7 +24,7 @@ public sealed class MarkazorContentCatalogTests
               "truncated":false,
               "tree":[
                 {"path":"posts/hello.md","mode":"100644","type":"blob","sha":"hello-sha"},
-                {"path":"notes/quick.md","mode":"100644","type":"blob","sha":"quick-sha"},
+                {"path":"posts/quick.md","mode":"100644","type":"blob","sha":"quick-sha"},
                 {"path":"drafts/runtime.md","mode":"100644","type":"blob","sha":"runtime-sha"},
                 {"path":"README.md","mode":"100644","type":"blob","sha":"readme-sha"}
               ]
@@ -36,7 +36,7 @@ public sealed class MarkazorContentCatalogTests
             Articles =
             [
                 Article("hello", "Build title", "posts/hello.md", isDraft: false),
-                Article("quick", "Build note", "notes/quick.md", isDraft: false, kind: MarkazorArticleKind.Note),
+                Article("quick", "Build update", "posts/quick.md", isDraft: false),
                 Article("deleted", "Deleted", "posts/deleted.md", isDraft: false),
             ],
         };
@@ -49,10 +49,9 @@ public sealed class MarkazorContentCatalogTests
         Assert.Null(catalog.Warning);
         Assert.Equal(3, entries.Count);
         Assert.Equal("Build title", entries.Single(entry => entry.RelativePath.EndsWith("hello.md", StringComparison.Ordinal)).Title);
-        MarkazorContentEntry note = entries.Single(entry => entry.RelativePath.EndsWith("quick.md", StringComparison.Ordinal));
-        Assert.Equal("Build note", note.Title);
-        Assert.Equal(MarkazorArticleKind.Note, note.Article.Kind);
-        Assert.Equal(RoutePath("notes", "quick"), note.Article.Route);
+        MarkazorContentEntry article = entries.Single(entry => entry.RelativePath.EndsWith("quick.md", StringComparison.Ordinal));
+        Assert.Equal("Build update", article.Title);
+        Assert.Equal(RoutePath("posts", "quick"), article.Article.Route);
         Assert.Equal("runtime", entries.Single(entry => entry.RelativePath.EndsWith("runtime.md", StringComparison.Ordinal)).Title);
         Assert.DoesNotContain(entries, entry => entry.RelativePath.EndsWith("deleted.md", StringComparison.Ordinal));
     }
@@ -111,8 +110,7 @@ public sealed class MarkazorContentCatalogTests
         string slug,
         string title,
         string path,
-        bool isDraft,
-        string kind = MarkazorArticleKind.Post)
+        bool isDraft)
     {
         return new ArticleMeta(
             slug,
@@ -122,11 +120,8 @@ public sealed class MarkazorContentCatalogTests
             [],
             null,
             path,
-            RoutePath(
-                string.Equals(kind, MarkazorArticleKind.Note, StringComparison.Ordinal) ? "notes" : "posts",
-                slug),
-            isDraft,
-            kind);
+            RoutePath("posts", slug),
+            isDraft);
     }
 
     private static string RoutePath(string routeRoot, string slug)

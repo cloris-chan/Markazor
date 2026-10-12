@@ -20,7 +20,7 @@ public sealed class MarkazorReaderServiceTests
         MarkazorArticlePage last = reader.GetArticles(99);
 
         Assert.Equal(1, first.PageNumber);
-        Assert.Equal(["field-note", "newest"], first.Articles.Select(static article => article.Slug));
+        Assert.Equal(["field-update", "newest"], first.Articles.Select(static article => article.Slug));
         Assert.False(first.HasPreviousPage);
         Assert.True(first.HasNextPage);
         Assert.Equal(2, last.PageNumber);
@@ -42,14 +42,14 @@ public sealed class MarkazorReaderServiceTests
         Assert.Equal(
             [
                 new MarkazorTaxonomyItem("General", 2),
-                new MarkazorTaxonomyItem("Notes", 1),
+                new MarkazorTaxonomyItem("Journal", 1),
                 new MarkazorTaxonomyItem("Updates", 1),
             ],
             reader.GetCategories());
         Assert.Equal(
             [
                 new MarkazorTaxonomyItem("dotnet", 2),
-                new MarkazorTaxonomyItem("notes", 1),
+                new MarkazorTaxonomyItem("journal", 1),
                 new MarkazorTaxonomyItem("release", 1),
             ],
             reader.GetTags());
@@ -74,7 +74,7 @@ public sealed class MarkazorReaderServiceTests
             group =>
             {
                 Assert.Equal((2026, 6), (group.Year, group.Month));
-                Assert.Equal(["field-note", "newest", "second"], group.Articles.Select(static article => article.Slug));
+                Assert.Equal(["field-update", "newest", "second"], group.Articles.Select(static article => article.Slug));
             },
             group =>
             {
@@ -84,27 +84,6 @@ public sealed class MarkazorReaderServiceTests
         Assert.Equal("oldest", navigation.PreviousArticle?.Slug);
         Assert.Equal("newest", navigation.NextArticle?.Slug);
         Assert.Null(reader.FindArticle("draft"));
-    }
-
-    [Fact]
-    public void SplitsPostsAndNotesByKind()
-    {
-        using HttpClient httpClient = CreateHttpClient();
-        MarkazorReaderService reader = new(
-            httpClient,
-            new MarkazorMarkdownRenderer(),
-            CreateOptions());
-
-        MarkazorArticlePage posts = reader.GetPosts();
-        MarkazorArticlePage notes = reader.GetNotes();
-        MarkazorArticleNavigation noteNavigation = reader.GetNavigation("field-note", MarkazorArticleKind.Note);
-
-        Assert.Equal(["newest", "second", "oldest"], posts.Articles.Select(static article => article.Slug));
-        Assert.Equal("field-note", Assert.Single(notes.Articles).Slug);
-        Assert.Null(reader.FindArticle("field-note", MarkazorArticleKind.Post));
-        Assert.Equal(MarkazorArticleKind.Note, reader.FindArticle("field-note", MarkazorArticleKind.Note)?.Kind);
-        Assert.Null(noteNavigation.PreviousArticle);
-        Assert.Null(noteNavigation.NextArticle);
     }
 
     [Fact]
@@ -139,7 +118,7 @@ public sealed class MarkazorReaderServiceTests
             [
                 Article("oldest", new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero), "General", ["DotNet"]),
                 Article("draft", new DateTimeOffset(2026, 6, 4, 0, 0, 0, TimeSpan.Zero), "Private", ["secret"], isDraft: true),
-                Article("field-note", new DateTimeOffset(2026, 6, 5, 0, 0, 0, TimeSpan.Zero), "Notes", ["notes"], MarkazorArticleKind.Note),
+                Article("field-update", new DateTimeOffset(2026, 6, 5, 0, 0, 0, TimeSpan.Zero), "Journal", ["journal"]),
                 Article("newest", new DateTimeOffset(2026, 6, 3, 0, 0, 0, TimeSpan.Zero), "General", ["dotnet"]),
                 Article("second", new DateTimeOffset(2026, 6, 2, 0, 0, 0, TimeSpan.Zero), "Updates", ["release"]),
             ],
@@ -151,14 +130,9 @@ public sealed class MarkazorReaderServiceTests
         DateTimeOffset publishedAt,
         string? category,
         IReadOnlyList<string> tags,
-        string kind = MarkazorArticleKind.Post,
         bool isDraft = false)
     {
-        string root = isDraft
-            ? "drafts"
-            : string.Equals(kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
-                ? "notes"
-                : "posts";
+        string root = isDraft ? "drafts" : "posts";
 
         return new ArticleMeta(
             slug,
@@ -167,12 +141,9 @@ public sealed class MarkazorReaderServiceTests
             publishedAt,
             tags,
             category,
-            ContentPath("content", root, string.Concat(slug, ".md")),
-            RoutePath(
-                string.Equals(kind, MarkazorArticleKind.Note, StringComparison.Ordinal) ? "notes" : "posts",
-                slug),
-            isDraft,
-            kind);
+            ContentPath(root, string.Concat(slug, ".md")),
+            RoutePath("posts", slug),
+            isDraft);
     }
 
     private static string ContentPath(params string[] segments)

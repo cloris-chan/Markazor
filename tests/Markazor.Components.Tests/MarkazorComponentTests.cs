@@ -19,9 +19,9 @@ public sealed class MarkazorComponentTests
         using BunitContext context = new();
         IRenderedComponent<ArticleList> component = context.Render<ArticleList>(parameters => parameters
             .Add(static item => item.Page, new MarkazorArticlePage([], 1, 10, 0, 1))
-            .Add(static item => item.EmptyMessage, "No notes have been published."));
+            .Add(static item => item.EmptyMessage, "No articles have been published."));
 
-        Assert.Contains("No notes have been published.", component.Find("[role='status']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("No articles have been published.", component.Find("[role='status']").TextContent, StringComparison.Ordinal);
         Assert.Empty(component.FindAll(".markazor-reader-card"));
         Assert.Empty(component.FindAll(".markazor-pagination"));
     }
@@ -51,7 +51,7 @@ public sealed class MarkazorComponentTests
             [
                 ReaderArticle("first", "First post", null, []),
                 ReaderArticle("second", "Second post", null, []),
-                ReaderArticle("note", "A note", null, []) with { Kind = MarkazorArticleKind.Note, RelativePath = "notes/note.md", Route = "/notes/note" },
+                ReaderArticle("third", "Third post", null, []),
                 ReaderArticle("private", "Private draft", null, []) with { IsDraft = true },
             ],
         };
@@ -64,10 +64,9 @@ public sealed class MarkazorComponentTests
 
         Assert.Contains(options.Site.Name, component.Find("h1").TextContent, StringComparison.Ordinal);
         Assert.Equal(options.Site.Description, component.Find(".reader-intro-description").TextContent);
-        Assert.Equal("02", component.Find(".reader-colophon-index a[href='/posts'] small").TextContent);
-        Assert.Equal("01", component.Find(".reader-colophon-index a[href='/notes'] small").TextContent);
+        Assert.Equal("03", component.Find(".reader-colophon-index a[href='/posts'] small").TextContent);
         Assert.Single(component.FindAll(".markazor-reader-card"));
-        Assert.Equal("/posts/first", component.Find(".markazor-reader-card h2 a").GetAttribute("href"));
+        Assert.Equal("/posts/second", component.Find(".markazor-reader-card h2 a").GetAttribute("href"));
         Assert.DoesNotContain("Private draft", component.Markup, StringComparison.Ordinal);
     }
 
@@ -90,7 +89,7 @@ public sealed class MarkazorComponentTests
         component.Find(".site-header").KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Escape" });
         Assert.Equal("false", component.Find(".site-menu-toggle").GetAttribute("aria-expanded"));
         component.Find(".site-menu-toggle").Click();
-        component.Find("#reader-navigation a[href='/notes']").Click();
+        component.Find("#reader-navigation a[href='/tags']").Click();
         Assert.Equal("false", component.Find(".site-menu-toggle").GetAttribute("aria-expanded"));
         Assert.Equal("#main-content", component.Find(".markazor-skip-link").GetAttribute("href"));
         Assert.NotNull(component.Find("main#main-content"));
@@ -820,7 +819,7 @@ public sealed class MarkazorComponentTests
     }
 
     [Fact]
-    public void EditorCreatesPostDraftWithMatchingKindMetadata()
+    public void EditorCreatesDraftWithSuggestedMetadata()
     {
         using BunitContext context = new();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -850,44 +849,8 @@ public sealed class MarkazorComponentTests
             Assert.Equal("Start writing.", component.Find(".markazor-editor-textarea").GetAttribute("value"));
             Assert.Equal("New Draft", GetMetadataInput(component, "Title").GetAttribute("value"));
             Assert.StartsWith("new-draft-", GetMetadataInput(component, "Slug").GetAttribute("value"), StringComparison.Ordinal);
-            Assert.True(GetMetadataKindInput(component, MarkazorArticleKind.Post).HasAttribute("checked"));
-        });
-    }
-
-    [Fact]
-    public void EditorCreatesNoteDraftWithMatchingKindMetadata()
-    {
-        using BunitContext context = new();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        FakeSession session = new();
-        FakeCatalog catalog = new([]);
-        FakeEditor editor = new();
-        context.Services.AddSingleton<IMarkazorClientSession>(session);
-        context.Services.AddSingleton<IMarkazorSetupDiagnosticsService>(
-            new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
-        context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
-        context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
-        context.Services.AddSingleton<IMarkazorEditorService>(editor);
-
-        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
-
-        component.WaitForAssertion(() =>
-            Assert.Contains("No documents yet. Create a draft to get started.", component.Markup, StringComparison.Ordinal));
-
-        component.Find("input[value=\"note\"]").Change("note");
-        component.FindAll("button")
-            .Single(button => string.Equals(button.TextContent.Trim(), "New Draft", StringComparison.Ordinal))
-            .Click();
-
-        component.WaitForAssertion(() =>
-        {
-            Assert.Contains("drafts/new-draft-", component.Markup, StringComparison.Ordinal);
-            Assert.Equal("Start writing.", component.Find(".markazor-editor-textarea").GetAttribute("value"));
-            Assert.Equal("New Draft", GetMetadataInput(component, "Title").GetAttribute("value"));
-            Assert.StartsWith("new-draft-", GetMetadataInput(component, "Slug").GetAttribute("value"), StringComparison.Ordinal);
-            Assert.True(GetMetadataKindInput(component, MarkazorArticleKind.Note).HasAttribute("checked"));
-            Assert.Contains("Note draft ready.", component.Markup, StringComparison.Ordinal);
+            Assert.Empty(component.FindAll("input[type='radio']"));
+            Assert.Contains("Draft ready.", component.Markup, StringComparison.Ordinal);
         });
     }
 
@@ -1029,33 +992,6 @@ public sealed class MarkazorComponentTests
         });
     }
 
-    [Fact]
-    public void EditorShowsArticleKindInLiveContentList()
-    {
-        using BunitContext context = new();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        FakeSession session = new();
-        FakeCatalog catalog = new(
-            [ContentEntry("notes/idea.md", "Idea", isDraft: false, sha: "note-sha", kind: MarkazorArticleKind.Note)]);
-        FakeEditor editor = new();
-        context.Services.AddSingleton<IMarkazorClientSession>(session);
-        context.Services.AddSingleton<IMarkazorSetupDiagnosticsService>(
-            new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
-        context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
-        context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
-        context.Services.AddSingleton<IMarkazorEditorService>(editor);
-
-        IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
-
-        component.WaitForAssertion(() =>
-        {
-            Assert.Contains("notes/idea.md", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("markazor-article-kind", component.Markup, StringComparison.Ordinal);
-            Assert.Contains(">Note<", component.Markup, StringComparison.Ordinal);
-        });
-    }
-
     private static MarkazorRepositoryDiagnostics CreateDiagnostics(bool ready, bool canPush)
     {
         return new MarkazorRepositoryDiagnostics(
@@ -1115,17 +1051,6 @@ public sealed class MarkazorComponentTests
         return Assert.IsAssignableFrom<AngleSharp.Dom.IElement>(input);
     }
 
-    private static AngleSharp.Dom.IElement GetMetadataKindInput(
-        IRenderedComponent<StudioWriterPanel> component,
-        string kind)
-    {
-        AngleSharp.Dom.IElement? input = component.Find(".markazor-metadata-kind")
-            .QuerySelectorAll("input")
-            .Single(item => string.Equals(item.GetAttribute("value"), kind, StringComparison.Ordinal));
-
-        return Assert.IsAssignableFrom<AngleSharp.Dom.IElement>(input);
-    }
-
     private static ArticleMeta ReaderArticle(
         string slug,
         string title,
@@ -1149,8 +1074,7 @@ public sealed class MarkazorComponentTests
         string title,
         bool isDraft,
         string? sha,
-        bool existsOnGitHub = true,
-        string kind = MarkazorArticleKind.Post)
+        bool existsOnGitHub = true)
     {
         string slug = Path.GetFileNameWithoutExtension(path);
 
@@ -1163,9 +1087,8 @@ public sealed class MarkazorComponentTests
                 [],
                 null,
                 path,
-                (string.Equals(kind, MarkazorArticleKind.Note, StringComparison.Ordinal) ? "/notes/" : "/posts/") + slug,
-                isDraft,
-                kind),
+                "/posts/" + slug,
+                isDraft),
             sha,
             existsOnGitHub);
     }

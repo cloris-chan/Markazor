@@ -67,25 +67,6 @@
             <details class="markazor-disclosure">
                 <summary>New draft</summary>
                 <div class="markazor-new-draft">
-                    <fieldset class="markazor-content-kind-picker">
-                        <legend>Type</legend>
-                        <label>
-                            <input type="radio"
-                                   name="new-draft-kind"
-                                   value="@MarkazorArticleKind.Post"
-                                   checked="@IsNewDraftKind(MarkazorArticleKind.Post)"
-                                   @onchange="args => ChangeNewDraftKind(args)" />
-                            <span>Post</span>
-                        </label>
-                        <label>
-                            <input type="radio"
-                                   name="new-draft-kind"
-                                   value="@MarkazorArticleKind.Note"
-                                   checked="@IsNewDraftKind(MarkazorArticleKind.Note)"
-                                   @onchange="args => ChangeNewDraftKind(args)" />
-                            <span>Note</span>
-                        </label>
-                    </fieldset>
                     <label>
                         <span>Title</span>
                         <input value="@newDraftTitle" @oninput="OnNewDraftTitleInput" />
@@ -116,7 +97,6 @@
                                 disabled="@isBusy">
                             <span class="markazor-article-title-line">
                                 <span class="markazor-article-title">@entry.Title</span>
-                                <span class="markazor-article-kind">@GetArticleKindLabel(entry.Article.Kind)</span>
                             </span>
                             <small>@entry.RelativePath</small>
                         </button>
@@ -186,27 +166,6 @@
                                 <span>Slug</span>
                                 <input value="@metadata.Slug" @oninput="OnMetadataSlugInput" disabled="@isBusy" />
                             </label>
-                            <fieldset class="markazor-content-kind-picker markazor-metadata-kind">
-                                <legend>Type</legend>
-                                <label>
-                                    <input type="radio"
-                                           name="document-kind"
-                                           value="@MarkazorArticleKind.Post"
-                                           checked="@IsMetadataKind(MarkazorArticleKind.Post)"
-                                           @onchange="args => ChangeMetadataKind(args)"
-                                           disabled="@isBusy" />
-                                    <span>Post</span>
-                                </label>
-                                <label>
-                                    <input type="radio"
-                                           name="document-kind"
-                                           value="@MarkazorArticleKind.Note"
-                                           checked="@IsMetadataKind(MarkazorArticleKind.Note)"
-                                           @onchange="args => ChangeMetadataKind(args)"
-                                           disabled="@isBusy" />
-                                    <span>Note</span>
-                                </label>
-                            </fieldset>
                         </div>
                         <label class="markazor-field markazor-path-field">
                             <span>Path</span>
@@ -227,7 +186,7 @@
                             </label>
                             <label class="markazor-field markazor-tags-field">
                                 <span>Tags</span>
-                                <input @bind="metadata.Tags" placeholder="dotnet, blazor, notes" disabled="@isBusy" />
+                                <input @bind="metadata.Tags" placeholder="dotnet, blazor, writing" disabled="@isBusy" />
                             </label>
                         </div>
                         <label class="markazor-field markazor-summary-field">
@@ -313,7 +272,6 @@
     private string newDraftTitle = "New Draft";
     private string newDraftTimestamp = CreateDraftTimestamp(DateTimeOffset.Now);
     private string newDraftSlug = string.Empty;
-    private string newDraftKind = MarkazorArticleKind.Post;
     private bool newDraftSlugFollowsTitle = true;
     private bool documentSlugFollowsTitle = true;
     private bool documentPathFollowsSlug = true;
@@ -533,16 +491,15 @@
 
         string slug = NormalizeSlug(newDraftSlug);
         string title = string.IsNullOrWhiteSpace(newDraftTitle) ? slug : newDraftTitle.Trim();
-        string kind = MarkazorArticleKind.Normalize(newDraftKind);
 
         await ApplyDocumentAsync(
             new MarkazorEditorDocument(
                 MarkazorRepositoryPaths.DraftsRoot + slug + ".md",
-                CreateDraftMarkdown(title, slug, kind),
+                CreateDraftMarkdown(title, slug),
                 null),
             isNew: true).ConfigureAwait(false);
 
-        SetSuccess($"{GetArticleKindLabel(kind)} draft ready.");
+        SetSuccess("Draft ready.");
         ResetNewDraftDefaults();
     }
 
@@ -664,7 +621,7 @@
                 selectedDraftPaths.Remove(draftPath);
                 await ApplyDocumentAsync(result.Value, isNew: false, clearPendingAssets: false).ConfigureAwait(false);
                 _ = await RefreshEditorCatalogAsync().ConfigureAwait(false);
-                SetSuccess($"Published to {GetArticleKindLabel(ParseDocumentKind(result.Value)).ToLowerInvariant()}s. Static Web Apps deployment is pending.");
+                SetSuccess("Published. Static Web Apps deployment is pending.");
             }
             else
             {
@@ -1120,26 +1077,6 @@
         return entry.IsDraft ? "markazor-article-row is-selectable" : "markazor-article-row";
     }
 
-    private bool IsNewDraftKind(string kind)
-    {
-        return string.Equals(newDraftKind, kind, StringComparison.Ordinal);
-    }
-
-    private void ChangeNewDraftKind(ChangeEventArgs args)
-    {
-        newDraftKind = MarkazorArticleKind.Normalize(args.Value?.ToString());
-    }
-
-    private bool IsMetadataKind(string kind)
-    {
-        return string.Equals(metadata.Kind, kind, StringComparison.Ordinal);
-    }
-
-    private void ChangeMetadataKind(ChangeEventArgs args)
-    {
-        metadata.Kind = MarkazorArticleKind.Normalize(args.Value?.ToString());
-    }
-
     private bool IsSelected(string path)
     {
         return selectedDraftPaths.Contains(path);
@@ -1181,7 +1118,7 @@
         }
     }
 
-    private static string CreateDraftMarkdown(string title, string slug, string kind)
+    private static string CreateDraftMarkdown(string title, string slug)
     {
         string today = DateTimeOffset.UtcNow.ToString(
             "yyyy-MM-dd",
@@ -1194,7 +1131,6 @@
             "---",
             $"slug: {slug}",
             $"title: \"{escapedTitle}\"",
-            $"kind: {kind}",
             "summary: \"\"",
             $"publishedAt: {today}",
             "draft: true",
@@ -1266,18 +1202,6 @@
     private static string CreateDraftPath(string slug)
     {
         return MarkazorRepositoryPaths.DraftsRoot + NormalizeSlug(slug) + ".md";
-    }
-
-    private static string GetArticleKindLabel(string kind)
-    {
-        return string.Equals(MarkazorArticleKind.Normalize(kind), MarkazorArticleKind.Note, StringComparison.Ordinal)
-            ? "Note"
-            : "Post";
-    }
-
-    private static string ParseDocumentKind(MarkazorEditorDocument document)
-    {
-        return MarkdownContent.ParseArticleMeta(document.Path, document.Markdown).Kind;
     }
 
     private static string NormalizeSlug(string value)
@@ -1457,8 +1381,6 @@
 
         public string Title { get; set; } = string.Empty;
 
-        public string Kind { get; set; } = MarkazorArticleKind.Post;
-
         public string Summary { get; set; } = string.Empty;
 
         public DateTime PublishedAt { get; set; } = DateTimeOffset.UnixEpoch.UtcDateTime;
@@ -1490,7 +1412,6 @@
             {
                 Slug = source.Slug,
                 Title = source.Title,
-                Kind = MarkazorArticleKind.Normalize(source.Kind),
                 Summary = source.Summary,
                 PublishedAt = source.PublishedAtUtc.UtcDateTime,
                 IsDraft = source.IsDraft,
@@ -1506,7 +1427,6 @@
             {
                 Slug = Slug,
                 Title = Title,
-                Kind = Kind,
                 Summary = Summary,
                 PublishedAt = PublishedAt,
                 IsDraft = IsDraft,
@@ -1521,7 +1441,6 @@
             return new MarkdownDocumentMetadata(
                 NormalizeRequiredText(Slug),
                 NormalizeRequiredText(Title),
-                MarkazorArticleKind.Normalize(Kind),
                 NormalizeOptionalText(Summary) ?? string.Empty,
                 ToPublishedAtUtc(),
                 IsDraft,
@@ -1535,7 +1454,6 @@
             return other is not null
                 && string.Equals(NormalizeRequiredText(Slug), NormalizeRequiredText(other.Slug), StringComparison.Ordinal)
                 && string.Equals(NormalizeRequiredText(Title), NormalizeRequiredText(other.Title), StringComparison.Ordinal)
-                && string.Equals(MarkazorArticleKind.Normalize(Kind), MarkazorArticleKind.Normalize(other.Kind), StringComparison.Ordinal)
                 && string.Equals(NormalizeOptionalText(Summary), NormalizeOptionalText(other.Summary), StringComparison.Ordinal)
                 && ToPublishedAtUtc().Equals(other.ToPublishedAtUtc())
                 && IsDraft == other.IsDraft
@@ -1554,7 +1472,6 @@
             HashCode hash = new();
             hash.Add(NormalizeRequiredText(Slug), StringComparer.Ordinal);
             hash.Add(NormalizeRequiredText(Title), StringComparer.Ordinal);
-            hash.Add(MarkazorArticleKind.Normalize(Kind), StringComparer.Ordinal);
             hash.Add(NormalizeOptionalText(Summary), StringComparer.Ordinal);
             hash.Add(ToPublishedAtUtc());
             hash.Add(IsDraft);

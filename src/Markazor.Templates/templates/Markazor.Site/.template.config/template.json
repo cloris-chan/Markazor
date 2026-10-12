@@ -8,7 +8,6 @@
     "Site",
     "Publishing",
     "Posts",
-    "Notes",
     "Static Web Apps"
   ],
   "description": "Creates a self-owned Markazor site with Blazor WebAssembly, Azure Functions, GitHub, and Azure Static Web Apps.",

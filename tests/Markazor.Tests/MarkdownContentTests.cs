@@ -81,9 +81,8 @@ public sealed class MarkdownContentTests
     {
         const string Markdown = """
             ---
-            slug: hello-note
-            title: "Hello Note"
-            kind: post
+            slug: hello-article
+            title: "Hello Article"
             summary: "Short summary"
             publishedAt: 2026-06-06T12:30:00Z
             draft: true
@@ -96,13 +95,12 @@ public sealed class MarkdownContentTests
             """;
 
         MarkdownDocument document = MarkdownContent.SplitDocument(
-            ContentPath("drafts", "hello-note.md"),
+            ContentPath("drafts", "hello-article.md"),
             Markdown);
 
         Assert.Equal("# Body", document.Body);
-        Assert.Equal("hello-note", document.Metadata.Slug);
-        Assert.Equal("Hello Note", document.Metadata.Title);
-        Assert.Equal(MarkazorArticleKind.Post, document.Metadata.Kind);
+        Assert.Equal("hello-article", document.Metadata.Slug);
+        Assert.Equal("Hello Article", document.Metadata.Title);
         Assert.Equal("Short summary", document.Metadata.Summary);
         Assert.True(document.Metadata.IsDraft);
         Assert.Equal(["dotnet", "blazor"], document.Metadata.Tags);
@@ -116,7 +114,6 @@ public sealed class MarkdownContentTests
         MarkdownDocumentMetadata metadata = new(
             "hello",
             "Hello \"World\"",
-            MarkazorArticleKind.Note,
             "Summary",
             new DateTimeOffset(2026, 6, 6, 12, 30, 0, TimeSpan.Zero),
             IsDraft: true,
@@ -128,7 +125,6 @@ public sealed class MarkdownContentTests
 
         Assert.Contains("slug: hello", markdown, StringComparison.Ordinal);
         Assert.Contains("title: \"Hello \\\"World\\\"\"", markdown, StringComparison.Ordinal);
-        Assert.Contains("kind: note", markdown, StringComparison.Ordinal);
         Assert.Contains("publishedAt: 2026-06-06T12:30:00Z", markdown, StringComparison.Ordinal);
         Assert.Contains("draft: true", markdown, StringComparison.Ordinal);
         Assert.Contains("tags: [\"dotnet\", \"blazor\"]", markdown, StringComparison.Ordinal);
@@ -161,116 +157,38 @@ public sealed class MarkdownContentTests
         Assert.Equal(["one", "two"], article.Tags);
         Assert.True(article.IsDraft);
         Assert.Equal(RoutePath("posts", "runtime"), article.Route);
-        Assert.Equal(MarkazorArticleKind.Post, article.Kind);
-    }
-
-    [Fact]
-    public void ParseArticleMetaInfersNoteKindAndRouteFromRoot()
-    {
-        const string Markdown = """
-            ---
-            title: "Runtime note"
-            publishedAt: 2026-06-06
-            ---
-
-            Body
-            """;
-
-        ArticleMeta article = MarkdownContent.ParseArticleMeta(
-            ContentPath("notes", "runtime-note.md"),
-            Markdown);
-
-        Assert.Equal("runtime-note", article.Slug);
-        Assert.Equal("Runtime note", article.Title);
-        Assert.False(article.IsDraft);
-        Assert.Equal(RoutePath("notes", "runtime-note"), article.Route);
-        Assert.Equal(MarkazorArticleKind.Note, article.Kind);
     }
 
     [Fact]
     public void ParseArticleMetaEscapesReservedCharactersInContentPath()
     {
         ArticleMeta article = MarkdownContent.ParseArticleMeta(
-            ContentPath("posts", "C# notes%.md"),
+            ContentPath("posts", "C# writing%.md"),
             "# Reserved filename");
 
-        Assert.Equal("/_markazor/content/posts/C%23%20notes%25.md", article.ContentPath);
+        Assert.Equal("/_markazor/content/posts/C%23%20writing%25.md", article.ContentPath);
     }
 
     [Fact]
-    public void ParseArticleMetaAllowsDraftsToDeclareNoteKind()
-    {
-        const string Markdown = """
-            ---
-            title: "Draft note"
-            kind: note
-            ---
-
-            Body
-            """;
-
-        ArticleMeta article = MarkdownContent.ParseArticleMeta(
-            ContentPath("drafts", "draft-note.md"),
-            Markdown);
-
-        Assert.True(article.IsDraft);
-        Assert.Equal(RoutePath("notes", "draft-note"), article.Route);
-        Assert.Equal(MarkazorArticleKind.Note, article.Kind);
-    }
-
-    [Fact]
-    public void ParseArticleMetaUsesDraftFrontMatterKindForFlatDrafts()
-    {
-        const string Markdown = """
-            ---
-            title: "Draft note"
-            kind: note
-            ---
-
-            Body
-            """;
-
-        ArticleMeta article = MarkdownContent.ParseArticleMeta(
-            ContentPath("drafts", "draft-note.md"),
-            Markdown);
-
-        Assert.True(article.IsDraft);
-        Assert.Equal(RoutePath("notes", "draft-note"), article.Route);
-        Assert.Equal(MarkazorArticleKind.Note, article.Kind);
-    }
-
-    [Fact]
-    public void TryCreatePublishedPathFromDraftUsesFrontMatterKind()
+    public void TryCreatePublishedPathFromDraftMapsFlatFilesToPosts()
     {
         bool mapped = MarkdownContent.TryCreatePublishedPathFromDraft(
-            ContentPath("drafts", "draft-note.md"),
-            """
-            ---
-            kind: note
-            ---
-            """,
+            ContentPath("drafts", "idea.md"),
             ContentPath("drafts"),
             ContentPath("posts"),
-            ContentPath("notes"),
             out string? publishedPath);
 
         Assert.True(mapped);
-        Assert.Equal(ContentPath("notes", "draft-note.md"), publishedPath);
+        Assert.Equal(ContentPath("posts", "idea.md"), publishedPath);
     }
 
     [Fact]
     public void TryCreatePublishedPathFromDraftRejectsNestedDraftFolders()
     {
         bool mapped = MarkdownContent.TryCreatePublishedPathFromDraft(
-            ContentPath("drafts", "notes", "idea.md"),
-            """
-            ---
-            kind: note
-            ---
-            """,
+            ContentPath("drafts", "archive", "idea.md"),
             ContentPath("drafts"),
             ContentPath("posts"),
-            ContentPath("notes"),
             out string? publishedPath);
 
         Assert.False(mapped);

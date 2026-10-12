@@ -14,11 +14,10 @@
         @for (int index = 0; index < Page.Articles.Count; index++)
         {
             ArticleMeta article = Page.Articles[index];
-            <article class="markazor-reader-card @ArticleKindClass(article)" @key="article.RelativePath">
+            <article class="markazor-reader-card" @key="article.RelativePath">
                 <span class="markazor-reader-entry-number" aria-hidden="true">@((index + 1 + ((Page.PageNumber - 1) * Page.PageSize)).ToString("D2", CultureInfo.InvariantCulture))</span>
                 <div class="markazor-reader-entry">
                     <div class="markazor-reader-meta">
-                        <span class="markazor-reader-kind">@ArticleKindLabel(article)</span>
                         <time datetime="@article.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">
                             @article.PublishedAtUtc.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)
                         </time>
@@ -44,7 +43,7 @@
                         </ul>
                     }
                     <a class="markazor-reader-more" href="@article.Route" aria-label="@($"Read {article.Title}")">
-                        Read @ArticleKindLabel(article).ToLowerInvariant() <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" />
+                        Read article <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" />
                     </a>
                 </div>
             </article>
@@ -81,17 +80,4 @@
     public Func<int, string> PageLinkFactory { get; set; } =
         static page => MarkazorReaderRoutes.Page("/", page);
 
-    private static string ArticleKindClass(ArticleMeta article)
-    {
-        return string.Equals(article.Kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
-            ? "is-note"
-            : "is-post";
-    }
-
-    private static string ArticleKindLabel(ArticleMeta article)
-    {
-        return string.Equals(article.Kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
-            ? "Note"
-            : "Post";
-    }
 }

@@ -1,14 +1,13 @@
 ---
-slug: private-notes
-title: Private notes
-kind: note
+slug: work-in-progress
+title: Work in progress
 summary: This draft must never appear in the published site.
 publishedAt: 2026-06-06T00:00:00Z
-tags: [private]
-category: Notes
+tags: [writing]
+category: Writing
 draft: true
 ---
 
-# Private notes
+# Work in progress
 
 This file is available to the authenticated editor through GitHub, not to public readers.

@@ -7,7 +7,6 @@ public sealed class ContentPathPolicyTests
 {
     [Theory]
     [InlineData("posts/hello.md")]
-    [InlineData("notes/quick.md")]
     [InlineData("drafts\\draft.md")]
     [InlineData("assets/image.png")]
     public void AllowsFixedContentRoots(string path)
@@ -17,11 +16,9 @@ public sealed class ContentPathPolicyTests
 
     [Theory]
     [InlineData("posts-evil/hello.md")]
-    [InlineData("notes-evil/hello.md")]
     [InlineData("assets-evil/image.png")]
     [InlineData("assets")]
     [InlineData("posts")]
-    [InlineData("notes")]
     [InlineData("posts/../drafts/escape.md")]
     [InlineData("/posts/absolute.md")]
     public void RejectsBoundaryBypassAndUnsafePaths(string path)

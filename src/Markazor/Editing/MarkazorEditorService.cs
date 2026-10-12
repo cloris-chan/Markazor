@@ -114,13 +114,12 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
 
         string draftRoot = MarkazorRepositoryPaths.DraftsRoot;
         string postRoot = MarkazorRepositoryPaths.PostsRoot;
-        string noteRoot = MarkazorRepositoryPaths.NotesRoot;
         if (!IsFlatDraftMarkdownPath(normalizedDraftPath, draftRoot))
         {
             return FailedDocument($"Only flat Markdown files under {draftRoot} can be published.");
         }
 
-        if (!MarkdownContent.TryCreatePublishedPathFromDraft(normalizedDraftPath, markdown, draftRoot, postRoot, noteRoot, out string? publishedPath)
+        if (!MarkdownContent.TryCreatePublishedPathFromDraft(normalizedDraftPath, draftRoot, postRoot, out string? publishedPath)
             || string.IsNullOrWhiteSpace(publishedPath))
         {
             return FailedDocument($"Draft {normalizedDraftPath} cannot be mapped to a published content path.");
@@ -470,7 +469,6 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
     {
         string draftRoot = MarkazorRepositoryPaths.DraftsRoot;
         string postRoot = MarkazorRepositoryPaths.PostsRoot;
-        string noteRoot = MarkazorRepositoryPaths.NotesRoot;
         MarkazorSetupStatus setupStatus = session.SetupStatus
             ?? throw new InvalidOperationException("Setup status has not been loaded.");
         Dictionary<string, string> destinations = new(StringComparer.Ordinal);
@@ -528,7 +526,7 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
                 return FailedBatch(blob, attempt);
             }
 
-            if (!MarkdownContent.TryCreatePublishedPathFromDraft(draftPath, blob.Value.ContentText, draftRoot, postRoot, noteRoot, out string? publishedPath) || string.IsNullOrWhiteSpace(publishedPath))
+            if (!MarkdownContent.TryCreatePublishedPathFromDraft(draftPath, draftRoot, postRoot, out string? publishedPath) || string.IsNullOrWhiteSpace(publishedPath))
             {
                 return FailedBatch($"Draft {draftPath} cannot be mapped to a published content path.", attemptCount: attempt);
             }

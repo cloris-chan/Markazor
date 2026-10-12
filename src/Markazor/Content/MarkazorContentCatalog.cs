@@ -103,8 +103,7 @@ public sealed class MarkazorContentCatalog(IMarkazorClientSession session, Marka
             if (!string.Equals(treeEntry.Type, "blob", StringComparison.Ordinal)
                 || !path.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
                 || (!path.StartsWith(MarkazorRepositoryPaths.DraftsRoot, StringComparison.Ordinal)
-                    && !path.StartsWith(MarkazorRepositoryPaths.PostsRoot, StringComparison.Ordinal)
-                    && !path.StartsWith(MarkazorRepositoryPaths.NotesRoot, StringComparison.Ordinal)))
+                    && !path.StartsWith(MarkazorRepositoryPaths.PostsRoot, StringComparison.Ordinal)))
             {
                 continue;
             }

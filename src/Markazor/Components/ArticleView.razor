@@ -4,7 +4,6 @@
     <header>
         <a class="markazor-back-link" href="@BackLinkHref"><MarkazorIcon Kind="MarkazorIconKind.ArrowLeft" />@BackLinkText</a>
         <div class="markazor-reader-meta">
-            <span class="markazor-reader-kind">@ArticleKindLabel</span>
             <time datetime="@Article.PublishedAtUtc.ToString("O", CultureInfo.InvariantCulture)">
                 @Article.PublishedAtUtc.ToString("D", CultureInfo.InvariantCulture)
             </time>
@@ -87,7 +86,4 @@
     [Parameter]
     public string BackLinkText { get; set; } = "All posts";
 
-    private string ArticleKindLabel => string.Equals(Article.Kind, MarkazorArticleKind.Note, StringComparison.Ordinal)
-        ? "Note"
-        : "Post";
 }
