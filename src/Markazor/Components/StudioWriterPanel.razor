@@ -24,9 +24,11 @@
 <div class="markazor-shell markazor-workbench-shell markazor-editor-shell">
     <header class="markazor-page-header markazor-workbench-header">
         <div>
-            <p class="markazor-eyebrow">01 / The writing desk</p>
             <h1>Write</h1>
-            <p>@StatusLine</p>
+            @if (!string.IsNullOrWhiteSpace(StatusLine))
+            {
+                <p>@StatusLine</p>
+            }
         </div>
         <div class="markazor-header-actions">
             <span class="markazor-status-pill @ContentSourceClass">@ContentSourceText</span>
@@ -51,17 +53,19 @@
         <aside class="markazor-panel markazor-sidebar markazor-content-browser">
             <div class="markazor-section-header">
                 <h2>Content</h2>
-                <span class="markazor-status-pill @ContentSourceClass">@ContentSourceText</span>
             </div>
 
-            <div class="markazor-sidebar-metrics" aria-label="Content summary">
-                <span><strong>@EditorEntries.Count</strong> files</span>
-                <span><strong>@DraftCount</strong> drafts</span>
-                <span><strong>@PublishedCount</strong> public</span>
-            </div>
+            @if (EditorEntries.Count > 0)
+            {
+                <div class="markazor-sidebar-metrics" aria-label="Content summary">
+                    <span><strong>@EditorEntries.Count</strong> files</span>
+                    <span><strong>@DraftCount</strong> drafts</span>
+                    <span><strong>@PublishedCount</strong> public</span>
+                </div>
+            }
 
             <details class="markazor-disclosure">
-                <summary>Start a new draft</summary>
+                <summary>New draft</summary>
                 <div class="markazor-new-draft">
                     <fieldset class="markazor-content-kind-picker">
                         <legend>Type</legend>
@@ -124,12 +128,15 @@
                 }
             </div>
 
-            <button class="markazor-publish-selected"
-                    type="button"
-                    @onclick="PublishSelectedAsync"
-                    disabled="@(!CanPublishSelected)">
-                Publish selected (@selectedDraftPaths.Count)
-            </button>
+            @if (selectedDraftPaths.Count > 0)
+            {
+                <button class="markazor-publish-selected"
+                        type="button"
+                        @onclick="PublishSelectedAsync"
+                        disabled="@(!CanPublishSelected)">
+                    Publish selected (@selectedDraftPaths.Count)
+                </button>
+            }
             @if (SelectedDraftIsDirty)
             {
                 <p class="markazor-muted">Save the selected open draft before batch publishing.</p>
@@ -139,136 +146,146 @@
         <section class="markazor-panel markazor-editor-main">
             <div class="markazor-document-header">
                 <div class="markazor-document-title">
-                    <p class="markazor-eyebrow">Current file</p>
                     <h2>@DocumentHeading</h2>
-                    <p>@DocumentTitle</p>
+                    @if (!string.IsNullOrWhiteSpace(documentPath))
+                    {
+                        <p>@documentPath</p>
+                    }
                 </div>
-                <div class="markazor-document-header-tools">
-                    <div class="markazor-document-state">
-                        <span class="markazor-status-pill @(IsDirty ? "is-waiting" : "is-ready")">@DirtyText</span>
-                        <span>@WordCount words</span>
-                        <span>@CharacterCount chars</span>
+                @if (HasDocument)
+                {
+                    <div class="markazor-document-header-tools">
+                        <div class="markazor-document-state">
+                            <span class="markazor-status-pill @(IsDirty ? "is-waiting" : "is-ready")">@DirtyText</span>
+                            <span>@WordCount words</span>
+                        </div>
+                        <div class="markazor-actions markazor-document-actions">
+                            <button type="button" @onclick="SaveAsync" disabled="@(!CanSave)">Save</button>
+                            <button class="markazor-action-danger" type="button" @onclick="DeleteAsync" disabled="@(!CanDelete)">@DeleteText</button>
+                            <button class="markazor-action-primary" type="button" @onclick="PublishAsync" disabled="@(!CanPublish)">Publish</button>
+                        </div>
                     </div>
-                    <div class="markazor-actions markazor-document-actions">
-                        <button type="button" @onclick="SaveAsync" disabled="@(!CanSave)">Save</button>
-                        <button class="markazor-action-danger" type="button" @onclick="DeleteAsync" disabled="@(!CanDelete)">@DeleteText</button>
-                        <button class="markazor-action-primary" type="button" @onclick="PublishAsync" disabled="@(!CanPublish)">Publish</button>
-                    </div>
-                </div>
+                }
             </div>
 
-            <details class="markazor-disclosure markazor-document-details">
-                <summary>Document details <small>Title, URL &amp; publishing</small></summary>
-                <section class="markazor-metadata-toolbar" aria-label="Document metadata">
-                    <div class="markazor-metadata-primary">
-                        <label class="markazor-field markazor-title-field">
-                            <span>Title</span>
-                            <input value="@metadata.Title" @oninput="OnMetadataTitleInput" disabled="@isBusy" />
-                        </label>
-                        <label class="markazor-field markazor-slug-field">
-                            <span>Slug</span>
-                            <input value="@metadata.Slug" @oninput="OnMetadataSlugInput" disabled="@isBusy" />
-                        </label>
-                        <fieldset class="markazor-content-kind-picker markazor-metadata-kind">
-                            <legend>Type</legend>
-                            <label>
-                                <input type="radio"
-                                       name="document-kind"
-                                       value="@MarkazorArticleKind.Post"
-                                       checked="@IsMetadataKind(MarkazorArticleKind.Post)"
-                                       @onchange="args => ChangeMetadataKind(args)"
-                                       disabled="@isBusy" />
-                                <span>Post</span>
-                            </label>
-                            <label>
-                                <input type="radio"
-                                       name="document-kind"
-                                       value="@MarkazorArticleKind.Note"
-                                       checked="@IsMetadataKind(MarkazorArticleKind.Note)"
-                                       @onchange="args => ChangeMetadataKind(args)"
-                                       disabled="@isBusy" />
-                                <span>Note</span>
-                            </label>
-                        </fieldset>
-                    </div>
-                    <label class="markazor-field markazor-path-field">
-                        <span>Path</span>
-                        <input value="@documentPath" @oninput="OnDocumentPathInput" disabled="@(!isNewDocument || isBusy)" />
-                    </label>
-                    <div class="markazor-metadata-secondary">
-                        <label class="markazor-field markazor-date-field">
-                            <span>Published</span>
-                            <input type="datetime-local" @bind="metadata.PublishedAt" @bind:format="yyyy-MM-ddTHH:mm:ss" disabled="@isBusy" />
-                        </label>
-                        <label class="markazor-field markazor-checkbox-field">
-                            <input type="checkbox" @bind="metadata.IsDraft" disabled="@isBusy" />
-                            <span>Draft</span>
-                        </label>
-                        <label class="markazor-field markazor-category-field">
-                            <span>Category</span>
-                            <input @bind="metadata.Category" disabled="@isBusy" />
-                        </label>
-                        <label class="markazor-field markazor-tags-field">
-                            <span>Tags</span>
-                            <input @bind="metadata.Tags" placeholder="dotnet, blazor, notes" disabled="@isBusy" />
-                        </label>
-                    </div>
-                    <label class="markazor-field markazor-summary-field">
-                        <span>Summary</span>
-                        <textarea @bind="metadata.Summary" disabled="@isBusy"></textarea>
-                    </label>
-                </section>
-            </details>
-
-            <div class="markazor-authoring-grid">
-                <section class="markazor-authoring-pane" aria-label="Markdown editor">
-                    <div class="markazor-pane-header">
-                        <h3>Markdown</h3>
-                    </div>
-                    <MarkazorMarkdownEditor Value="@bodyMarkdown"
-                                            @ref="markdownEditor"
-                                            ValueChanged="OnMarkdownChanged"
-                                            Disabled="@isBusy"
-                                            SaveRequested="SaveRequestedAsync"
-                                            ExternalImageRequested="InsertExternalImageAsync"
-                                            ImageUploadRequested="UploadImageAsync"
-                                            AcceptedImageTypes="@AcceptedImageTypes"
-                                            PendingAssetCount="@ReferencedPendingAssetCount" />
-                </section>
-
-                <section class="markazor-preview" aria-label="Markdown preview">
-                    <div class="markazor-pane-header">
-                        <h3>Preview</h3>
-                    </div>
-                    <article class="markazor-preview-body"><MarkdownBody Content="RenderPreview()" ShowContents="false" /></article>
-                </section>
-            </div>
-
-            @if (conflict is not null)
+            @if (!HasDocument)
             {
-                <section class="markazor-conflict">
-                    <div class="markazor-section-header">
-                        <h2>GitHub changed this file</h2>
-                        <span class="markazor-status-pill is-waiting">Conflict</span>
-                    </div>
-                    <p class="markazor-muted">Choose the remote version, or save the current editor text over the latest GitHub revision.</p>
-                    <div class="markazor-conflict-grid">
-                        <label class="markazor-field">
-                            <span>Current editor</span>
-                            <textarea readonly>@CurrentMarkdown</textarea>
-                        </label>
-                        <label class="markazor-field">
-                            <span>GitHub version</span>
-                            <textarea readonly>@conflict.RemoteMarkdown</textarea>
-                        </label>
-                    </div>
-                    <div class="markazor-actions">
-                        <button type="button" @onclick="UseRemoteAsync" disabled="@isBusy">Use GitHub version</button>
-                        <button type="button" @onclick="SaveLocalOverLatestAsync" disabled="@isBusy">Save editor over latest</button>
-                    </div>
-                </section>
+                <p class="markazor-muted">Select a document or create a draft.</p>
             }
+            else
+            {
+                <details class="markazor-disclosure markazor-document-details">
+                    <summary>Document details</summary>
+                    <section class="markazor-metadata-toolbar" aria-label="Document metadata">
+                        <div class="markazor-metadata-primary">
+                            <label class="markazor-field markazor-title-field">
+                                <span>Title</span>
+                                <input value="@metadata.Title" @oninput="OnMetadataTitleInput" disabled="@isBusy" />
+                            </label>
+                            <label class="markazor-field markazor-slug-field">
+                                <span>Slug</span>
+                                <input value="@metadata.Slug" @oninput="OnMetadataSlugInput" disabled="@isBusy" />
+                            </label>
+                            <fieldset class="markazor-content-kind-picker markazor-metadata-kind">
+                                <legend>Type</legend>
+                                <label>
+                                    <input type="radio"
+                                           name="document-kind"
+                                           value="@MarkazorArticleKind.Post"
+                                           checked="@IsMetadataKind(MarkazorArticleKind.Post)"
+                                           @onchange="args => ChangeMetadataKind(args)"
+                                           disabled="@isBusy" />
+                                    <span>Post</span>
+                                </label>
+                                <label>
+                                    <input type="radio"
+                                           name="document-kind"
+                                           value="@MarkazorArticleKind.Note"
+                                           checked="@IsMetadataKind(MarkazorArticleKind.Note)"
+                                           @onchange="args => ChangeMetadataKind(args)"
+                                           disabled="@isBusy" />
+                                    <span>Note</span>
+                                </label>
+                            </fieldset>
+                        </div>
+                        <label class="markazor-field markazor-path-field">
+                            <span>Path</span>
+                            <input value="@documentPath" @oninput="OnDocumentPathInput" disabled="@(!isNewDocument || isBusy)" />
+                        </label>
+                        <div class="markazor-metadata-secondary">
+                            <label class="markazor-field markazor-date-field">
+                                <span>Published</span>
+                                <input type="datetime-local" @bind="metadata.PublishedAt" @bind:format="yyyy-MM-ddTHH:mm:ss" disabled="@isBusy" />
+                            </label>
+                            <label class="markazor-field markazor-checkbox-field">
+                                <input type="checkbox" @bind="metadata.IsDraft" disabled="@isBusy" />
+                                <span>Draft</span>
+                            </label>
+                            <label class="markazor-field markazor-category-field">
+                                <span>Category</span>
+                                <input @bind="metadata.Category" disabled="@isBusy" />
+                            </label>
+                            <label class="markazor-field markazor-tags-field">
+                                <span>Tags</span>
+                                <input @bind="metadata.Tags" placeholder="dotnet, blazor, notes" disabled="@isBusy" />
+                            </label>
+                        </div>
+                        <label class="markazor-field markazor-summary-field">
+                            <span>Summary</span>
+                            <textarea @bind="metadata.Summary" disabled="@isBusy"></textarea>
+                        </label>
+                    </section>
+                </details>
 
+                <div class="markazor-authoring-grid">
+                    <section class="markazor-authoring-pane" aria-label="Markdown editor">
+                        <div class="markazor-pane-header">
+                            <h3>Markdown</h3>
+                        </div>
+                        <MarkazorMarkdownEditor Value="@bodyMarkdown"
+                                                @ref="markdownEditor"
+                                                ValueChanged="OnMarkdownChanged"
+                                                Disabled="@isBusy"
+                                                SaveRequested="SaveRequestedAsync"
+                                                ExternalImageRequested="InsertExternalImageAsync"
+                                                ImageUploadRequested="UploadImageAsync"
+                                                AcceptedImageTypes="@AcceptedImageTypes"
+                                                PendingAssetCount="@ReferencedPendingAssetCount" />
+                    </section>
+
+                    <section class="markazor-preview" aria-label="Markdown preview">
+                        <div class="markazor-pane-header">
+                            <h3>Preview</h3>
+                        </div>
+                        <article class="markazor-preview-body"><MarkdownBody Content="RenderPreview()" ShowContents="false" /></article>
+                    </section>
+                </div>
+
+                @if (conflict is not null)
+                {
+                    <section class="markazor-conflict">
+                        <div class="markazor-section-header">
+                            <h2>GitHub changed this file</h2>
+                            <span class="markazor-status-pill is-waiting">Conflict</span>
+                        </div>
+                        <p class="markazor-muted">Choose the remote version, or save the current editor text over the latest GitHub revision.</p>
+                        <div class="markazor-conflict-grid">
+                            <label class="markazor-field">
+                                <span>Current editor</span>
+                                <textarea readonly>@CurrentMarkdown</textarea>
+                            </label>
+                            <label class="markazor-field">
+                                <span>GitHub version</span>
+                                <textarea readonly>@conflict.RemoteMarkdown</textarea>
+                            </label>
+                        </div>
+                        <div class="markazor-actions">
+                            <button type="button" @onclick="UseRemoteAsync" disabled="@isBusy">Use GitHub version</button>
+                            <button type="button" @onclick="SaveLocalOverLatestAsync" disabled="@isBusy">Save editor over latest</button>
+                        </div>
+                    </section>
+                }
+            }
         </section>
     </section>
 </div>
@@ -349,13 +366,11 @@
 
     private string DeleteText => pendingDeleteSha is null ? "Delete" : "Delete latest version";
 
-    private string DocumentTitle => string.IsNullOrWhiteSpace(documentPath) ? "No file selected" : documentPath;
-
     private string DocumentHeading => string.IsNullOrWhiteSpace(documentPath)
         ? "No file selected"
         : string.IsNullOrWhiteSpace(metadata.Title) ? GetFileName(documentPath) : metadata.Title;
 
-    private int CharacterCount => bodyMarkdown.Length;
+    private bool HasDocument => !string.IsNullOrWhiteSpace(documentPath);
 
     private int WordCount => CountWords(bodyMarkdown);
 
@@ -384,20 +399,20 @@
         : "is-waiting";
 
     private string EmptyContentText => diagnostics?.Ready == true
-        ? "No GitHub content files are available under the configured roots."
-        : "Authorize GitHub and pass repository diagnostics to load the live content tree.";
+        ? "No documents yet. Create a draft to get started."
+        : "Connect GitHub in Setup to load your content.";
 
     private string MessageClass => isSuccessMessage ? "markazor-success" : "markazor-alert";
 
-    private string StatusLine => isLocalPreview
-        ? "Local preview mode for theme tuning."
+    private string? StatusLine => isLocalPreview
+        ? null
         : status is null
-        ? "Loading setup status."
+        ? isBusy && string.IsNullOrWhiteSpace(message) ? "Loading setup status..." : null
         : status.Ready
             ? Session.IsAuthenticated
                 ? diagnostics?.Ready == true
-                    ? "Connected to GitHub."
-                    : "Repository diagnostics must pass before editing."
+                    ? null
+                    : "Check repository access in Settings."
                 : "GitHub authorization is required."
             : "Setup is incomplete.";
 
@@ -482,7 +497,6 @@
         if (isLocalPreview && MarkazorLocalPreview.TryCreateEditorDocument(entry.RelativePath, out MarkazorEditorDocument document))
         {
             await ApplyDocumentAsync(document, isNew: false).ConfigureAwait(false);
-            SetSuccess("Loaded local preview.");
 
             return;
         }
@@ -493,7 +507,6 @@
         if (result.Succeeded && result.Value is not null)
         {
             await ApplyDocumentAsync(result.Value, isNew: false).ConfigureAwait(false);
-            SetSuccess("Loaded.");
         }
         else
         {

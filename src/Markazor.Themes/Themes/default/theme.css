@@ -181,16 +181,6 @@ input[type=radio] {
 .site-menu-toggle {
   display: none;
 }
-.site-edition {
-  color: var(--mk-muted);
-  display: flex;
-  font: 0.6rem/1.5 var(--mk-font-mono);
-  gap: 1rem;
-  justify-content: space-between;
-  letter-spacing: 0.1em;
-  padding-block: 1rem;
-  text-transform: uppercase;
-}
 .site-shell > main {
   flex: 1;
   min-width: 0;
@@ -209,26 +199,15 @@ input[type=radio] {
   display: grid;
   gap: clamp(2rem, 5vw, 5rem);
   grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.44fr);
-  padding-block: 3rem 5rem;
+  padding-block: 2.5rem 3rem;
 }
 .reader-intro-copy {
   min-width: 0;
 }
-.reader-intro .reader-eyebrow {
-  align-items: center;
-  display: flex;
-  gap: 0.65rem;
-}
-.reader-live-dot {
-  background: var(--mk-editorial);
-  border-radius: 50%;
-  height: 0.4rem;
-  width: 0.4rem;
-}
 .reader-intro h1 {
   font: 400 clamp(3.4rem, 6.7vw, 6.15rem)/1.01 var(--mk-font-display);
   letter-spacing: -0.055em;
-  margin: 1.2rem 0 1.5rem;
+  margin: 0 0 1rem;
   max-width: 12ch;
   text-wrap: initial;
 }
@@ -242,33 +221,11 @@ input[type=radio] {
   margin: 0;
   max-width: 43ch;
 }
-.reader-intro-link {
-  align-items: center;
-  display: inline-flex;
-  font-size: 0.8rem;
-  gap: 2rem;
-  min-height: 2.75rem;
-  margin-top: 1.5rem;
-  text-decoration: none;
-}
-.reader-intro-link .markazor-icon {
-  color: var(--mk-editorial);
-  height: 1.25rem;
-  width: 1.25rem;
-}
-.reader-intro-link:hover {
-  color: var(--mk-accent);
-}
 .reader-colophon {
-  align-self: stretch;
   background: var(--mk-accent);
   color: var(--mk-on-accent);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  min-height: 22rem;
   overflow: hidden;
-  padding: 2rem;
+  padding: 1.5rem;
   position: relative;
 }
 .reader-colophon::after {
@@ -277,26 +234,6 @@ input[type=radio] {
   inset: 0.6rem;
   pointer-events: none;
   position: absolute;
-}
-.reader-colophon-mark {
-  height: 6.5rem;
-  opacity: 0.85;
-  position: absolute;
-  right: 1.5rem;
-  stroke-width: 0.65;
-  top: 1.5rem;
-  width: 6.5rem;
-}
-.reader-colophon-label {
-  font: 0.6rem/1.6 var(--mk-font-mono);
-  letter-spacing: 0.08em;
-  margin: 7rem 0 0.8rem;
-  text-transform: uppercase;
-}
-.reader-colophon-title {
-  font: italic 400 clamp(2.8rem, 4vw, 3.7rem)/1.03 var(--mk-font-display);
-  letter-spacing: -0.05em;
-  margin: 0 0 1.75rem;
 }
 .reader-colophon-index {
   display: grid;
@@ -315,6 +252,9 @@ input[type=radio] {
 .reader-colophon-index a:hover {
   text-decoration: underline;
 }
+.reader-colophon-index a:first-child {
+  border-top: 0;
+}
 .reader-colophon-index small {
   font: 0.65rem var(--mk-font-mono);
   margin-left: 0.5rem;
@@ -328,19 +268,10 @@ input[type=radio] {
   justify-content: space-between;
   padding-bottom: 1.4rem;
 }
-.reader-feed-heading .reader-eyebrow {
-  margin-bottom: 0.5rem;
-}
 .reader-feed-heading h2 {
   font: 400 clamp(1.8rem, 3vw, 2.5rem)/1.2 var(--mk-font-display);
   letter-spacing: -0.04em;
   margin: 0;
-}
-.reader-feed-heading h2 .markazor-icon {
-  color: var(--mk-editorial);
-  height: 1.75rem;
-  margin-left: 1.25rem;
-  width: 1.75rem;
 }
 .reader-feed-heading > a {
   font-size: 0.7rem;
@@ -454,6 +385,9 @@ input[type=radio] {
   font: 400 clamp(3rem, 6vw, 5rem)/1.08 var(--mk-font-display);
   letter-spacing: -0.055em;
   margin: 0 0 1rem;
+}
+.reader-page-heading h1:last-child {
+  margin-bottom: 0;
 }
 .reader-page-heading > p:not(.reader-eyebrow),
 .reader-empty-state > p:not(.reader-eyebrow) {
@@ -634,11 +568,6 @@ input[type=radio] {
 .site-footer-title span {
   color: var(--mk-editorial);
 }
-.site-footer p {
-  color: var(--mk-muted);
-  font-size: 0.75rem;
-  margin: 0.6rem 0 0;
-}
 .site-footer nav {
   display: flex;
   gap: 1.5rem;
@@ -651,15 +580,6 @@ input[type=radio] {
 .site-footer nav .markazor-icon {
   color: var(--mk-accent);
   margin-left: 0.5rem;
-}
-.site-footer-credit {
-  border-top: 1px solid var(--mk-line);
-  color: var(--mk-muted);
-  font: 0.55rem/1.5 var(--mk-font-mono);
-  grid-column: 1 / -1;
-  letter-spacing: 0.07em;
-  padding-top: 1.25rem;
-  text-transform: uppercase;
 }
 .markazor-studio-layout,
 .markazor-setup-layout {
@@ -675,7 +595,7 @@ input[type=radio] {
   color: var(--mk-on-accent);
   display: flex;
   flex-direction: column;
-  gap: 2.75rem;
+  gap: 2rem;
   height: 100dvh;
   overflow-y: auto;
   padding: 2rem 1.35rem 1.5rem;
@@ -683,28 +603,23 @@ input[type=radio] {
   top: 0;
 }
 .markazor-studio-brand {
+  align-items: center;
   color: inherit;
-  display: grid;
-  gap: 1rem;
+  display: flex;
+  gap: 0.75rem;
   text-decoration: none;
 }
 .markazor-studio-mark {
   border: 1px solid rgb(255 255 255 / 28%);
   border-radius: 8px;
   display: block;
-  height: 3.5rem;
-  width: 3.5rem;
+  height: 2rem;
+  width: 2rem;
 }
 .markazor-studio-brand strong {
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-}
-.markazor-studio-brand small {
-  display: block;
-  font-size: 0.65rem;
-  margin-top: 0.4rem;
-  opacity: 0.8;
 }
 .markazor-studio-nav {
   display: grid;
@@ -736,31 +651,6 @@ input[type=radio] {
   margin-left: auto;
   width: 0.85rem;
 }
-.markazor-studio-nav small {
-  display: block;
-  font-size: 0.6rem;
-  line-height: 1.6;
-  margin-top: 0.45rem;
-  opacity: 0.85;
-}
-.markazor-studio-note {
-  margin-top: auto;
-}
-.markazor-studio-note > .markazor-icon {
-  height: 2.5rem;
-  stroke-width: 1;
-  width: 2.5rem;
-}
-.markazor-studio-note p {
-  font: italic 2rem/1.15 var(--mk-font-display);
-  letter-spacing: -0.04em;
-  margin: 0.9rem 0;
-}
-.markazor-studio-note small {
-  font-size: 0.6rem;
-  line-height: 1.7;
-  opacity: 0.8;
-}
 .markazor-studio-site-link {
   border-top: 1px solid rgb(255 255 255 / 35%);
   color: inherit;
@@ -768,6 +658,7 @@ input[type=radio] {
   font-size: 0.75rem;
   justify-content: space-between;
   min-height: 2.75rem;
+  margin-top: auto;
   padding-top: 1.25rem;
   text-decoration: none;
 }
@@ -809,9 +700,12 @@ input[type=radio] {
 .markazor-page-header h1:focus {
   outline: none;
 }
-.markazor-page-header .markazor-eyebrow {
-  color: var(--mk-accent);
-  margin-bottom: 0.8rem;
+.markazor-studio-stage .markazor-page-header {
+  align-items: center;
+  padding-bottom: 1.25rem;
+}
+.markazor-studio-stage .markazor-page-header h1 {
+  font-size: clamp(2.25rem, 3.5vw, 3.25rem);
 }
 .markazor-page-header p:not(.markazor-eyebrow) {
   color: var(--mk-muted);
@@ -912,7 +806,7 @@ input[type=radio] {
 .markazor-shell .markazor-button-link {
   color: var(--mk-on-accent);
 }
-.markazor-editor-shell .markazor-header-actions button,
+.markazor-studio-stage .markazor-header-actions button,
 .markazor-button-link.is-secondary,
 .markazor-document-actions button {
   background: transparent;
@@ -978,6 +872,9 @@ input[type=radio] {
 }
 .markazor-settings-form {
   gap: 1.25rem;
+}
+.markazor-settings-diagnostics > summary > span:first-of-type {
+  font: 400 1.2rem/1.3 var(--mk-font-display);
 }
 .markazor-site-title-field input {
   font: 1.5rem/1.2 var(--mk-font-display);
@@ -1149,10 +1046,6 @@ input[type=radio] {
   color: var(--mk-accent);
   margin-left: 0.65rem;
 }
-.markazor-setup-masthead > span {
-  color: var(--mk-muted);
-  font: 0.65rem var(--mk-font-mono);
-}
 .markazor-setup-brand {
   align-items: center;
   display: inline-flex;
@@ -1230,7 +1123,7 @@ input[type=radio] {
   text-align: center;
 }
 .loading-progress-text::after {
-  content: var(--blazor-load-percentage-text, "Opening the journal\2026");
+  content: var(--blazor-load-percentage-text, "Loading\2026");
 }
 #blazor-error-ui {
   background: var(--mk-danger-soft);
@@ -1300,11 +1193,11 @@ input[type=radio] {
   .markazor-studio-brand {
     align-items: center;
     display: flex;
-    gap: 1.5rem;
+    gap: 0.75rem;
   }
   .markazor-studio-mark {
-    height: 2.75rem;
-    width: 2.75rem;
+    height: 2rem;
+    width: 2rem;
   }
   .markazor-studio-nav {
     display: flex;
@@ -1314,17 +1207,10 @@ input[type=radio] {
     min-width: 7.5rem;
     padding: 0.7rem;
   }
-  .markazor-studio-nav small,
-  .markazor-studio-note {
-    display: none;
-  }
   .markazor-studio-site-link {
     grid-column: 1 / -1;
     min-height: 2rem;
     padding-top: 0.75rem;
-  }
-  .reader-colophon {
-    padding: 1.5rem;
   }
 }
 @media (max-width: 760px) {
@@ -1371,50 +1257,28 @@ input[type=radio] {
     grid-column: 1 / -1;
     justify-content: space-between;
   }
-  .site-edition {
-    font-size: 0.5rem;
-    letter-spacing: 0.03em;
-  }
   .reader-intro {
-    gap: 2.5rem;
+    gap: 1.5rem;
     grid-template-columns: 1fr;
-    padding-block: 2rem 3.5rem;
+    padding-block: 2rem 2.5rem;
   }
   .reader-intro h1 {
     font-size: clamp(3.1rem, 11vw, 5rem);
     max-width: 14ch;
   }
   .reader-colophon {
-    min-height: 16rem;
-    padding: 1.75rem;
-  }
-  .reader-colophon-title {
-    font-size: 2.8rem;
-    margin-bottom: 1.25rem;
-  }
-  .reader-colophon-label {
-    margin-top: 0;
-  }
-  .reader-colophon-mark {
-    height: 8rem;
-    right: 2rem;
-    top: 1.5rem;
-    width: 8rem;
+    padding: 1rem 1.5rem;
   }
   .reader-colophon-index {
     gap: 1.5rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .reader-colophon-index a {
+    border-top: 0;
     padding-top: 0.25rem;
   }
   .reader-feed .markazor-reader-list {
     grid-template-columns: 1fr;
-  }
-  .reader-feed-heading h2 .markazor-icon {
-    height: 1.25rem;
-    margin-left: 0.6rem;
-    width: 1.25rem;
   }
   .reader-taxonomy-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1435,9 +1299,6 @@ input[type=radio] {
   .markazor-reader-article {
     margin-top: 2rem;
   }
-  .markazor-setup-masthead > span {
-    display: none;
-  }
   .markazor-shell {
     padding: 0;
   }
@@ -1456,10 +1317,6 @@ input[type=radio] {
   }
 }
 @media (max-width: 420px) {
-  .site-edition span:last-child {
-    max-width: 9rem;
-    text-align: right;
-  }
   .reader-feed-heading {
     align-items: start;
     flex-direction: column;
@@ -1467,11 +1324,6 @@ input[type=radio] {
   }
   .reader-feed-heading > a {
     padding-block: 0.5rem;
-  }
-  .reader-colophon-mark {
-    height: 6rem;
-    right: 1.25rem;
-    width: 6rem;
   }
   .markazor-reader-card {
     gap: 0.75rem;
@@ -1521,7 +1373,6 @@ input[type=radio] {
     padding: 0;
   }
   .site-header,
-  .site-edition,
   .site-footer,
   .markazor-skip-link,
   .markazor-back-link,

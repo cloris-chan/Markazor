@@ -5,15 +5,13 @@
 
 <section class="reader-intro" aria-labelledby="journal-title">
     <div class="reader-intro-copy">
-        <p class="reader-eyebrow"><span class="reader-live-dot" aria-hidden="true"></span> The journal</p>
         <h1 id="journal-title">@Reader.Site.Name<span class="reader-title-period" aria-hidden="true">.</span></h1>
-        <p class="reader-intro-description">@Reader.Site.Description</p>
-        <a class="reader-intro-link" href="#latest-writing">Find something to read <MarkazorIcon Kind="MarkazorIconKind.ArrowDown" /></a>
+        @if (!string.IsNullOrWhiteSpace(Reader.Site.Description))
+        {
+            <p class="reader-intro-description">@Reader.Site.Description</p>
+        }
     </div>
-    <aside class="reader-colophon" aria-label="Explore the journal">
-        <MarkazorIcon Kind="MarkazorIconKind.Book" Class="reader-colophon-mark" />
-        <p class="reader-colophon-label">A work in progress</p>
-        <p class="reader-colophon-title">Ideas<br />live here.</p>
+    <aside class="reader-colophon" aria-label="Browse content">
         <nav class="reader-colophon-index" aria-label="Content types">
             <a href="/posts"><span>Posts <small>@postCount.ToString("D2", CultureInfo.InvariantCulture)</small></span><MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
             <a href="/notes"><span>Notes <small>@noteCount.ToString("D2", CultureInfo.InvariantCulture)</small></span><MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
@@ -23,11 +21,8 @@
 
 <section class="reader-feed" id="latest-writing" aria-labelledby="latest-writing-title" tabindex="-1">
     <header class="reader-feed-heading">
-        <div>
-            <p class="reader-eyebrow">The latest</p>
-            <h2 id="latest-writing-title">Fresh off the page<MarkazorIcon Kind="MarkazorIconKind.ArrowDownLeft" /></h2>
-        </div>
-        <a href="/archive">All writing <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
+        <h2 id="latest-writing-title">Latest</h2>
+        <a href="/archive">Archive <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
     </header>
     <ArticleList Page="articlePage" AriaLabel="Latest writing" PageLinkFactory="CreatePageLink" />
 </section>

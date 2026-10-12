@@ -14,26 +14,18 @@
             <img class="markazor-studio-mark" src="/_content/Markazor/markazor-mark.svg" alt="" width="64" height="64" />
             <span>
                 <strong>Markazor Studio</strong>
-                <small>Your publishing desk</small>
             </span>
         </a>
 
         <nav class="markazor-studio-nav" aria-label="Studio navigation">
             <a class="@NavClass(StudioSection.Write)" aria-current="@(ActiveSection == StudioSection.Write ? "page" : null)" href="/studio/write">
                 <span><MarkazorIcon Kind="MarkazorIconKind.Write" /> Write <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" Class="markazor-nav-arrow" /></span>
-                <small>Posts, notes, and drafts</small>
             </a>
             <a class="@NavClass(StudioSection.Settings)" aria-current="@(ActiveSection == StudioSection.Settings ? "page" : null)" href="/studio/settings">
                 <span><MarkazorIcon Kind="MarkazorIconKind.Settings" /> Settings <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" Class="markazor-nav-arrow" /></span>
-                <small>Make this space yours</small>
             </a>
         </nav>
 
-        <div class="markazor-studio-note" aria-hidden="true">
-            <MarkazorIcon Kind="MarkazorIconKind.Bookmark" />
-            <p>Your space.<br />Your words.</p>
-            <small>A little more you.<br />A little less internet noise.</small>
-        </div>
         <a class="markazor-studio-site-link" href="/">View Site <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
     </aside>
 

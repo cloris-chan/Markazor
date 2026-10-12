@@ -13,20 +13,18 @@
 <div class="markazor-shell markazor-workbench-shell markazor-settings-shell">
     <header class="markazor-page-header markazor-workbench-header">
         <div>
-            <p class="markazor-eyebrow">02 / Make it yours</p>
             <h1>Settings</h1>
-            <p>A home for your words, with your name on the door.</p>
         </div>
         <div class="markazor-header-actions">
             <span class="markazor-status-pill @ReadyClass">@ReadyText</span>
+            <div class="markazor-actions">
+                <button type="button" @onclick="ReloadAsync" disabled="@isBusy">Refresh</button>
+                <button type="button" @onclick="OpenSetup" disabled="@isBusy">Setup</button>
+            </div>
         </div>
     </header>
 
-    @if (isLoading)
-    {
-        <p class="markazor-muted">Loading settings status...</p>
-    }
-    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    @if (!isLoading && !string.IsNullOrWhiteSpace(errorMessage))
     {
         <p class="markazor-alert">@errorMessage</p>
     }
@@ -36,7 +34,6 @@
         <section class="markazor-panel">
             <div class="markazor-section-header">
                 <h2>@SettingsGateTitle</h2>
-                <span class="markazor-status-pill is-waiting">@SettingsGateStatus</span>
             </div>
 
             <p class="markazor-muted">@SettingsGateDescription</p>
@@ -52,7 +49,7 @@
                 }
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(AuthorizationDisabledReason))
+            @if (!NeedsSetupBeforeAuthorization && !isBusy && !string.IsNullOrWhiteSpace(AuthorizationDisabledReason))
             {
                 <p class="markazor-warning">@AuthorizationDisabledReason</p>
             }
@@ -62,33 +59,11 @@
     {
         <section class="markazor-panel">
             <div class="markazor-section-header">
-                <h2>Session</h2>
-                <span class="markazor-status-pill @(IsWorkspaceVisible ? "is-ready" : "is-waiting")">@AuthText</span>
-            </div>
-
-            @if (Session.AccessTokenExpiresAtUtc is not null)
-            {
-                <p class="markazor-muted">Access expires at @Session.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.InvariantCulture).</p>
-            }
-            else
-            {
-                <p class="markazor-muted">Authorize GitHub from Setup before changing repository configuration.</p>
-            }
-
-            <div class="markazor-actions">
-                <button type="button" @onclick="RefreshAsync" disabled="@isBusy">Refresh</button>
-                <button type="button" @onclick="OpenSetup" disabled="@isBusy">Setup</button>
-                <button type="button" @onclick="OpenWrite" disabled="@(!CanOpenWrite)">Write</button>
-            </div>
-        </section>
-
-        <section class="markazor-panel">
-            <div class="markazor-section-header">
                 <h2>Public Settings</h2>
-                <span class="markazor-status-pill @(settingsFormDirty ? "is-waiting" : "is-ready")">@SettingsFormText</span>
+                <span class="markazor-status-pill @SettingsFormClass">@SettingsFormText</span>
             </div>
 
-            <p class="markazor-muted"><code>markazor.settings.json</code> stores public, non-secret values. Saving here commits the canonical settings through the authorized GitHub App.</p>
+            <p class="markazor-muted">Saving commits these settings to GitHub.</p>
 
             <div class="markazor-settings-form">
                 <label class="markazor-field markazor-field-wide">
@@ -98,7 +73,7 @@
                               rows="3"
                               autocomplete="url"
                               spellcheck="false"></textarea>
-                    <small>One absolute URL per line. Put the primary Static Web Apps URL first, then any custom domains.</small>
+                    <small>One URL per line. Put the primary Static Web Apps URL first.</small>
                 </label>
 
                 <label class="markazor-field markazor-site-title-field">
@@ -170,7 +145,8 @@
                 <button type="button" @onclick="SaveSettingsAsync" disabled="@(!CanSaveSettings)">Save Settings</button>
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(SettingsDisabledReason))
+            @if (!isBusy && !settingsSaved && string.IsNullOrWhiteSpace(settingsMessage)
+                && string.IsNullOrWhiteSpace(siteIconError) && !string.IsNullOrWhiteSpace(SettingsDisabledReason))
             {
                 <p class="markazor-warning">@SettingsDisabledReason</p>
             }
@@ -181,69 +157,54 @@
             }
         </section>
 
-        <section class="markazor-panel">
-            <div class="markazor-section-header">
-                <h2>Repository Diagnostics</h2>
+        <details class="markazor-panel markazor-settings-diagnostics" open="@NeedsDiagnosticsAttention">
+            <summary>
+                <span>Repository Diagnostics</span>
                 <span class="markazor-status-pill @(diagnostics?.Ready == true ? "is-ready" : "is-waiting")">@DiagnosticsText</span>
-            </div>
+            </summary>
 
-            @if (diagnostics is null)
-            {
-                <p class="markazor-muted">Refresh after authorization to verify repository access.</p>
-            }
-            else
-            {
+            <div class="markazor-settings-diagnostics-body">
                 <dl class="markazor-kv">
-                    <dt>Repository</dt>
-                    <dd>@CheckText(diagnostics.RepositoryAccessible)</dd>
-                    <dt>Read permission</dt>
-                    <dd>@CheckText(diagnostics.CanPull)</dd>
-                    <dt>Push permission</dt>
-                    <dd>@CheckText(diagnostics.CanPush)</dd>
-                    <dt>Branch</dt>
-                    <dd>@CheckText(diagnostics.BranchAccessible)</dd>
-                    <dt>Tree</dt>
-                    <dd>@CheckText(diagnostics.TreeReadable)</dd>
+                    <dt>GitHub</dt>
+                    <dd>@AuthText</dd>
+                    @if (Session.AccessTokenExpiresAtUtc is not null)
+                    {
+                        <dt>Session expires</dt>
+                        <dd>@Session.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.InvariantCulture)</dd>
+                    }
                 </dl>
 
-                @foreach (string error in diagnostics.Errors)
+                @if (diagnostics is null)
                 {
-                    <p class="markazor-alert">@error</p>
+                    <p class="markazor-muted">Refresh after authorization to verify repository access.</p>
                 }
-
-                @foreach (string warning in diagnostics.Warnings)
+                else
                 {
-                    <p class="markazor-warning">@warning</p>
+                    <dl class="markazor-kv">
+                        <dt>Repository</dt>
+                        <dd>@CheckText(diagnostics.RepositoryAccessible)</dd>
+                        <dt>Read permission</dt>
+                        <dd>@CheckText(diagnostics.CanPull)</dd>
+                        <dt>Push permission</dt>
+                        <dd>@CheckText(diagnostics.CanPush)</dd>
+                        <dt>Branch</dt>
+                        <dd>@CheckText(diagnostics.BranchAccessible)</dd>
+                        <dt>Tree</dt>
+                        <dd>@CheckText(diagnostics.TreeReadable)</dd>
+                    </dl>
+
+                    @foreach (string error in diagnostics.Errors)
+                    {
+                        <p class="markazor-alert">@error</p>
+                    }
+
+                    @foreach (string warning in diagnostics.Warnings)
+                    {
+                        <p class="markazor-warning">@warning</p>
+                    }
                 }
-            }
-        </section>
-
-        <section class="markazor-panel">
-            <div class="markazor-section-header">
-                <h2>Deployment Workflow</h2>
-                <span class="markazor-status-pill is-waiting">Planned</span>
             </div>
-
-            <p class="markazor-muted">Markazor can later manage a dedicated Static Web Apps deployment workflow instead of the Azure-generated Oryx workflow. The planned workflow should build with the repository SDK, bypass the .NET 9 Oryx ceiling, and skip SWA deployment when a change cannot affect the published app.</p>
-
-            <dl class="markazor-kv">
-                <dt>Dedicated deploy</dt>
-                <dd>Install or update a Markazor-owned GitHub Actions workflow.</dd>
-                <dt>Path filters</dt>
-                <dd>Skip Static Web Apps deployment for docs, drafts-only, or maintenance-only changes.</dd>
-                <dt>Scheduled jobs</dt>
-                <dd>Run daily maintenance jobs such as future unreferenced asset cleanup.</dd>
-            </dl>
-        </section>
-
-        <section class="markazor-panel">
-            <div class="markazor-section-header">
-                <h2>Resource Maintenance</h2>
-                <span class="markazor-status-pill is-waiting">Planned</span>
-            </div>
-
-            <p class="markazor-muted">Future media management can live here: inventory uploaded assets, find files that are not referenced by any post or note, and clean them through a scheduled workflow.</p>
-        </section>
+        </details>
     }
 </div>
 
@@ -269,24 +230,33 @@
 
     private string AuthText => Session.IsAuthenticated ? "Authorized" : isLocalPreview ? "Local preview" : "Signed out";
 
-    private string ReadyText => IsWorkspaceVisible
+    private string ReadyText => isLoading ? "Checking..."
+        : !string.IsNullOrWhiteSpace(errorMessage) ? "Unavailable"
+        : isLocalPreview ? "Local preview" : IsWorkspaceVisible
         ? (diagnostics?.Ready == true ? "Ready" : "Needs attention")
         : "Authorization required";
 
-    private string ReadyClass => IsWorkspaceVisible && diagnostics?.Ready == true ? "is-ready" : "is-waiting";
+    private string ReadyClass => !isLoading && string.IsNullOrWhiteSpace(errorMessage)
+        && IsWorkspaceVisible && diagnostics?.Ready == true ? "is-ready" : "is-waiting";
 
     private string DiagnosticsText => diagnostics?.Ready == true ? "Passed" : "Not passed";
 
+    private bool NeedsDiagnosticsAttention => diagnostics is null || !diagnostics.Ready
+        || diagnostics.Errors.Count > 0 || diagnostics.Warnings.Count > 0;
+
     private string SettingsFormText => settingsFormDirty
         ? "Unsaved changes"
-        : status?.SettingsFileExists == true ? "Repository" : "Not saved";
+        : settingsSaved || status?.SettingsFileExists == true ? "Saved" : "Not saved";
+
+    private string SettingsFormClass => !settingsFormDirty && (settingsSaved || status?.SettingsFileExists == true)
+        ? "is-ready" : "is-waiting";
 
     private string SettingsMessageClass => settingsMessageIsSuccess ? "markazor-success" : "markazor-alert";
 
     private string SiteIconText => string.IsNullOrWhiteSpace(siteIconError)
         ? string.IsNullOrWhiteSpace(selectedSiteIconName)
-            ? $"Optional PNG. Saved to {MarkazorRepositoryPaths.SiteIconPath} and served from {MarkazorRepositoryPaths.SiteIconWebPath}."
-            : $"{selectedSiteIconName} will replace {MarkazorRepositoryPaths.SiteIconPath}."
+            ? "Optional PNG, up to 512 KB."
+            : $"{selectedSiteIconName} will replace the site icon when saved."
         : siteIconError;
 
     private bool CanAuthorize => string.IsNullOrWhiteSpace(AuthorizationDisabledReason);
@@ -298,11 +268,9 @@
 
     private string SettingsGateTitle => NeedsSetupBeforeAuthorization ? "Setup Required" : "GitHub Authorization";
 
-    private string SettingsGateStatus => NeedsSetupBeforeAuthorization ? "Setup first" : "Required";
-
     private string SettingsGateDescription => NeedsSetupBeforeAuthorization
-        ? "Open Setup to enter the GitHub App Client ID and configure the Static Web Apps secret before authorizing this browser."
-        : "Authorize the GitHub App before opening repository settings, diagnostics, and maintenance tools.";
+        ? "Open Setup to connect your GitHub App."
+        : "Authorize GitHub to edit these settings.";
 
     private string SiteBaseUrl => MarkazorSettingsForm.ParseBaseUrls(settingsForm.SiteBaseUrls).FirstOrDefault()?.ToString()
         ?? status?.Site.PrimaryBaseUrl?.ToString()
@@ -349,11 +317,6 @@
             return null;
         }
     }
-
-    private bool CanOpenWrite => MarkazorSetupReadiness.HasRepositoryConfiguration(status)
-        && IsWorkspaceVisible
-        && diagnostics?.Ready == true
-        && !isBusy;
 
     private bool CanSaveSettings => MarkazorSetupReadiness.HasAuthorizationConfiguration(status)
         && !isLocalPreview
@@ -434,11 +397,6 @@
         {
             return null;
         }
-    }
-
-    private async Task RefreshAsync()
-    {
-        await ReloadAsync().ConfigureAwait(false);
     }
 
     private async Task ReloadAsync()
@@ -675,11 +633,6 @@
     private void OpenSetup()
     {
         Navigation.NavigateTo("/setup");
-    }
-
-    private void OpenWrite()
-    {
-        Navigation.NavigateTo("/studio/write");
     }
 
     private static string ToInputValue(ChangeEventArgs args)

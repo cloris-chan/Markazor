@@ -309,7 +309,7 @@ public sealed class MarkazorComponentTests
         Assert.Contains("Insert image", component.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("From URL", component.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Upload local image", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("2 pending asset(s)", component.Markup, StringComparison.Ordinal);
+        Assert.Contains("2 images to upload on save", component.Markup, StringComparison.Ordinal);
         Assert.Empty(component.FindAll(".markazor-asset-tools"));
 
         component.FindAll("button")
@@ -487,7 +487,7 @@ public sealed class MarkazorComponentTests
         SetInput(component, "Site Title", "Edited Site");
         SetTextarea(component, "Site Description", "Edited site description.");
         Assert.Contains("Site Icon", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("assets/site-icon.png", component.Markup, StringComparison.Ordinal);
+        Assert.Equal("image/png", component.Find(".markazor-site-icon-field input").GetAttribute("accept"));
         SetInput(component, "GitHub App Client ID", "edited-client");
         SetInput(component, "Repository Owner", "edited-owner");
         SetInput(component, "Repository Name", "edited-repo");
@@ -506,6 +506,8 @@ public sealed class MarkazorComponentTests
             Assert.Equal("edited-owner", saved.Repository.Owner);
             Assert.Equal("edited-repo", saved.Repository.Name);
             Assert.Equal("trunk", saved.Repository.DefaultBranch);
+            Assert.Equal("Saved", component.Find(".markazor-section-header .markazor-status-pill").TextContent);
+            Assert.Empty(component.FindAll(".markazor-warning"));
         });
     }
 
@@ -532,7 +534,9 @@ public sealed class MarkazorComponentTests
         {
             Assert.Contains("GitHub authorization is required.", component.Markup, StringComparison.Ordinal);
             Assert.Contains("GitHub required", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("Authorize GitHub and pass repository diagnostics to load the live content tree.", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("Connect GitHub in Setup to load your content.", component.Markup, StringComparison.Ordinal);
+            Assert.Empty(component.FindAll(".markazor-document-state"));
+            Assert.Empty(component.FindAll(".markazor-authoring-grid"));
             Assert.DoesNotContain("posts/build-only.md", component.Markup, StringComparison.Ordinal);
             Assert.DoesNotContain("Build index", component.Markup, StringComparison.Ordinal);
         });
@@ -638,7 +642,7 @@ public sealed class MarkazorComponentTests
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
-            Assert.Contains("No GitHub content files are available under the configured roots.", component.Markup, StringComparison.Ordinal));
+            Assert.Contains("No documents yet. Create a draft to get started.", component.Markup, StringComparison.Ordinal));
 
         component.FindAll("button")
             .Single(button => string.Equals(button.TextContent.Trim(), "New Draft", StringComparison.Ordinal))
@@ -673,7 +677,7 @@ public sealed class MarkazorComponentTests
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
 
         component.WaitForAssertion(() =>
-            Assert.Contains("No GitHub content files are available under the configured roots.", component.Markup, StringComparison.Ordinal));
+            Assert.Contains("No documents yet. Create a draft to get started.", component.Markup, StringComparison.Ordinal));
 
         component.Find("input[value=\"note\"]").Change("note");
         component.FindAll("button")
@@ -709,7 +713,7 @@ public sealed class MarkazorComponentTests
 
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
         component.WaitForAssertion(() =>
-            Assert.Contains("No GitHub content files are available under the configured roots.", component.Markup, StringComparison.Ordinal));
+            Assert.Contains("No documents yet. Create a draft to get started.", component.Markup, StringComparison.Ordinal));
 
         component.FindAll("button")
             .Single(button => string.Equals(button.TextContent.Trim(), "New Draft", StringComparison.Ordinal))

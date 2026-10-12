@@ -71,11 +71,11 @@
         </span>
         @if (editorUnavailable)
         {
-            <span class="markazor-markdown-toolbar-status">Enhanced editor unavailable. Textarea fallback is active.</span>
+            <span class="markazor-markdown-toolbar-status">Formatting tools unavailable. You can still type.</span>
         }
         @if (PendingAssetCount > 0)
         {
-            <span class="markazor-markdown-toolbar-status">@PendingAssetCount pending asset(s)</span>
+            <span class="markazor-markdown-toolbar-status">@PendingAssetCount @(PendingAssetCount == 1 ? "image" : "images") to upload on save</span>
         }
     </div>
     <div class="markazor-codemirror-host" @ref="hostElement"></div>

@@ -29,15 +29,10 @@ else if (Kind is MarkazorReaderPageKind.Post or MarkazorReaderPageKind.Note)
 else
 {
     <section class="reader-page-heading">
-        <p class="reader-eyebrow">Browse</p>
         <h1>@Title</h1>
         @if (!string.IsNullOrEmpty(Value) && Kind is MarkazorReaderPageKind.Tags or MarkazorReaderPageKind.Categories)
         {
             <a href="@(Kind == MarkazorReaderPageKind.Tags ? "/tags" : "/categories")">View all @(Kind == MarkazorReaderPageKind.Tags ? "tags" : "categories")</a>
-        }
-        else
-        {
-            <p>@Description</p>
         }
     </section>
 
