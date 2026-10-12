@@ -1,5 +1,5 @@
-@page "/setup"
-@layout SetupLayout
+@page "/studio/setup"
+@layout StudioLayout
 @using Markazor.Client
 @using Markazor.Core.Auth
 @using Markazor.Core.Setup
@@ -9,7 +9,9 @@
 @inject IJSRuntime JavaScript
 @implements IAsyncDisposable
 
-<div class="markazor-shell">
+<PageTitle>Setup - Markazor Studio</PageTitle>
+
+<div class="markazor-shell markazor-setup-shell">
     <header class="markazor-page-header">
         <div>
             <h1>Setup</h1>
@@ -55,7 +57,7 @@
                 <dt>Recommended SWA secret</dt>
                 <dd><code>MARKAZOR_AUTH_COOKIE_SECRET</code> protects OAuth state and refresh cookies independently. If it is omitted, Markazor falls back to <code>GITHUB_APP_CLIENT_SECRET</code>.</dd>
                 <dt>Public settings</dt>
-                <dd>After authorization, use Studio settings to save <code>markazor.settings.json</code> and maintain deployment settings.</dd>
+                <dd>After authorization, use Settings to save <code>markazor.settings.json</code>.</dd>
             </dl>
         </section>
 
@@ -323,9 +325,9 @@
 
     private string GitHubAppDescription => $"Repository-native Markazor Studio for {ConfiguredRepositoryFullName}.";
 
-    private string GitHubCallbackUrl => new Uri(new Uri(SiteBaseUrl), "setup/github-callback").ToString();
+    private string GitHubCallbackUrl => new Uri(new Uri(SiteBaseUrl), "studio/setup/github-callback").ToString();
 
-    private string SetupUrl => new Uri(new Uri(SiteBaseUrl), "setup").ToString();
+    private string SetupUrl => new Uri(new Uri(SiteBaseUrl), "studio/setup").ToString();
 
     private string ConfiguredRepositoryFullName
     {
@@ -370,7 +372,7 @@
 
         if (returnedFromGitHub)
         {
-            Navigation.NavigateTo("/setup", replace: true);
+            Navigation.NavigateTo("/studio/setup", replace: true);
         }
     }
 
@@ -425,7 +427,7 @@
             IJSObjectReference? module = await EnsureSetupModuleAsync().ConfigureAwait(false);
             await MarkazorSetupStorage.SaveAuthorizationReturnPathAsync(
                 module,
-                "/setup?auth=github").ConfigureAwait(false);
+                "/studio/setup?auth=github").ConfigureAwait(false);
             Uri authorizationUrl = (await Session.StartGitHubAuthorizationAsync(request).ConfigureAwait(false)).AuthorizationUrl;
             Navigation.NavigateTo(authorizationUrl.ToString(), forceLoad: true);
         }

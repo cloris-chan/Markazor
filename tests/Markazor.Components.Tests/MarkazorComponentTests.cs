@@ -108,16 +108,23 @@ public sealed class MarkazorComponentTests
         context.Services.AddSingleton<IMarkazorContentCatalog>(new FakeCatalog());
         context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(new FakeEditor());
+        context.Services.AddSingleton<IMarkazorPwaUpdateService>(new FakePwaUpdateService());
         Microsoft.AspNetCore.Components.NavigationManager navigation =
             context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
         navigation.NavigateTo("/studio/settings");
 
-        IRenderedComponent<StudioPage> component = context.Render<StudioPage>();
+        IRenderedComponent<StudioLayout> component = context.Render<StudioLayout>(parameters => parameters
+            .Add(static item => item.Body, builder =>
+            {
+                builder.OpenComponent<StudioPage>(0);
+                builder.CloseComponent();
+            }));
 
         component.WaitForAssertion(() =>
         {
             Assert.Equal("Settings", component.Find("h1").TextContent);
             Assert.Equal("page", component.Find("a[href='/studio/settings']").GetAttribute("aria-current"));
+            Assert.Null(component.Find("a[href='/studio/setup']").GetAttribute("aria-current"));
         });
 
         navigation.NavigateTo("/studio/write");
@@ -376,9 +383,9 @@ public sealed class MarkazorComponentTests
             Assert.Contains("GitHub App", component.Markup, StringComparison.Ordinal);
             Assert.Contains("https://github.com/settings/apps/new?name=Markazor%20repo", component.Markup, StringComparison.Ordinal);
             Assert.Contains("https://github.com/organizations/owner/settings/apps/new?name=Markazor%20repo", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("http://localhost/setup/github-callback", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("callback_urls%5B%5D=http%3A%2F%2Flocalhost%2Fsetup%2Fgithub-callback", component.Markup, StringComparison.Ordinal);
-            Assert.Contains("setup_url=http%3A%2F%2Flocalhost%2Fsetup", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("http://localhost/studio/setup/github-callback", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("callback_urls%5B%5D=http%3A%2F%2Flocalhost%2Fstudio%2Fsetup%2Fgithub-callback", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("setup_url=http%3A%2F%2Flocalhost%2Fstudio%2Fsetup", component.Markup, StringComparison.Ordinal);
             Assert.Contains("webhook_active=false", component.Markup, StringComparison.Ordinal);
             Assert.Contains("contents=write", component.Markup, StringComparison.Ordinal);
             Assert.Contains("Only select repositories: owner/repo", component.Markup, StringComparison.Ordinal);
@@ -392,6 +399,56 @@ public sealed class MarkazorComponentTests
             Assert.Contains("Open Settings", component.Markup, StringComparison.Ordinal);
             Assert.DoesNotContain("Save Settings", component.Markup, StringComparison.Ordinal);
         });
+    }
+
+    [Fact]
+    public void StudioSetupIsAvailableBeforeAuthorizationAndEnvironmentConfiguration()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IMarkazorClientSession>(new FakeSession(
+            isAuthenticated: false,
+            missingSettings: ["GITHUB_APP_CLIENT_SECRET"]));
+        context.Services.AddSingleton<IMarkazorSetupDiagnosticsService>(
+            new FakeDiagnosticsService(CreateDiagnostics(ready: false, canPush: false)));
+        context.Services.AddSingleton<IMarkazorPwaUpdateService>(new FakePwaUpdateService());
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo("/studio/setup");
+
+        IRenderedComponent<StudioLayout> component = context.Render<StudioLayout>(parameters => parameters
+            .Add(static item => item.Body, builder =>
+            {
+                builder.OpenComponent<SetupPage>(0);
+                builder.CloseComponent();
+            }));
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Equal("Setup", component.Find("h1").TextContent);
+            Assert.Equal("page", component.Find("a[href='/studio/setup']").GetAttribute("aria-current"));
+            Assert.Null(component.Find("a[href='/studio/settings']").GetAttribute("aria-current"));
+            Assert.Contains("Create App", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("GitHub App Client ID", component.Markup, StringComparison.Ordinal);
+            Assert.Contains("GITHUB_APP_CLIENT_SECRET", component.Markup, StringComparison.Ordinal);
+            Assert.Single(component.FindAll("main#studio-content"));
+            Assert.Equal("#studio-content", component.Find(".markazor-skip-link").GetAttribute("href"));
+        });
+    }
+
+    [Fact]
+    public void GitHubCallbackReturnsToStudioSetupAfterAuthorization()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IMarkazorClientSession>(new FakeSession());
+        Microsoft.AspNetCore.Components.NavigationManager navigation =
+            context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo("/studio/setup/github-callback?code=code-1&state=state-1");
+
+        IRenderedComponent<GitHubCallbackPage> component = context.Render<GitHubCallbackPage>();
+
+        component.WaitForAssertion(() =>
+            Assert.Equal("http://localhost/studio/setup?auth=github", navigation.Uri));
     }
 
     [Fact]
@@ -417,6 +474,13 @@ public sealed class MarkazorComponentTests
             Assert.DoesNotContain("Repository Diagnostics", component.Markup, StringComparison.Ordinal);
             Assert.DoesNotContain("Deployment Workflow", component.Markup, StringComparison.Ordinal);
         });
+
+        component.FindAll("button")
+            .Single(button => string.Equals(button.TextContent.Trim(), "Open Setup", StringComparison.Ordinal))
+            .Click();
+
+        Assert.Equal("http://localhost/studio/setup",
+            context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri);
     }
 
     [Fact]

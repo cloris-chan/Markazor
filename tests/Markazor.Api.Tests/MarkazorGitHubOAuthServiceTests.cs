@@ -15,7 +15,7 @@ public sealed class MarkazorGitHubOAuthServiceTests
             """);
         using HttpClient httpClient = new(handler);
         MarkazorGitHubOAuthService service = CreateService(httpClient);
-        Uri callbackUri = new("https://example.com/setup/github-callback");
+        Uri callbackUri = new("https://example.com/studio/setup/github-callback");
         MarkazorGitHubOAuthStartResult start = service.Start(callbackUri, FixedNow);
         string state = ParseQuery(start.AuthorizationUrl)["state"];
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
@@ -46,7 +46,7 @@ public sealed class MarkazorGitHubOAuthServiceTests
             """);
         using HttpClient callbackClient = new(callbackHandler);
         MarkazorGitHubOAuthService callbackService = CreateService(callbackClient, clientId: string.Empty);
-        Uri callbackUri = new("https://public.example/setup/github-callback");
+        Uri callbackUri = new("https://public.example/studio/setup/github-callback");
 
         MarkazorGitHubOAuthStartResult start = callbackService.Start(
             callbackUri,
@@ -58,7 +58,7 @@ public sealed class MarkazorGitHubOAuthServiceTests
             "code-1",
             startQuery["state"],
             start.StateCookieValue,
-            new Uri("https://internal.example/setup/github-callback"),
+            new Uri("https://internal.example/studio/setup/github-callback"),
             FixedNow,
             cancellationToken);
 
@@ -66,7 +66,7 @@ public sealed class MarkazorGitHubOAuthServiceTests
         Assert.Equal(callbackUri.ToString(), startQuery["redirect_uri"]);
         Assert.Contains("client_id=temporary-client", callbackHandler.LastBody, StringComparison.Ordinal);
         Assert.Contains(
-            "redirect_uri=https%3A%2F%2Fpublic.example%2Fsetup%2Fgithub-callback",
+            "redirect_uri=https%3A%2F%2Fpublic.example%2Fstudio%2Fsetup%2Fgithub-callback",
             callbackHandler.LastBody,
             StringComparison.Ordinal);
 
@@ -125,7 +125,7 @@ public sealed class MarkazorGitHubOAuthServiceTests
     }
 
     private static readonly DateTimeOffset FixedNow = new(2026, 6, 4, 0, 0, 0, TimeSpan.Zero);
-    private static readonly Uri CallbackUri = new("https://example.com/setup/github-callback");
+    private static readonly Uri CallbackUri = new("https://example.com/studio/setup/github-callback");
 
     private static MarkazorGitHubOAuthService CreateService(
         HttpClient httpClient,

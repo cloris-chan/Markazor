@@ -10,7 +10,7 @@ api_location: src/Markazor.MinimalSite.Functions
 output_location: wwwroot
 ```
 
-The `/setup` page is available only after the Static Web App has already been deployed, so it can verify these values but cannot replace this deployment-time configuration.
+The `/studio/setup` page is available only after the Static Web App has already been deployed, so it can verify these values but cannot replace this deployment-time configuration.
 
 Configure these Static Web Apps environment variables for the Functions API:
 
@@ -28,9 +28,9 @@ The sample Functions app exposes these Markazor endpoints:
 - `POST /api/auth/github/callback`
 - `POST /api/auth/github/refresh`
 
-Use `/setup/github-callback` as the GitHub App callback URL. That browser page posts the returned `code` and `state` to `/api/auth/github/callback`.
+Use `/studio/setup/github-callback` as the GitHub App callback URL and `/studio/setup` as its Setup URL. The callback page posts the returned `code` and `state` to `/api/auth/github/callback`.
 
-The sample includes `public/markazor.settings.json` with public site title, description, URLs, repository, GitHub client id, and theme settings. After deployment, open the independent `/setup` page, create the GitHub App, paste the Client ID into the temporary field, add `GITHUB_APP_CLIENT_SECRET` to Static Web Apps, install the app on the repository, and authorize GitHub. Then open `/studio/settings` to edit and save the canonical public settings back to the repository, or upload a PNG site icon to the fixed `assets/site-icon.png` asset. Studio Write is enabled only when the configured repository, branch, tree, and pull/push permissions pass.
+The sample includes `public/markazor.settings.json` with public site title, description, URLs, repository, GitHub client id, and theme settings. After deployment, open `/studio/setup` from the shared Studio navigation, create the GitHub App, paste the Client ID into the temporary field, add `GITHUB_APP_CLIENT_SECRET` to Static Web Apps, install the app on the repository, and authorize GitHub. Setup remains available before authorization. Then open `/studio/settings` to edit and save the canonical public settings back to the repository, or upload a PNG site icon to the fixed `assets/site-icon.png` asset. Studio Write is enabled only when the configured repository, branch, tree, and pull/push permissions pass.
 
 `/studio/write` uses the live GitHub tree as the content list source of truth and only enriches matching files with build-time `SiteIndex` metadata. It supports single-file create/update/delete, asset upload, dirty-document navigation guards, remote/local recovery after SHA conflicts, and multi-select draft publishing. New drafts are stored as flat `drafts/*.md` files; `kind: post` publishes to `posts/`, and `kind: note` publishes to `notes/`. Publishing happens in one atomic Git commit; a branch-head conflict is recalculated and retried once. A successful publish still needs the Azure-generated Static Web Apps workflow to deploy the new public site version.
 
@@ -40,4 +40,4 @@ The build emits complete public HTML using the shared reader components. `/posts
 
 Only `posts/**` and `notes/**` are compiled and published. `drafts/**` stays out of the browser bundle and public static files, and is available only to the authenticated editor through GitHub. Repository assets under `assets/**` are published to `/assets/**`, while public Markdown is staged under `/_markazor/content/**`. Published content under `posts/**` or `notes/**` with `draft: true` fails the build with `MZ001`.
 
-The published PWA caches generated public HTML and public Markdown for offline reading. When a new deployment installs a waiting service worker, the site displays an explicit Reload prompt instead of replacing the running app automatically. The Static Web Apps configuration also applies no-store to setup and Studio paths, revalidates public Markdown, and supplies security headers plus a static 404 response.
+The published PWA caches generated public HTML and public Markdown for offline reading. When a new deployment installs a waiting service worker, the site displays an explicit Reload prompt instead of replacing the running app automatically. The Static Web Apps configuration also applies no-store to all Studio paths, revalidates public Markdown, and supplies security headers plus a static 404 response.

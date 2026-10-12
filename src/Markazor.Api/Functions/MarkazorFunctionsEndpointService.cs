@@ -170,7 +170,7 @@ public sealed class MarkazorFunctionsEndpointService(HttpClient httpClient, Mark
         Uri publicBaseUri = GetPublicBaseUri(request, settings, siteBaseUrl);
         UriBuilder builder = new(publicBaseUri)
         {
-            Path = "/setup/github-callback",
+            Path = "/studio/setup/github-callback",
             Query = string.Empty,
         };
 
@@ -181,7 +181,7 @@ public sealed class MarkazorFunctionsEndpointService(HttpClient httpClient, Mark
     {
         Uri baseUri = settings.Site.PrimaryBaseUrl ?? new Uri("https://localhost/");
 
-        return new Uri(baseUri, "/setup/github-callback");
+        return new Uri(baseUri, "/studio/setup/github-callback");
     }
 
     private static Uri GetPublicBaseUri(HttpRequestData request, MarkazorSiteSettings settings, Uri? siteBaseUrl)

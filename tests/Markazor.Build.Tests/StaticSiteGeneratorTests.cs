@@ -49,6 +49,9 @@ public sealed class StaticSiteGeneratorTests : IDisposable
         Assert.DoesNotContain("SECRET DRAFT", File.ReadAllText(Path.Combine(Output, "index.html")), StringComparison.Ordinal);
         Assert.Contains("blazor.webassembly.js", File.ReadAllText(Path.Combine(Output, "_markazor", "app.html")), StringComparison.Ordinal);
         Assert.Contains("markazor-reader.js", File.ReadAllText(Path.Combine(Output, "studio", "write", "index.html")), StringComparison.Ordinal);
+        Assert.Contains("blazor.webassembly.js", File.ReadAllText(Path.Combine(Output, "studio", "setup", "index.html")), StringComparison.Ordinal);
+        Assert.Contains("blazor.webassembly.js", File.ReadAllText(Path.Combine(Output, "studio", "setup", "github-callback", "index.html")), StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(Output, "setup")));
         Assert.Single(document.QuerySelectorAll("script[src$='markazor-reader.js']"));
         Assert.Empty(document.QuerySelectorAll("a[href^='#']"));
         Assert.NotNull(document.QuerySelector("a[href='/posts/hello#mk-fn%3A1']"));

@@ -2,7 +2,7 @@
 
 **Markazor is a browser-first, self-owned Blazor WebAssembly site framework for posts, notes, and static publishing on GitHub and Azure Static Web Apps.**
 
-Markazor generates complete public HTML at build time, with a Blazor WebAssembly Studio for settings and writing, an independent browser setup page, and an Azure Functions setup/auth API. `Markazor.SourceGen` indexes public Markdown; the packaged static builder renders the shared reader components with article content and search/share metadata. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
+Markazor generates complete public HTML at build time, with a Blazor WebAssembly Studio for setup, settings, and writing, and an Azure Functions setup/auth API. `Markazor.SourceGen` indexes public Markdown; the packaged static builder renders the shared reader components with article content and search/share metadata. After the first Azure Static Web Apps deployment, the rest of the setup and daily writing flow can happen from the browser.
 
 All durable state stays in accounts you control: source code, posts, notes, drafts, media, public settings, the GitHub App, and the deployment workflow live in your GitHub and Azure resources. Browser edits become ordinary Git commits; public content is indexed at build time, while `drafts/**` stays out of publish output and service worker assets.
 
@@ -40,7 +40,7 @@ Wait for the first deployment to complete.
 
 ### 3. Finish Setup in the Browser
 
-Open the deployed site and go to `/setup`. This independent setup page guides you through GitHub App creation, Client ID entry, Static Web Apps environment variables, and GitHub authorization. After authorization, continue in Studio Settings to save the public repository settings.
+Open the deployed site and go to `/studio/setup`, or choose **Setup** in Studio. This page is available before GitHub authorization and guides you through GitHub App creation, Client ID entry, Static Web Apps environment variables, and GitHub authorization. Use `/studio/setup/github-callback` as the GitHub App callback URL. After authorization, continue in Studio Settings to save the public repository settings.
 
 Required Static Web Apps environment variable:
 
@@ -60,14 +60,14 @@ For the full walkthrough, see [User Guide](https://github.com/cloris-chan/Markaz
 
 ### Site Creation and First Setup
 
-Both creation paths produce a user-owned site repository. Azure deploys that repository first, then the independent setup page guides GitHub App authorization before Studio handles public settings and writing.
+Both creation paths produce a user-owned site repository. Azure deploys that repository first, then Studio Setup guides GitHub App authorization before Studio Settings and Write handle public settings and writing.
 
 ```mermaid
 flowchart LR
     T["Use template<br/>Markazor.Template"] --> R["User-owned<br/>site repository"]
     N["dotnet new<br/>markazor-site"] --> R
     R --> A["Azure Static Web Apps<br/>first deployment<br/>src/*.Web + src/*.Functions"]
-    A --> S["/setup<br/>GitHub App + SWA secret"]
+    A --> S["/studio/setup<br/>GitHub App + SWA secret"]
     S --> M["/studio/settings<br/>save public settings"]
     M --> E["/studio/write<br/>write content"]
 ```

@@ -93,7 +93,7 @@ internal static class StaticSiteGenerator
         List<StaticPage> pages = CreatePages(reader, articles);
         Directory.CreateDirectory(Path.Combine(output, "_markazor"));
         await File.WriteAllTextAsync(Path.Combine(output, "_markazor", "app.html"), shell, cancellationToken).ConfigureAwait(false);
-        foreach (string route in new[] { "studio", "studio/write", "studio/settings", "setup", "setup/github-callback" })
+        foreach (string route in new[] { "studio", "studio/write", "studio/settings", "studio/setup", "studio/setup/github-callback" })
         {
             string path = Path.Combine(output, route.Replace('/', Path.DirectorySeparatorChar), "index.html");
             EnsureGeneratedPathAvailable(path);

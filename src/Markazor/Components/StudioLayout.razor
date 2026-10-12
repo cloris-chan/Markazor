@@ -1,7 +1,81 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@implements IDisposable
 
 <div class="markazor-studio-layout">
     <MarkazorHead />
-    @Body
+    <a class="markazor-skip-link" href="#studio-content">Skip to workspace</a>
+
+    <section class="markazor-studio-shell" aria-label="Markazor Studio">
+        <aside class="markazor-studio-sidebar">
+            <a class="markazor-studio-brand" href="/">
+                <img class="markazor-studio-mark" src="/_content/Markazor/markazor-mark.svg" alt="" width="64" height="64" />
+                <strong>Markazor Studio</strong>
+            </a>
+
+            <nav class="markazor-studio-nav" aria-label="Studio navigation">
+                <a class="@NavClass(StudioSection.Write)" aria-current="@(ActiveSection == StudioSection.Write ? "page" : null)" href="/studio/write">
+                    <span><MarkazorIcon Kind="MarkazorIconKind.Write" /> Write <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" Class="markazor-nav-arrow" /></span>
+                </a>
+                <a class="@NavClass(StudioSection.Settings)" aria-current="@(ActiveSection == StudioSection.Settings ? "page" : null)" href="/studio/settings">
+                    <span><MarkazorIcon Kind="MarkazorIconKind.Settings" /> Settings <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" Class="markazor-nav-arrow" /></span>
+                </a>
+                <a class="@NavClass(StudioSection.Setup)" aria-current="@(ActiveSection == StudioSection.Setup ? "page" : null)" href="/studio/setup">
+                    <span><MarkazorIcon Kind="MarkazorIconKind.Book" /> Setup <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" Class="markazor-nav-arrow" /></span>
+                </a>
+            </nav>
+
+            <a class="markazor-studio-site-link" href="/">View Site <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
+        </aside>
+
+        <main class="markazor-studio-stage" id="studio-content" tabindex="-1">
+            @Body
+        </main>
+    </section>
     <PwaUpdatePrompt />
 </div>
+
+@code {
+    private StudioSection ActiveSection
+    {
+        get
+        {
+            string path = Navigation.ToBaseRelativePath(Navigation.Uri)
+                .Split('?', 2)[0]
+                .Split('#', 2)[0]
+                .Trim('/')
+                .ToLowerInvariant();
+
+            return path switch
+            {
+                "studio/write" => StudioSection.Write,
+                "studio/setup" or "studio/setup/github-callback" => StudioSection.Setup,
+                _ => StudioSection.Settings,
+            };
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string NavClass(StudioSection section) => section == ActiveSection ? "is-active" : string.Empty;
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= HandleLocationChanged;
+    }
+
+    private enum StudioSection
+    {
+        Settings,
+        Write,
+        Setup,
+    }
+}

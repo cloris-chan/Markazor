@@ -72,7 +72,7 @@ async function onFetch(event) {
     if (request.mode === 'navigate') {
         const path = url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : '/';
         const page = self.markazorRoutes[path];
-        const admin = /^\/(?:studio|setup|auth)(?:\/|$)/.test(path);
+        const admin = /^\/(?:studio|auth)(?:\/|$)/.test(path);
         const target = page || (admin ? '/_markazor/app.html' : null);
         if (target) {
             const response = await cache.match(target);

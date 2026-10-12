@@ -34,21 +34,21 @@ output_location: wwwroot
 
 For a differently named site, replace `MarkazorSite` with your site name.
 
-Wait for Azure's generated deployment workflow to finish. `/setup` is available only after the first successful deployment.
+Wait for Azure's generated deployment workflow to finish. `/studio/setup` is available only after the first successful deployment.
 
 ## 3. Configure the GitHub App
 
-Open the deployed site and go to `/setup`.
+Open the deployed site and go to `/studio/setup`, or choose **Setup** in Studio.
 
-The setup page is an independent initialization surface, separate from Studio. It shows the values to use when creating the GitHub App. The generated "Create App" link prefills safe defaults, but the app name and description are only suggestions.
+Studio Setup shares the navigation and layout with Settings and Write, and is available before GitHub authorization. It shows the values to use when creating the GitHub App. The generated "Create App" link prefills safe defaults, but the app name and description are only suggestions.
 
 Use these settings:
 
 | Setting | Value |
 |---|---|
 | Homepage URL | The deployed site root. |
-| Callback URL | `https://your-static-web-app.azurestaticapps.net/setup/github-callback` |
-| Setup URL | `https://your-static-web-app.azurestaticapps.net/setup` |
+| Callback URL | `https://your-static-web-app.azurestaticapps.net/studio/setup/github-callback` |
+| Setup URL | `https://your-static-web-app.azurestaticapps.net/studio/setup` |
 | Redirect on update | Enabled |
 | Webhook | Inactive |
 | Repository permission | Contents: read and write |
@@ -57,12 +57,12 @@ Use these settings:
 After creating the app:
 
 1. Copy the GitHub App Client ID.
-2. Paste it into the temporary Client ID field on `/setup`.
+2. Paste it into the temporary Client ID field on `/studio/setup`.
 3. Generate a GitHub App Client secret.
 4. Add the secret to Azure Static Web Apps environment variables as `GITHUB_APP_CLIENT_SECRET`.
 5. Add `MARKAZOR_AUTH_COOKIE_SECRET` as a separate long random value when possible.
 6. Install the GitHub App on the site repository.
-7. Return to `/setup` and authorize GitHub.
+7. Return to `/studio/setup` and authorize GitHub.
 
 Required Static Web Apps environment variable:
 
@@ -80,7 +80,7 @@ If `MARKAZOR_AUTH_COOKIE_SECRET` is omitted, the Functions API falls back to `GI
 
 ## 4. Save Public Settings
 
-After authorization, open `/studio/settings`. Studio is the authenticated settings and writing workspace; setup remains a separate initialization page at `/setup`.
+After authorization, open `/studio/settings`. Studio groups Setup, Settings, and Write under the same navigation. Setup is available before authorization; changing public settings and writing content require GitHub authorization.
 
 `public/markazor.settings.json` stores public, non-secret site settings:
 
@@ -92,7 +92,7 @@ After authorization, open `/studio/settings`. Studio is the authenticated settin
 
 Studio Settings can also upload a PNG site icon. The file is always saved to `assets/site-icon.png` and served from `/assets/site-icon.png`.
 
-The built-in **Fieldnotes** theme uses the `default` configuration name. It provides a matching public journal, Studio, and setup interface.
+The built-in **Fieldnotes** theme uses the `default` configuration name. It provides a matching public journal and Studio interface.
 
 Use **Save Settings** to commit settings back to the repository. If the current values already match the repository file, Markazor skips the commit.
 
@@ -191,6 +191,8 @@ Reload deliberately stays manual so editing sessions are not interrupted.
 
 For package-only upgrades, update the `Markazor` version in the generated repository's `Directory.Packages.props`, then deploy again.
 
+For an existing GitHub App, set its Callback URL to `/studio/setup/github-callback` and its Setup URL to `/studio/setup` on your deployed site origin. These registration values must match the URLs shown in Studio Setup.
+
 For template structure changes, compare the target version of `cloris-chan/Markazor.Template` with your site repository and merge the relevant changes manually.
 
 Stable template releases update the template repository's `main` branch. Prerelease templates update the separate `preview` branch, which is rooted at the repository's initial commit and does not inherit a previous stable skeleton. The `main` branch therefore remains on the latest stable skeleton, and template repository tags align with their package versions.
@@ -199,17 +201,18 @@ The versionless NuGet commands in this guide resolve stable packages. To test a 
 
 ## Troubleshooting
 
-### `/setup` Is Not Available
+### `/studio/setup` Is Not Available
 
-Make sure the first Static Web Apps deployment has completed successfully. `/setup` is part of the deployed Blazor app.
+Make sure the first Static Web Apps deployment has completed successfully. `/studio/setup` is part of the deployed Blazor app and can be opened before GitHub authorization.
 
 ### Authorization Fails
 
 Check:
 
 - `GITHUB_APP_CLIENT_SECRET` is configured in Azure Static Web Apps;
-- the GitHub App Callback URL points to `/setup/github-callback`;
-- the Client ID pasted into `/setup` belongs to the same GitHub App;
+- the GitHub App Callback URL points to `/studio/setup/github-callback`;
+- the GitHub App Setup URL points to `/studio/setup`;
+- the Client ID pasted into `/studio/setup` belongs to the same GitHub App;
 - the GitHub App is installed on the site repository.
 
 ### Studio Write Cannot Save

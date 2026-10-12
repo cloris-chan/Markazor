@@ -1,5 +1,5 @@
-@page "/setup/github-callback"
-@layout SetupLayout
+@page "/studio/setup/github-callback"
+@layout StudioLayout
 @using Markazor.Core.Auth
 @using Markazor.Client
 @inject IMarkazorClientSession Session
@@ -9,12 +9,12 @@
 
 <PageTitle>GitHub Authorization</PageTitle>
 
-<main class="markazor-shell">
+<div class="markazor-shell">
     <section class="markazor-panel">
         <h1>GitHub Authorization</h1>
         <p class="@MessageClass">@message</p>
     </section>
-</main>
+</div>
 
 @code {
     private string message = "Completing GitHub authorization...";
@@ -90,7 +90,7 @@
 
     private async Task<string> GetReturnPathAsync()
     {
-        const string fallback = "/setup?auth=github";
+        const string fallback = "/studio/setup?auth=github";
 
         try
         {

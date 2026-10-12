@@ -6,41 +6,16 @@
 @implements IDisposable
 
 <PageTitle>@PageTitle</PageTitle>
-<a class="markazor-skip-link" href="#studio-content">Skip to workspace</a>
 
-<section class="markazor-studio-shell" aria-label="Markazor Studio">
-    <aside class="markazor-studio-sidebar">
-        <a class="markazor-studio-brand" href="/">
-            <img class="markazor-studio-mark" src="/_content/Markazor/markazor-mark.svg" alt="" width="64" height="64" />
-            <span>
-                <strong>Markazor Studio</strong>
-            </span>
-        </a>
-
-        <nav class="markazor-studio-nav" aria-label="Studio navigation">
-            <a class="@NavClass(StudioSection.Write)" aria-current="@(ActiveSection == StudioSection.Write ? "page" : null)" href="/studio/write">
-                <span><MarkazorIcon Kind="MarkazorIconKind.Write" /> Write <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" Class="markazor-nav-arrow" /></span>
-            </a>
-            <a class="@NavClass(StudioSection.Settings)" aria-current="@(ActiveSection == StudioSection.Settings ? "page" : null)" href="/studio/settings">
-                <span><MarkazorIcon Kind="MarkazorIconKind.Settings" /> Settings <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" Class="markazor-nav-arrow" /></span>
-            </a>
-        </nav>
-
-        <a class="markazor-studio-site-link" href="/">View Site <MarkazorIcon Kind="MarkazorIconKind.ArrowUpRight" /></a>
-    </aside>
-
-    <main class="markazor-studio-stage" id="studio-content" tabindex="-1">
-        @switch (ActiveSection)
-        {
-            case StudioSection.Write:
-                <StudioWriterPanel />
-                break;
-            default:
-                <StudioSettingsPanel />
-                break;
-        }
-    </main>
-</section>
+@switch (ActiveSection)
+{
+    case StudioSection.Write:
+        <StudioWriterPanel />
+        break;
+    default:
+        <StudioSettingsPanel />
+        break;
+}
 
 @code {
     private StudioSection ActiveSection => ResolveSection(Navigation.ToBaseRelativePath(Navigation.Uri));
@@ -62,11 +37,6 @@
         StudioSection.Write => "Write",
         _ => "Settings",
     };
-
-    private string NavClass(StudioSection section)
-    {
-        return section == ActiveSection ? "is-active" : string.Empty;
-    }
 
     private static StudioSection ResolveSection(string relativePath)
     {

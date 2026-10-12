@@ -581,8 +581,7 @@ input[type=radio] {
   color: var(--mk-accent);
   margin-left: 0.5rem;
 }
-.markazor-studio-layout,
-.markazor-setup-layout {
+.markazor-studio-layout {
   min-height: 100dvh;
 }
 .markazor-studio-shell {
@@ -1021,50 +1020,13 @@ input[type=radio] {
 .markazor-conflict textarea {
   border-color: var(--mk-line-strong);
 }
-.markazor-setup-layout {
-  padding: 0 clamp(1.25rem, 5vw, 4rem) 4rem;
-}
-.markazor-setup-masthead {
-  align-items: center;
-  border-bottom: 1px solid var(--mk-ink);
-  display: flex;
-  gap: 1.5rem;
-  justify-content: space-between;
-  margin: 0 auto 3rem;
-  max-width: 72rem;
-  min-height: 6rem;
-}
-.markazor-setup-masthead > a {
-  font-size: 0.85rem;
-  padding-block: 0.75rem;
-  text-decoration: none;
-}
-.markazor-setup-masthead > a:first-child {
-  font: 1.75rem/1.2 var(--mk-font-display);
-}
-.markazor-setup-masthead a .markazor-icon {
-  color: var(--mk-accent);
-  margin-left: 0.65rem;
-}
-.markazor-setup-brand {
-  align-items: center;
-  display: inline-flex;
-  gap: 0.75rem;
-}
-.markazor-setup-brand img {
-  border-radius: 5px;
-}
-.markazor-setup-layout main {
-  margin-inline: auto;
-  max-width: 62rem;
-}
-.markazor-setup-layout .markazor-shell {
+.markazor-setup-shell {
   counter-reset: setup-section;
 }
-.markazor-setup-layout .markazor-shell > .markazor-panel {
+.markazor-setup-shell > .markazor-panel {
   counter-increment: setup-section;
 }
-.markazor-setup-layout .markazor-shell > .markazor-panel .markazor-section-header h2::before {
+.markazor-setup-shell > .markazor-panel .markazor-section-header h2::before {
   color: var(--mk-editorial);
   content: counter(setup-section, decimal-leading-zero);
   font: 0.7rem var(--mk-font-mono);
@@ -1214,6 +1176,16 @@ input[type=radio] {
   }
 }
 @media (max-width: 760px) {
+  .markazor-studio-sidebar {
+    grid-template-columns: 1fr;
+  }
+  .markazor-studio-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .markazor-studio-nav a {
+    min-width: 0;
+  }
   .site-header {
     flex-wrap: wrap;
     gap: 0;
@@ -1338,11 +1310,15 @@ input[type=radio] {
   .markazor-reader-empty {
     padding: 2rem 1.25rem;
   }
-  .markazor-studio-sidebar {
-    grid-template-columns: 1fr;
-  }
   .markazor-studio-nav a {
-    flex: 1;
+    padding-inline: 0.4rem;
+  }
+  .markazor-studio-nav span {
+    font-size: 0.8rem;
+    gap: 0.35rem;
+  }
+  .markazor-studio-nav .markazor-nav-arrow {
+    display: none;
   }
   .markazor-studio-stage {
     padding: 1rem;

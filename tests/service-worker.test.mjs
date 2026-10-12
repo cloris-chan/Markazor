@@ -94,9 +94,11 @@ test('offline navigation returns the requested article, including a trailing sla
 
 test('Studio navigation uses the application shell', async () => {
   const { request } = createWorker();
-  const response = await request('/studio/write?markazor-preview=1');
-  assert.equal(response.redirected, false);
-  assert.equal(await response.text(), 'Studio shell');
+  for (const path of ['/studio/write?markazor-preview=1', '/studio/setup', '/studio/setup/github-callback?code=code&state=state']) {
+    const response = await request(path);
+    assert.equal(response.redirected, false);
+    assert.equal(await response.text(), 'Studio shell');
+  }
 });
 
 test('known routes with a cache miss fetch the canonical navigation URL', async () => {
@@ -110,9 +112,11 @@ test('known routes with a cache miss fetch the canonical navigation URL', async 
 
 test('unknown offline routes return a real 404 response', async () => {
   const { request } = createWorker();
-  const response = await request('/posts/missing');
-  assert.equal(response.status, 404);
-  assert.equal(await response.text(), 'Page not found');
+  for (const path of ['/posts/missing', '/setup', '/setup/github-callback']) {
+    const response = await request(path);
+    assert.equal(response.status, 404);
+    assert.equal(await response.text(), 'Page not found');
+  }
 });
 
 test('public cached assets are served while missing assets return 503', async () => {

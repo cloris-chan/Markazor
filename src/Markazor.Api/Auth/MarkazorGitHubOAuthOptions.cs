@@ -14,7 +14,7 @@ public sealed class MarkazorGitHubOAuthOptions
 
     public string RefreshCookieName { get; init; } = "markazor_refresh";
 
-    public string SetupRedirectPath { get; init; } = "/setup?auth=github";
+    public string SetupRedirectPath { get; init; } = "/studio/setup?auth=github";
 
     public Uri AuthorizationEndpoint { get; init; } = new("https://github.com/login/oauth/authorize");
 

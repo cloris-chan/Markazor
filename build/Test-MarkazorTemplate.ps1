@@ -545,6 +545,8 @@ $generatedWebRootExpectedFiles = @(
     'staticwebapp.config.json',
     'service-worker.js',
     'service-worker.published.js',
+    (Join-Path (Join-Path 'studio' 'setup') 'index.html'),
+    (Join-Path (Join-Path (Join-Path 'studio' 'setup') 'github-callback') 'index.html'),
     (Join-Path 'styles' 'site.css'),
     (Join-Path 'scripts' 'site.js')
 )
@@ -563,8 +565,8 @@ if (-not (Test-Path -LiteralPath $generatedThemeCss)) {
 
 $generatedStaticWebAppConfigPath = Join-Path $generatedWebRoot 'staticwebapp.config.json'
 $generatedStaticWebAppConfig = Get-Content -Raw -LiteralPath $generatedStaticWebAppConfigPath
-if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"route": "/setup*"')) {
-    throw 'Generated staticwebapp.config.json is missing the /setup no-store route.'
+if (Test-Path -LiteralPath (Join-Path $generatedWebRoot 'setup')) {
+    throw 'Generated setup pages must be under studio.'
 }
 
 if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"route": "/studio*"')) {

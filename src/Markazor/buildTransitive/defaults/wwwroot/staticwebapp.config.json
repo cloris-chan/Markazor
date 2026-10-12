@@ -10,12 +10,6 @@
   },
   "routes": [
     {
-      "route": "/setup*",
-      "headers": {
-        "Cache-Control": "no-store"
-      }
-    },
-    {
       "route": "/studio*",
       "headers": {
         "Cache-Control": "no-store"
