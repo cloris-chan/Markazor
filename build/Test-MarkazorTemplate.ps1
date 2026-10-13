@@ -352,7 +352,7 @@ $generatedCentralPackagesPath = Join-Path $generatedPath 'Directory.Packages.pro
 [xml] $generatedCentralPackagesXml = Get-Content -LiteralPath $generatedCentralPackagesPath
 $generatedMarkazorPackageVersions = @(
     $generatedCentralPackagesXml.Project.ItemGroup.PackageVersion |
-        Where-Object { $_.Include -in @('Markazor', 'Markazor.Api', 'Markazor.Core', 'Markazor.Themes') } |
+        Where-Object { $_.Include -in @('Markazor', 'Markazor.Api', 'Markazor.Themes') } |
         ForEach-Object {
             [pscustomobject] @{
                 Include = $_.Include
@@ -361,7 +361,7 @@ $generatedMarkazorPackageVersions = @(
         }
 )
 
-foreach ($expectedPackage in @('Markazor', 'Markazor.Api', 'Markazor.Core', 'Markazor.Themes')) {
+foreach ($expectedPackage in @('Markazor', 'Markazor.Api', 'Markazor.Themes')) {
     $generatedPackage = @($generatedMarkazorPackageVersions | Where-Object { $_.Include -eq $expectedPackage })[0]
     if ($null -eq $generatedPackage) {
         throw "Generated Directory.Packages.props is missing $expectedPackage."

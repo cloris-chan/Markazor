@@ -155,6 +155,8 @@ Generated Web projects do not keep a source-controlled `wwwroot`. The final web 
 
 ## Local Verification
 
+Source projects, tests, and the MinimalSite sample use `ProjectReference` to build against this checkout. The root `Directory.Packages.props` manages third-party package versions. Generated site repositories use NuGet references to `Markazor`, `Markazor.Api`, and `Markazor.Themes`; `Markazor.Core` is supplied through their package dependencies.
+
 ```powershell
 dotnet restore Markazor.slnx
 dotnet build Markazor.slnx -c Release --no-restore
