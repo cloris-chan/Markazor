@@ -15,7 +15,7 @@ The `/studio/setup` page is available only after the Static Web App has already 
 After deployment, open `/studio/setup` or choose **Setup** in Studio:
 
 1. **Create a GitHub App** using the prefilled link, then paste its public Client ID into Setup.
-2. **Add the secret to Azure:** in the Static Web App's **Settings → Environment variables**, add `GITHUB_APP_CLIENT_SECRET` with the app's Client secret. Apply the change and choose **Check again** in Setup.
+2. **Add the secret to Azure:** in your GitHub App, open **Credentials → Client secrets → New secret** and create a secret. In the Static Web App's **Settings → Environment variables**, add `GITHUB_APP_CLIENT_SECRET` with the secret's value. Apply the change and choose **Check again** in Setup.
 3. **Connect your repository:** install the app on this repository, then choose **Authorize GitHub**.
 4. **Open Settings:** review the sample's public settings and choose **Save Settings**. After Azure deploys the change, return to Setup and check again to enable Write.
 

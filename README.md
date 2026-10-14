@@ -43,7 +43,7 @@ Wait for the first deployment to complete.
 Open `/studio/setup` on the deployed site, or choose **Setup** in Studio. Follow the four numbered steps:
 
 1. **Create a GitHub App.** The Create App button fills in the required settings. Paste the app's public Client ID into Setup.
-2. **Add the secret to Azure.** Save the app's Client secret as `GITHUB_APP_CLIENT_SECRET` under the Static Web App's **Settings → Environment variables**, then choose **Check again** in Setup.
+2. **Add the secret to Azure.** In your GitHub App, open **Credentials → Client secrets → New secret** and create a secret. Save its value as `GITHUB_APP_CLIENT_SECRET` under the Static Web App's **Settings → Environment variables**, then choose **Check again** in Setup.
 3. **Connect your repository.** Install the app on the site repository and choose **Authorize GitHub**.
 4. **Save settings and start writing.** Open Settings, enter your site details and repository, then Save Settings. Wait for deployment, return to Setup, and Check again to enable Write.
 

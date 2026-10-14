@@ -67,7 +67,7 @@ Leave the other options at their defaults. Setup remembers the public Client ID 
 
 ### Step 2. Add the Secret to Azure
 
-1. On your GitHub App's General page, generate a new **Client secret** and copy it.
+1. In your GitHub App, open **Credentials → Client secrets** and select **New secret**. Create the secret, then copy its value.
 2. In Azure, open your **Static Web App → Settings → Environment variables**. Choose **Production** for the live site, or the matching environment if you are setting up a preview.
 3. Choose **+ Add** and enter:
 
