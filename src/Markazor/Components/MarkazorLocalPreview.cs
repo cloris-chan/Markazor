@@ -142,7 +142,7 @@ internal static class MarkazorLocalPreview
             string.Empty,
             "This preview lets the writing and settings views render without a live GitHub session.",
             string.Empty,
-            "Use it to check spacing, metadata controls, markdown editing, preview typography, and action density before shipping the theme.");
+            "Use it to check spacing, metadata controls, direct Markdown editing, article typography, and action density before shipping the theme.");
     }
 
     private static string CreatePublishedMarkdown()

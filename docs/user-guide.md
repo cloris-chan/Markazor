@@ -116,11 +116,15 @@ Wait for the deployment to succeed in GitHub **Actions**, then choose **Check se
 
 1. Open **Write** and expand **New draft**.
 2. Enter a title, keep the suggested slug, and select **New Draft**. The slug becomes part of the published URL.
-3. Write in Markdown and use the preview to check the result. **Document details** lets you change the title, slug, and other metadata.
+3. Write directly in the styled article editor. Headings, lists, tables, links, and code appear as you edit. **Document details** lets you change the title, slug, and other metadata.
 4. Choose **Save** to keep the draft, or **Publish** to make it public.
 5. Wait for the Azure deployment to finish, then open the public site.
 
 Studio reads GitHub directly, so saved files appear there immediately. The public site updates after deployment. Drafts stay in the repository and are excluded from the published site.
+
+Use the toolbar or Markdown shortcuts to format text: type `## ` for a section heading, `- ` for a list, or use **Ctrl/Cmd+B** and **Ctrl/Cmd+I** for bold and italic. **Find** searches within the article. Use **Image** to insert a URL or upload a local PNG, JPEG, WebP, or GIF; you can also paste or drop an image into the editor. Images upload to the repository when you save or publish. Each file can be up to 8 MB.
+
+The editor keeps articles as Markdown files. Opening an article alone does not change it. After editing, Markdown spacing and table formatting may be normalized while preserving the content.
 
 ## 5. Content Layout
 
@@ -151,7 +155,7 @@ Unpublished drafts:
 
 Repository assets under `assets/**` are published to `/assets/**`. Public Markdown is staged internally under `/_markazor/content/**`, so reader routes like `/posts/{slug}` do not collide with raw Markdown files. The build also renders complete HTML for public pages, including the article body, title, contents links, and metadata. Taxonomy and pagination use path-based routes such as `/tags/design` and `/posts/page/2`.
 
-Write the article title in front matter and start body sections with `##`. Studio preview and published articles share the same safe Markdown renderer and typography. The current UI and date formatting are English; there is no site-language setting.
+Set the article title in **Document details** and start body sections with `##`. The editor's article typography follows the reading theme; published articles use the site's safe Markdown renderer. Diagram and math fences remain code blocks. The current UI and date formatting are English; there is no site-language setting.
 
 `public/**` is the user-owned web root overlay. Use `public/styles/site.css` and `public/scripts/site.js` for ordinary customization without replacing the shell. A replacement `index.html` must retain `#app` and the resources needed by the application. The builder derives public pages and the Studio/Setup shell from it, adds the reader enhancement module, and preserves deployment headers and route rules while applying the static route contract. Public assets cannot occupy a generated page's `index.html` path.
 

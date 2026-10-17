@@ -13,6 +13,7 @@ const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
 const offlineAssetsInclude = [ /\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /\.json$/, /\.css$/, /\.woff2?$/, /\.png$/, /\.svg$/, /\.webp$/, /\.jpe?g$/, /\.gif$/, /\.ico$/, /\.blat$/, /\.dat$/, /\.webmanifest$/, /\.md$/ ];
 const offlineAssetsExclude = [ /^service-worker\.js$/, /(^|\/)_markazor\/content\/drafts\//, /(^|\/)staticwebapp\.config\.json$/ ];
+const editorAsset = /(?:^|\/)_content\/Markazor\/(?:editor\/|markazor-markdown-editor(?:\.[^/]+)?\.(?:js|css)$)/;
 
 const baseUrl = new URL('/', self.origin);
 const manifestUrlList = new Set(self.assetsManifest.assets.map(asset => toAssetUrl(asset.url).href));
@@ -48,6 +49,7 @@ async function onInstall(event) {
     const assetsRequests = self.assetsManifest.assets
         .filter(asset => offlineAssetsInclude.some(pattern => pattern.test(asset.url)))
         .filter(asset => !offlineAssetsExclude.some(pattern => pattern.test(asset.url)))
+        .filter(asset => !editorAsset.test(asset.url))
         .map(asset => new Request(toAssetUrl(asset.url).href, { integrity: asset.hash, cache: 'no-cache' }));
     await caches.open(cacheName).then(cache => cache.addAll(assetsRequests));
 }
@@ -78,12 +80,16 @@ async function onFetch(event) {
             const response = await cache.match(target);
             if (response) return createNavigationResponse(response);
         }
-    } else if (manifestUrlList.has(url.href)) {
+    } else if (manifestUrlList.has(url.href) || editorAsset.test(url.pathname)) {
         const response = await cache.match(request);
         if (response) return response;
     }
     try {
-        return await fetch(request);
+        const response = await fetch(request);
+        if (response.ok && editorAsset.test(url.pathname)) {
+            await cache.put(request, response.clone());
+        }
+        return response;
     } catch {
         if (request.mode === 'navigate') {
             const missing = await cache.match('/404.html');

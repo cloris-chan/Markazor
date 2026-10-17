@@ -629,6 +629,36 @@ if (-not (Test-Path -LiteralPath $emptyPublishedEditorBundle)) {
     throw "Published web output is missing the Markazor markdown editor bundle: $emptyPublishedEditorBundle"
 }
 
+$publishedMarkazorRoot = Split-Path -Parent $emptyPublishedEditorBundle
+foreach ($relativeAsset in @('markazor-markdown-editor.css', 'editor')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $publishedMarkazorRoot $relativeAsset))) {
+        throw "Published editor dependency is missing: $relativeAsset"
+    }
+}
+
+$hasMuyaLicense = $false
+foreach ($assetFile in Get-ChildItem -LiteralPath $publishedMarkazorRoot -File -Recurse | Where-Object Extension -In '.js', '.css') {
+    $assetText = Get-Content -LiteralPath $assetFile.FullName -Raw
+    if ($assetText.Contains('Copyright (c) 2018-present Luo Ran')) {
+        $hasMuyaLicense = $true
+    }
+
+    foreach ($reference in [regex]::Matches($assetText, '/_content/Markazor/[A-Za-z0-9_./-]+')) {
+        if ($reference.Value -notmatch '\.(js|css|woff2?|ttf|svg|png)$') {
+            continue
+        }
+
+        $relativeAsset = $reference.Value.Substring('/_content/Markazor/'.Length)
+        if (-not (Test-Path -LiteralPath (Join-Path $publishedMarkazorRoot $relativeAsset) -PathType Leaf)) {
+            throw "Published editor asset $($assetFile.Name) references a missing file: $relativeAsset"
+        }
+    }
+}
+
+if (-not $hasMuyaLicense) {
+    throw 'Published editor assets must retain the Muya MIT license notice.'
+}
+
 $emptyPublishedThemeCss = Join-Path (Join-Path (Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') '_content') 'Markazor.Themes') 'theme.css'
 if (-not (Test-Path -LiteralPath $emptyPublishedThemeCss)) {
     throw "Published web output is missing the selected Markazor theme CSS: $emptyPublishedThemeCss"

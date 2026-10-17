@@ -78,8 +78,7 @@
 
 .markazor-page-header,
 .markazor-section-header,
-.markazor-actions,
-.markazor-pane-header {
+.markazor-actions {
   align-items: center;
   display: flex;
   gap: 0.75rem;
@@ -93,8 +92,7 @@
 }
 
 .markazor-page-header h1,
-.markazor-panel h2,
-.markazor-pane-header h3 {
+.markazor-panel h2 {
   margin: 0;
 }
 
@@ -567,21 +565,28 @@
   white-space: nowrap;
 }
 
-.markazor-codemirror-host {
+.markazor-muya-host {
   min-height: 32rem;
   min-width: 0;
   overflow: auto;
 }
 
-.markazor-codemirror-host .cm-editor {
-  min-height: inherit;
+.markazor-actions .markazor-browser-toggle { display: none; }
+.markazor-editor-more { position: relative; }
+.markazor-editor-more > summary { cursor: pointer; font: inherit; min-height: 2.75rem; padding: 0.75rem; }
+.markazor-editor-more-tools { background: var(--mk-surface); border: 1px solid var(--mk-line-strong); box-shadow: var(--mk-shadow); display: grid; right: 0; min-width: 11rem; padding: 0.25rem; position: absolute; top: 100%; z-index: 30; }
+.markazor-editor-more-tools button { border: 0; text-align: left; width: 100%; }
+@media (max-width: 1120px) {
+  .markazor-actions .markazor-browser-toggle { display: inline-flex; }
+  .markazor-content-browser:not(.is-open) { display: none; }
+  .markazor-editor-shell .markazor-workbench-header { align-items: center; flex-direction: row; flex-wrap: wrap; text-align: left; }
 }
 
-.markazor-markdown-editor:not(.is-codemirror-ready) .markazor-codemirror-host {
+.markazor-markdown-editor:not(.is-muya-ready) .markazor-muya-host {
   display: none;
 }
 
-.markazor-markdown-editor.is-codemirror-ready .markazor-markdown-editor-fallback {
+.markazor-markdown-editor.is-muya-ready .markazor-markdown-editor-fallback {
   display: none;
 }
 
@@ -850,52 +855,12 @@
   width: 100%;
 }
 
-.markazor-authoring-grid {
-  align-items: stretch;
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(22rem, 1.12fr) minmax(20rem, 0.88fr);
-  min-height: 34rem;
-}
-
-.markazor-authoring-pane,
-.markazor-preview {
+.markazor-authoring-pane {
   background: var(--mk-surface);
   border: 1px solid var(--mk-line);
-  display: grid;
+  display: block;
+  min-height: 34rem;
   min-width: 0;
-}
-
-.markazor-authoring-pane {
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-
-.markazor-preview {
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-.markazor-pane-header {
-  background: var(--mk-soft);
-  border-bottom: 1px solid var(--mk-line);
-  min-height: 2.4rem;
-  padding: 0 0.75rem;
-}
-
-.markazor-pane-header h3 {
-  color: var(--mk-ink);
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.markazor-preview {
-  align-self: stretch;
-}
-
-.markazor-preview-body {
-  min-height: 32rem;
-  overflow: auto;
-  padding: 1rem;
 }
 
 .markazor-conflict {
@@ -928,19 +893,13 @@
   width: 100%;
 }
 
-.markazor-authoring-pane:focus-within,
-.markazor-preview:focus-within {
+.markazor-authoring-pane:focus-within {
   border-color: var(--mk-accent);
 }
 
 @container markazor-editor-main (max-width: 48rem) {
-  .markazor-authoring-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .markazor-codemirror-host,
-  .markazor-editor-textarea,
-  .markazor-preview-body {
+  .markazor-muya-host,
+  .markazor-editor-textarea {
     min-height: 24rem;
   }
 }

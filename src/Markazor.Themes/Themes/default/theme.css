@@ -948,16 +948,6 @@ input[type=radio] {
 .markazor-metadata-toolbar .markazor-checkbox-field input {
   min-height: auto;
 }
-.markazor-authoring-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.markazor-pane-header {
-  min-height: 2.75rem;
-}
-.markazor-pane-header h3 {
-  font: 0.6rem/1.5 var(--mk-font-mono);
-  letter-spacing: 0.07em;
-}
 .markazor-markdown-toolbar button,
 .markazor-markdown-upload-button {
   min-height: 2.75rem;
@@ -971,11 +961,6 @@ input[type=radio] {
 .markazor-markdown-toolbar .markazor-markdown-menu-backdrop {
   min-height: 0;
   min-width: 0;
-}
-.markazor-preview-body {
-  background: var(--mk-surface);
-  color: var(--mk-ink);
-  padding: 1.5rem;
 }
 .markazor-conflict {
   border-color: var(--mk-danger);
@@ -1062,11 +1047,6 @@ input[type=radio] {
   cursor: pointer;
   float: right;
   padding-inline: 0.5rem;
-}
-@container markazor-editor-main (max-width: 48rem) {
-  .markazor-authoring-grid {
-    grid-template-columns: 1fr;
-  }
 }
 @container markazor-editor-main (max-width: 40rem) {
   .markazor-document-state {

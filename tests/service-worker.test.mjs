@@ -25,6 +25,10 @@ function createWorker() {
     '/404.html',
     '/site.css',
     '/_markazor/content/drafts/private.md',
+    '/_content/Markazor/markazor-markdown-editor.js',
+    '/_content/Markazor/markazor-markdown-editor.css',
+    '/_content/Markazor/markazor-markdown-editor.hash123.js',
+    '/_content/Markazor/editor/chunk-test.js',
   ];
   const events = new Map();
   const state = { network: [], installed: [], deleted: [], claimed: false, skipped: false, online: false };
@@ -57,6 +61,7 @@ function createWorker() {
             return response;
           },
           async addAll(requests) { state.installed = requests.map(request => request.url); },
+          async put(request, response) { entries.set(new URL(request.url).pathname, { body: await response.text(), redirected: false }); },
         };
       },
       async keys() { return ['offline-cache-current', 'offline-cache-old', 'unrelated-cache']; },
@@ -141,6 +146,7 @@ test('installation excludes drafts and activation only removes older owned cache
   assert.ok(state.installed.some(url => url.endsWith('/_markazor/content/posts/C%23%20hello%25.md')));
   assert.ok(state.installed.every(url => !url.includes('#')));
   assert.ok(state.installed.every(url => !url.includes('/drafts/')));
+  assert.ok(state.installed.every(url => !url.includes('/editor/') && !url.includes('markazor-markdown-editor.')));
   await context.onActivate({});
   assert.deepEqual(state.deleted, ['offline-cache-old']);
   assert.equal(state.claimed, true);
@@ -151,4 +157,14 @@ test('waiting updates activate only after the explicit message', () => {
   assert.equal(state.skipped, false);
   events.get('message')({ data: { type: 'SKIP_WAITING' } });
   assert.equal(state.skipped, true);
+});
+
+test('editor assets load on demand and are then available offline', async () => {
+  const { request, state } = createWorker();
+  state.online = true;
+  const asset = '/_content/Markazor/editor/chunk-test.js?version=current';
+  assert.equal(await (await request(asset, { mode: 'cors' })).text(), 'Network navigation');
+  state.online = false;
+  assert.equal(await (await request(asset, { mode: 'cors' })).text(), 'Network navigation');
+  assert.equal(state.network.length, 1);
 });

@@ -8,11 +8,9 @@
 @using System.Globalization
 @using System.Security.Cryptography
 @using System.Text
-@using System.Text.Encodings.Web
 @inject IMarkazorClientSession Session
 @inject IMarkazorSetupDiagnosticsService DiagnosticsService
 @inject IMarkazorContentCatalog Catalog
-@inject IMarkazorMarkdownRenderer MarkdownRenderer
 @inject IMarkazorEditorService Editor
 @inject NavigationManager Navigation
 @inject Microsoft.JSInterop.IJSRuntime JavaScript
@@ -33,6 +31,7 @@
         <div class="markazor-header-actions">
             <span class="markazor-status-pill @ContentSourceClass">@ContentSourceText</span>
             <div class="markazor-actions">
+                <button type="button" class="markazor-browser-toggle" aria-controls="markazor-content-browser" aria-expanded="@fileBrowserOpen" @onclick="ToggleFileBrowser">Articles</button>
                 <button type="button" @onclick="ReloadSetupAsync" disabled="@isBusy">Refresh</button>
                 <button type="button" @onclick="OpenSetup" disabled="@isBusy">Setup</button>
             </div>
@@ -50,7 +49,7 @@
     }
 
     <section class="markazor-editor-layout" aria-label="Editor workspace">
-        <aside class="markazor-panel markazor-sidebar markazor-content-browser">
+        <aside id="markazor-content-browser" class="markazor-panel markazor-sidebar markazor-content-browser @(fileBrowserOpen ? "is-open" : null)">
             <div class="markazor-section-header">
                 <h2>Content</h2>
             </div>
@@ -196,12 +195,9 @@
                     </section>
                 </details>
 
-                <div class="markazor-authoring-grid">
-                    <section class="markazor-authoring-pane" aria-label="Markdown editor">
-                        <div class="markazor-pane-header">
-                            <h3>Markdown</h3>
-                        </div>
+                    <section class="markazor-authoring-pane" aria-label="Article editor">
                         <MarkazorMarkdownEditor Value="@bodyMarkdown"
+                                                DocumentKey="@documentKey"
                                                 @ref="markdownEditor"
                                                 ValueChanged="OnMarkdownChanged"
                                                 Disabled="@isBusy"
@@ -209,16 +205,10 @@
                                                 ExternalImageRequested="InsertExternalImageAsync"
                                                 ImageUploadRequested="UploadImageAsync"
                                                 AcceptedImageTypes="@AcceptedImageTypes"
-                                                PendingAssetCount="@ReferencedPendingAssetCount" />
+                                                PendingAssetCount="@ReferencedPendingAssetCount"
+                                                ImageSources="@EditorImageSources"
+                                                MaxImageBytes="@MaxImageAssetBytes" />
                     </section>
-
-                    <section class="markazor-preview" aria-label="Markdown preview">
-                        <div class="markazor-pane-header">
-                            <h3>Preview</h3>
-                        </div>
-                        <article class="markazor-preview-body"><MarkdownBody Content="RenderPreview()" ShowContents="false" /></article>
-                    </section>
-                </div>
 
                 @if (conflict is not null)
                 {
@@ -258,8 +248,10 @@
     private MarkazorMarkdownEditor? markdownEditor;
     private IJSObjectReference? assetModule;
     private string documentPath = string.Empty;
+    private string documentKey = Guid.NewGuid().ToString("N");
     private string bodyMarkdown = string.Empty;
     private string baseBodyMarkdown = string.Empty;
+    private bool fileBrowserOpen;
     private EditorMetadataState metadata = EditorMetadataState.CreateDefault();
     private EditorMetadataState baseMetadata = EditorMetadataState.CreateDefault();
     private string? sha;
@@ -319,6 +311,10 @@
         || ReferencedPendingAssetCount > 0;
 
     private string CurrentMarkdown => MarkdownContent.ComposeDocument(metadata.ToDocumentMetadata(), bodyMarkdown);
+
+    private IReadOnlyDictionary<string, string> EditorImageSources => pendingAssets.Values
+        .Where(static asset => !string.IsNullOrWhiteSpace(asset.PreviewUrl))
+        .ToDictionary(static asset => asset.MarkdownPath, static asset => asset.PreviewUrl!, StringComparer.Ordinal);
 
     private string DirtyText => IsDirty ? "Unsaved" : "Saved";
 
@@ -452,6 +448,7 @@
 
     private async Task LoadArticleCoreAsync(MarkazorContentEntry entry)
     {
+        fileBrowserOpen = false;
         if (isLocalPreview && MarkazorLocalPreview.TryCreateEditorDocument(entry.RelativePath, out MarkazorEditorDocument document))
         {
             await ApplyDocumentAsync(document, isNew: false).ConfigureAwait(false);
@@ -500,11 +497,13 @@
             isNew: true).ConfigureAwait(false);
 
         SetSuccess("Draft ready.");
+        fileBrowserOpen = false;
         ResetNewDraftDefaults();
     }
 
     private async Task SaveAsync()
     {
+        await FlushEditorAsync().ConfigureAwait(false);
         isBusy = true;
         message = null;
         pendingDeleteSha = null;
@@ -527,6 +526,7 @@
 
     private async Task SaveLocalOverLatestAsync()
     {
+        await FlushEditorAsync().ConfigureAwait(false);
         if (conflict is null)
         {
             return;
@@ -603,6 +603,7 @@
 
     private async Task PublishAsync()
     {
+        await FlushEditorAsync().ConfigureAwait(false);
         isBusy = true;
         message = null;
         string draftPath = documentPath;
@@ -636,6 +637,7 @@
 
     private async Task PublishSelectedAsync()
     {
+        await FlushEditorAsync().ConfigureAwait(false);
         if (!CanPublishSelected)
         {
             return;
@@ -702,6 +704,10 @@
             await ClearAllPendingAssetsAsync().ConfigureAwait(false);
         }
 
+        if (clearPendingAssets)
+        {
+            documentKey = Guid.NewGuid().ToString("N");
+        }
         documentPath = document.Path;
         sha = document.Sha;
         isNewDocument = isNew;
@@ -795,6 +801,7 @@
 
     private async Task SaveRequestedAsync()
     {
+        await FlushEditorAsync().ConfigureAwait(false);
         if (CanSave)
         {
             await SaveAsync().ConfigureAwait(false);
@@ -814,6 +821,7 @@
             return;
         }
 
+        string targetDocument = documentKey;
         IBrowserFile file = args.File;
         string? extension = GetImageExtension(file);
         if (extension is null)
@@ -849,6 +857,11 @@
             Array.Resize(ref content, offset);
         }
 
+        if (!string.Equals(targetDocument, documentKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
         string hash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
         string fileName = hash + extension;
         string repositoryPath = CreateAssetRepositoryPath(fileName);
@@ -863,6 +876,16 @@
                 webPath,
                 contentType,
                 content).ConfigureAwait(false);
+
+        if (!string.Equals(targetDocument, documentKey, StringComparison.Ordinal))
+        {
+            if (module is not null && previewUrl is not null)
+            {
+                await module.InvokeVoidAsync("revokeObjectUrl", webPath).ConfigureAwait(false);
+            }
+
+            return;
+        }
 
         pendingAssets[markdownPath] = new PendingEditorAsset(
             repositoryPath,
@@ -884,7 +907,7 @@
     {
         if (markdownEditor is not null)
         {
-            await markdownEditor.InsertMarkdownAsync(markdown).ConfigureAwait(false);
+            await markdownEditor.InsertMarkdownAsync(markdown, EditorImageSources).ConfigureAwait(false);
 
             return;
         }
@@ -892,41 +915,12 @@
         bodyMarkdown += markdown;
     }
 
-    private string? renderedBody;
-    private string? renderedTitle;
-    private MarkdownRenderResult renderedPreview = MarkdownRenderResult.Empty;
-
-    private MarkdownRenderResult RenderPreview()
+    private async Task FlushEditorAsync()
     {
-        if (!string.Equals(renderedBody, bodyMarkdown, StringComparison.Ordinal) || !string.Equals(renderedTitle, metadata.Title, StringComparison.Ordinal))
+        if (markdownEditor is not null)
         {
-            renderedPreview = MarkdownRenderer.Render(bodyMarkdown, metadata.Title);
-            renderedBody = bodyMarkdown;
-            renderedTitle = metadata.Title;
+            await markdownEditor.FlushAsync().ConfigureAwait(false);
         }
-
-        string html = renderedPreview.Html;
-
-        foreach (PendingEditorAsset asset in GetReferencedPendingAssets())
-        {
-            if (string.IsNullOrWhiteSpace(asset.PreviewUrl))
-            {
-                continue;
-            }
-
-            string encodedMarkdownPath = HtmlEncoder.Default.Encode(asset.MarkdownPath);
-            string encodedPreviewUrl = HtmlEncoder.Default.Encode(asset.PreviewUrl);
-            html = html.Replace(
-                $"src=\"{encodedMarkdownPath}\"",
-                $"src=\"{encodedPreviewUrl}\"",
-                StringComparison.Ordinal);
-            html = html.Replace(
-                $"href=\"{encodedMarkdownPath}\"",
-                $"href=\"{encodedPreviewUrl}\"",
-                StringComparison.Ordinal);
-        }
-
-        return ReferenceEquals(html, renderedPreview.Html) ? renderedPreview : renderedPreview with { Html = html };
     }
 
     private IReadOnlyList<PendingEditorAsset> GetReferencedPendingAssets()
@@ -1040,6 +1034,8 @@
         Navigation.NavigateTo("/studio/setup");
     }
 
+    private void ToggleFileBrowser() => fileBrowserOpen = !fileBrowserOpen;
+
     private static string DescribeSetupFailure(Exception exception)
     {
         return exception is TaskCanceledException
@@ -1049,7 +1045,7 @@
 
     private async Task ConfirmNavigationAsync(LocationChangingContext context)
     {
-        if (IsDirty && !await ConfirmDiscardAsync().ConfigureAwait(false))
+        if (!await ConfirmDiscardAsync().ConfigureAwait(false))
         {
             context.PreventNavigation();
         }
@@ -1057,6 +1053,7 @@
 
     private async Task<bool> ConfirmDiscardAsync()
     {
+        await FlushEditorAsync().ConfigureAwait(false);
         return !IsDirty
             || await JavaScript.InvokeAsync<bool>(
                 "confirm",

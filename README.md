@@ -92,6 +92,8 @@ flowchart LR
 
 Studio Write uses the live GitHub repository tree as its source of truth. Public pages use the last deployed build-time index, so a successful browser commit becomes visible after Azure Static Web Apps rebuilds and deploys the site.
 
+Write provides a single styled Markdown editor powered by Muya. Edit the article directly, keep metadata in **Document details**, and insert images by URL, upload, paste, or drop. See the [User Guide](docs/user-guide.md#4-write-your-first-post) for writing.
+
 ```mermaid
 sequenceDiagram
     participant B as Browser /studio/write

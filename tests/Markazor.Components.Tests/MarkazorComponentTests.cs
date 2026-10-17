@@ -275,7 +275,7 @@ public sealed class MarkazorComponentTests
     }
 
     [Fact]
-    public void MarkdownEditorRendersToolbarAndFallbackSurface()
+    public void MarkdownEditorRendersOneArticleCanvasAndRecoverySurface()
     {
         using BunitContext context = new();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -290,12 +290,74 @@ public sealed class MarkazorComponentTests
         Assert.Contains("Code block", component.Markup, StringComparison.Ordinal);
         Assert.Contains("Table", component.Markup, StringComparison.Ordinal);
         Assert.Contains("Image", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("markazor-codemirror-host", component.Markup, StringComparison.Ordinal);
+        Assert.Contains("markazor-muya-host", component.Markup, StringComparison.Ordinal);
         Assert.Equal("# Hello", component.Find(".markazor-editor-textarea").GetAttribute("value"));
 
         component.Find(".markazor-editor-textarea").Input("Updated");
 
         Assert.Equal("Updated", editedMarkdown);
+    }
+
+    [Fact]
+    public async Task MarkdownEditorFlushesTheLatestBrowserValueBeforeSaving()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = context.JSInterop.SetupModule("./_content/Markazor/markazor-markdown-editor.js");
+        module.Setup<string>("getValue", _ => true).SetResult("Latest browser text");
+        string current = "Original text";
+        IRenderedComponent<MarkazorMarkdownEditor> component = context.Render<MarkazorMarkdownEditor>(parameters => parameters
+            .Add(static editor => editor.Value, current)
+            .Add(static editor => editor.ValueChanged, value => current = value));
+
+        await component.InvokeAsync(component.Instance.FlushAsync);
+
+        Assert.Equal("Latest browser text", current);
+    }
+
+    [Fact]
+    public async Task MarkdownEditorSendsPastedImagesThroughTheExistingUploadCallback()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        byte[]? uploaded = null;
+        string? uploadedName = null;
+        IRenderedComponent<MarkazorMarkdownEditor> component = context.Render<MarkazorMarkdownEditor>(parameters => parameters
+            .Add(static editor => editor.ImageUploadRequested, async args =>
+            {
+                uploadedName = args.File.Name;
+                uploaded = new byte[args.File.Size];
+                using Stream stream = args.File.OpenReadStream();
+                await stream.ReadExactlyAsync(uploaded).ConfigureAwait(false);
+            }));
+
+        await component.InvokeAsync(() => component.Instance.NotifyImageFile("clipboard.png", "image/png", [1, 2, 3]));
+
+        Assert.Equal("clipboard.png", uploadedName);
+        Assert.Equal([1, 2, 3], uploaded);
+    }
+
+    [Fact]
+    public async Task MarkdownEditorIgnoresCallbacksFromThePreviousDocument()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        string current = "Current article";
+        bool uploaded = false;
+        IRenderedComponent<MarkazorMarkdownEditor> component = context.Render<MarkazorMarkdownEditor>(parameters => parameters
+            .Add(static editor => editor.DocumentKey, "posts/current.md")
+            .Add(static editor => editor.Value, current)
+            .Add(static editor => editor.ValueChanged, value => current = value)
+            .Add(static editor => editor.ImageUploadRequested, _ => uploaded = true));
+
+        await component.InvokeAsync(() => component.Instance.NotifyEditorChanged("Previous article", "posts/previous.md"));
+        await component.InvokeAsync(() => component.Instance.NotifyImageFile("old.png", "image/png", [1], "posts/previous.md"));
+
+        Assert.Equal("Current article", current);
+        Assert.False(uploaded);
+
+        await component.InvokeAsync(() => component.Instance.NotifyEditorChanged("Current edit", "posts/current.md"));
+        Assert.Equal("Current edit", current);
     }
 
     [Fact]

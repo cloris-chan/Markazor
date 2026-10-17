@@ -1,543 +1,276 @@
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
 import {
-  bracketMatching,
-  defaultHighlightStyle,
-  foldGutter,
-  foldKeymap,
-  indentOnInput,
-  syntaxHighlighting
-} from "@codemirror/language";
-import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { Annotation, Compartment, EditorSelection, EditorState } from "@codemirror/state";
-import {
-  crosshairCursor,
-  drawSelection,
-  dropCursor,
-  EditorView,
-  highlightActiveLine,
-  highlightActiveLineGutter,
-  keymap,
-  lineNumbers,
-  rectangularSelection
-} from "@codemirror/view";
+  Muya, CodeBlockLanguageSelector, FootnoteTool, ImageEditTool,
+  LinkTools, TableColumnToolbar, TableDragBar, TableRowColumMenu
+} from '@muyajs/core';
+import '@muyajs/core/lib/core.css';
+import './markazor-muya.css';
+import { rewriteImageUrls, restoreDisplayUrls } from './markdown-images.js';
 
 const editors = new Map();
-const fromBlazor = Annotation.define();
+const settled = () => new Promise(resolve => requestAnimationFrame(resolve));
+for (const plugin of [CodeBlockLanguageSelector, FootnoteTool, TableColumnToolbar, TableDragBar, TableRowColumMenu]) Muya.use(plugin);
+Muya.use(LinkTools, {
+  jumpClick: info => {
+    if (/^https?:\/\//i.test(info?.href ?? '')) window.open(info.href, '_blank', 'noopener,noreferrer');
+  }
+});
+Muya.use(ImageEditTool);
 
-const markazorTheme = EditorView.theme(
-  {
-    "&": {
-      backgroundColor: "var(--mk-surface)",
-      color: "var(--mk-ink)",
-      height: "100%"
-    },
-    "&.cm-focused": {
-      outline: "none"
-    },
-    ".cm-scroller": {
-      fontFamily: 'ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace'
-    },
-    ".cm-content": {
-      caretColor: "var(--mk-accent)",
-      fontSize: "0.95rem",
-      lineHeight: "1.55",
-      minHeight: "28rem",
-      padding: "0.75rem 0"
-    },
-    ".cm-line": {
-      padding: "0 0.75rem"
-    },
-    ".cm-gutters": {
-      backgroundColor: "var(--mk-soft)",
-      borderRight: "1px solid var(--mk-line)",
-      color: "var(--mk-muted)"
-    },
-    ".cm-activeLine": {
-      backgroundColor: "var(--mk-accent-soft)"
-    },
-    ".cm-activeLineGutter": {
-      backgroundColor: "var(--mk-accent-soft)",
-      color: "var(--mk-ink)"
-    },
-    ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
-      backgroundColor: "var(--mk-selection)"
-    },
-    ".cm-cursor": {
-      borderLeftColor: "var(--mk-accent)"
-    },
-    ".cm-matchingBracket, .cm-nonmatchingBracket": {
-      backgroundColor: "var(--mk-accent-soft)",
-      outline: "1px solid var(--mk-accent)"
-    },
-    ".cm-foldGutter span": {
-      cursor: "pointer"
-    },
-    ".cm-searchMatch": {
-      backgroundColor: "var(--mk-warning-soft)",
-      outline: "1px solid var(--mk-warning)"
-    },
-    ".cm-searchMatch.cm-searchMatch-selected": {
-      backgroundColor: "var(--mk-selection)"
-    }
-  },
-  { dark: false }
-);
-
-const markazorHighlightStyle = syntaxHighlighting(defaultHighlightStyle, { fallback: true });
-
-export function initialize(id, root, host, dotNetReference, value, disabled) {
-  dispose(id);
-
-  const editableCompartment = new Compartment();
-  const readOnlyCompartment = new Compartment();
-  const initialValue = value ?? "";
-  const isDisabled = disabled === true;
-
-  const instance = {
-    dotNetReference,
-    editableCompartment,
-    readOnlyCompartment,
-    value: initialValue,
-    view: null
-  };
-
-  const extensions = [
-    lineNumbers(),
-    foldGutter(),
-    history(),
-    drawSelection(),
-    dropCursor(),
-    rectangularSelection(),
-    crosshairCursor(),
-    highlightActiveLine(),
-    highlightActiveLineGutter(),
-    highlightSelectionMatches(),
-    indentOnInput(),
-    bracketMatching(),
-    markdown(),
-    markazorTheme,
-    markazorHighlightStyle,
-    EditorView.lineWrapping,
-    editableCompartment.of(EditorView.editable.of(!isDisabled)),
-    readOnlyCompartment.of(EditorState.readOnly.of(isDisabled)),
-    EditorView.updateListener.of(update => {
-      if (!update.docChanged || update.transactions.some(transaction => transaction.annotation(fromBlazor))) {
-        return;
-      }
-
-      const nextValue = update.state.doc.toString();
-      instance.value = nextValue;
-      dotNetReference.invokeMethodAsync("NotifyEditorChanged", nextValue);
-    }),
-    keymap.of([
-      {
-        key: "Mod-s",
-        preventDefault: true,
-        run: () => {
-          dotNetReference.invokeMethodAsync("NotifySaveRequested");
-          return true;
-        }
-      },
-      {
-        key: "Mod-b",
-        preventDefault: true,
-        run: view => formatSelection(view, "bold")
-      },
-      {
-        key: "Mod-i",
-        preventDefault: true,
-        run: view => formatSelection(view, "italic")
-      },
-      indentWithTab,
-      ...defaultKeymap,
-      ...historyKeymap,
-      ...foldKeymap,
-      ...searchKeymap
-    ])
-  ];
-
-  const state = EditorState.create({
-    doc: initialValue,
-    extensions
-  });
-
-  instance.view = new EditorView({
-    state,
-    parent: host
-  });
-
-  editors.set(id, instance);
-  root.classList.add("is-codemirror-ready");
+function read(instance) {
+  const markdown = restoreDisplayUrls(instance.muya.getMarkdown(), instance.originalUrls);
+  return markdown === instance.initialNormalized ? instance.initialValue : markdown;
 }
 
-export function setValue(id, value) {
-  const instance = editors.get(id);
-  if (!instance?.view) {
-    return;
-  }
+async function notify(instance) {
+  if (instance.loading || instance.disposed) return;
+  const value = read(instance);
+  if (value === instance.value) return;
+  instance.value = value;
+  const revision = instance.inputRevision;
+  const documentKey = instance.documentKey;
+  await instance.dotNetReference.invokeMethodAsync('NotifyEditorChanged', value, documentKey);
+  if (instance.disposed || instance.documentKey !== documentKey || instance.value !== value) return;
+  instance.acknowledgedValue = value;
+  instance.acknowledgedRevision = revision;
+}
 
-  const nextValue = value ?? "";
-  const currentValue = instance.view.state.doc.toString();
-  if (currentValue === nextValue) {
-    instance.value = nextValue;
-    return;
-  }
+function updateSources(instance, sources) {
+  instance.imageSources = new Map(Object.entries(sources ?? {}));
+  // Undo history can still reference earlier display URLs.
+  for (const [path, url] of instance.imageSources) instance.originalUrls.set(url, path);
+}
 
-  instance.value = nextValue;
-  instance.view.dispatch({
-    changes: {
-      from: 0,
-      to: currentValue.length,
-      insert: nextValue
-    },
-    annotations: fromBlazor.of(true)
+function load(instance, value) {
+  instance.loading = true;
+  instance.initialValue = instance.value = value;
+  if (instance.searchResult) instance.muya.search('');
+  instance.searchText = null;
+  instance.muya.setContent(rewriteImageUrls(value, instance.imageSources), false);
+  instance.initialNormalized = restoreDisplayUrls(instance.muya.getMarkdown(), instance.originalUrls);
+  instance.loading = false;
+  setDisabled(instance.id, instance.disabled);
+}
+
+function activeBlock(instance) {
+  let block = instance.muya.editor.selection.anchorBlock;
+  if (!block) {
+    block = instance.muya.editor.scrollPage.lastContentInDescendant();
+    block?.setCursor(block.text.length, block.text.length, true);
+  }
+  return block;
+}
+
+export function initialize(id, root, host, dotNetReference, value, disabled, sources = {}, uploads = {}) {
+  dispose(id);
+  const mount = document.createElement('div');
+  mount.className = 'markazor-muya-canvas';
+  host.replaceChildren(mount);
+  const instance = {
+    id, root, host, dotNetReference, disabled: !!disabled, originalUrls: new Map(),
+    imageSources: new Map(), loading: true, disposed: false, initialValue: value ?? '',
+    value: value ?? '', acknowledgedValue: value ?? '', cleanups: [], uploads,
+    documentKey: uploads.documentKey ?? null, inputRevision: 0, acknowledgedRevision: 0
+  };
+  updateSources(instance, sources);
+  const muya = instance.muya = new Muya(mount, {
+    markdown: rewriteImageUrls(instance.value, instance.imageSources),
+    frontMatter: false, math: false, footnote: true, superSubScript: true,
+    hideQuickInsertHint: true, fontSize: 18, lineHeight: 1.75
   });
+  muya.init();
+  instance.initialNormalized = restoreDisplayUrls(muya.getMarkdown(), instance.originalUrls);
+  instance.loading = false;
+  muya.on('json-change', () => { instance.searchText = null; void notify(instance); });
+  const closeMore = event => {
+    if (event.target.closest('.markazor-editor-more-tools button')) event.target.closest('details').open = false;
+  };
+  root.addEventListener('click', closeMore);
+  instance.cleanups.push(() => root.removeEventListener('click', closeMore));
+  const beforeUnload = event => {
+    if (read(instance) !== instance.acknowledgedValue || instance.inputRevision !== instance.acknowledgedRevision) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  };
+  window.addEventListener('beforeunload', beforeUnload);
+  instance.cleanups.push(() => window.removeEventListener('beforeunload', beforeUnload));
+  const on = (name, handler, capture = false) => {
+    host.addEventListener(name, handler, capture);
+    instance.cleanups.push(() => host.removeEventListener(name, handler, capture));
+  };
+  on('input', () => {
+    instance.inputRevision++;
+    queueMicrotask(() => requestAnimationFrame(() => {
+      if (!instance.disposed && read(instance) === instance.acknowledgedValue) instance.acknowledgedRevision = instance.inputRevision;
+    }));
+  }, true);
+  on('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.isComposing) {
+      const command = { b: 'bold', i: 'italic', z: event.shiftKey ? 'redo' : 'undo', y: 'redo' }[event.key.toLowerCase()];
+      if (command) {
+        event.preventDefault(); event.stopPropagation();
+        void format(id, command);
+        return;
+      }
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault(); event.stopPropagation();
+      if (!instance.disabled && !event.isComposing) void notify(instance).then(() => dotNetReference.invokeMethodAsync('NotifySaveRequested'));
+    }
+  }, true);
+  const uploadFiles = async files => {
+    for (const file of files) {
+      if (instance.disposed || instance.disabled) break;
+      if (file.size > uploads.maxBytes) {
+        await dotNetReference.invokeMethodAsync('NotifyEditorError', 'Image uploads are limited to 8 MB.');
+        continue;
+      }
+      const documentKey = instance.documentKey;
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        if (instance.disposed || documentKey !== instance.documentKey) break;
+        await dotNetReference.invokeMethodAsync('NotifyImageFile', file.name || 'pasted-image.png', file.type, bytes, documentKey);
+      } catch {
+        if (!instance.disposed && documentKey === instance.documentKey) {
+          await dotNetReference.invokeMethodAsync('NotifyEditorError', 'Could not insert the image. Try choosing the file again.');
+        }
+      }
+    }
+  };
+  on('paste', event => {
+    if (!uploads.enabled || instance.disabled) return;
+    const files = [...(event.clipboardData?.files ?? [])].filter(file => /^image\//i.test(file.type));
+    if (!files.length) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    void uploadFiles(files);
+  }, true);
+  on('dragover', event => {
+    if (uploads.enabled && !instance.disabled && [...(event.dataTransfer?.types ?? [])].includes('Files')) event.preventDefault();
+  });
+  on('drop', event => {
+    const files = [...(event.dataTransfer?.files ?? [])].filter(file => /^image\//i.test(file.type));
+    if (!uploads.enabled || instance.disabled || !files.length) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    void uploadFiles(files);
+  }, true);
+  editors.set(id, instance);
+  root.classList.add('is-muya-ready');
+  setDisabled(id, disabled);
+}
+
+export async function setValue(id, value, sources = {}, documentKey = null) {
+  const instance = editors.get(id);
+  if (!instance) return;
+  await settled();
+  if (instance.disposed) return;
+  if (instance.documentKey !== documentKey) instance.originalUrls.clear();
+  instance.documentKey = documentKey;
+  updateSources(instance, sources);
+  load(instance, value ?? '');
+  instance.acknowledgedValue = instance.value;
+  instance.acknowledgedRevision = instance.inputRevision;
+}
+
+export async function setImageSources(id, sources = {}) {
+  const instance = editors.get(id);
+  if (!instance) return;
+  await settled();
+  if (instance.disposed) return;
+  const value = read(instance);
+  const before = rewriteImageUrls(value, instance.imageSources);
+  updateSources(instance, sources);
+  if (before !== rewriteImageUrls(value, instance.imageSources)) load(instance, value);
+}
+
+export async function getValue(id) {
+  const instance = editors.get(id);
+  if (!instance) return null;
+  // Muya applies text operations on the next animation frame. A synchronous
+  // getMarkdown() here can save only a prefix of the last typed word.
+  await settled();
+  return instance.disposed ? null : read(instance);
 }
 
 export function setDisabled(id, disabled) {
   const instance = editors.get(id);
-  if (!instance?.view) {
-    return;
-  }
-
-  const nextDisabled = disabled === true;
-  instance.view.dispatch({
-    effects: [
-      instance.editableCompartment.reconfigure(EditorView.editable.of(!nextDisabled)),
-      instance.readOnlyCompartment.reconfigure(EditorState.readOnly.of(nextDisabled))
-    ],
-    annotations: fromBlazor.of(true)
-  });
+  if (!instance) return;
+  instance.disabled = !!disabled;
+  instance.host.inert = instance.disabled;
+  instance.host.setAttribute('aria-disabled', String(instance.disabled));
 }
 
 export function focus(id) {
   const instance = editors.get(id);
-  instance?.view?.focus();
+  if (instance && !instance.disabled) instance.muya.focus();
 }
 
-export function format(id, command) {
+export async function insertText(id, markdown, sources = {}) {
   const instance = editors.get(id);
-  if (!instance?.view) {
-    return;
-  }
-
-  formatSelection(instance.view, command);
+  if (!instance || instance.disabled) return;
+  await setImageSources(id, sources);
+  activeBlock(instance);
+  const selection = instance.muya.editor.selection;
+  const current = selection.getSelection();
+  if (current) selection.setSelection(current);
+  const transfer = new DataTransfer();
+  transfer.setData('text/plain', rewriteImageUrls(markdown, instance.imageSources));
+  await instance.muya.editor.clipboard.pasteHandler(new ClipboardEvent('paste', { clipboardData: transfer }));
+  await settled();
+  await notify(instance);
 }
 
-export function insertText(id, text) {
+export async function format(id, command) {
   const instance = editors.get(id);
-  if (!instance?.view || instance.view.state.readOnly) {
-    return;
-  }
+  if (!instance || instance.disabled) return;
+  const muya = instance.muya;
+  if (command === 'undo' || command === 'redo') { await settled(); muya[command](); await notify(instance); return; }
+  const block = activeBlock(instance);
+  const inline = { bold: 'strong', italic: 'em', code: 'inline_code', link: 'link', image: 'image' }[command];
+  if (inline) { block?.format?.(inline); await settled(); await notify(instance); return; }
+  const anchor = block?.getAnchor();
+  if (!anchor) return;
+  const text = block.text.replace(/^#{1,6}\s+/, '');
+  const original = anchor.getState();
+  const states = {
+    heading2: { name: 'atx-heading', meta: { level: 2 }, text: `## ${text}` },
+    heading3: { name: 'atx-heading', meta: { level: 3 }, text: `### ${text}` },
+    'unordered-list': { name: 'bullet-list', meta: { marker: '-', loose: false }, children: original.name === 'order-list' ? original.children : [{ name: 'list-item', children: [original] }] },
+    'ordered-list': { name: 'order-list', meta: { start: 1, delimiter: '.', loose: false }, children: original.name === 'bullet-list' ? original.children : [{ name: 'list-item', children: [original] }] },
+    quote: { name: 'block-quote', children: [original] },
+    divider: { name: 'thematic-break', text: '---' },
+    'code-block': { name: 'code-block', meta: { type: 'fenced', lang: '' }, text },
+    table: { name: 'table', children: ['Heading', 'Text'].map(value => ({ name: 'table.row', children: [value, ''].map(cell => ({ name: 'table.cell', meta: { align: 'none' }, text: cell })) })) }
+  };
+  const state = states[command];
+  if (!state) return;
+  const type = muya.editor.scrollPage.constructor.loadBlock(state.name);
+  const replacement = type.create(muya, state);
+  const insert = command === 'table' || command === 'divider' || (original.children && !['quote', 'unordered-list', 'ordered-list'].includes(command));
+  if (insert) anchor.parent.insertAfter(replacement, anchor);
+  else anchor.replaceWith(replacement);
+  const content = replacement.firstContentInDescendant();
+  content?.setCursor(content.text.length, content.text.length, true);
+  await settled();
+  await notify(instance);
+}
 
-  insertInline(instance.view, text ?? "");
+export function search(id, value, direction) {
+  const instance = editors.get(id);
+  if (!instance) return;
+  if (instance.searchText !== value) {
+    instance.searchResult = instance.muya.search(value, { isCaseSensitive: false });
+    instance.searchText = value;
+  }
+  if (direction) instance.searchResult = instance.muya.find(direction);
+  return { count: instance.searchResult.matches.length, index: instance.searchResult.index };
 }
 
 export function dispose(id) {
   const instance = editors.get(id);
-  if (!instance) {
-    return;
-  }
-
-  instance.view?.destroy();
+  if (!instance) return;
+  instance.disposed = true;
+  instance.cleanups.forEach(cleanup => cleanup());
+  instance.muya.destroy();
+  instance.root.classList.remove('is-muya-ready');
   editors.delete(id);
-}
-
-function formatSelection(view, command) {
-  if (view.state.readOnly) {
-    return true;
-  }
-
-  switch (command) {
-    case "undo":
-      return undo(view);
-    case "redo":
-      return redo(view);
-    case "bold":
-      return wrapSelection(view, "**", "**", "strong text");
-    case "italic":
-      return wrapSelection(view, "*", "*", "emphasis");
-    case "code":
-      return wrapSelection(view, "`", "`", "code");
-    case "link":
-      return wrapSelection(view, "[", "](https://)", "link text");
-    case "image":
-      return wrapSelection(view, "![", "](https://)", "alt text");
-    case "heading":
-    case "heading2":
-      return setHeadingLevel(view, 2);
-    case "heading3":
-      return setHeadingLevel(view, 3);
-    case "quote":
-      return toggleLinePrefix(view, "> ");
-    case "list":
-    case "unordered-list":
-      return toggleLinePrefix(view, "- ");
-    case "ordered-list":
-      return toggleOrderedList(view);
-    case "code-block":
-      return wrapBlockSelection(view, "```\n", "\n```", "code");
-    case "table":
-      return insertBlock(view, "| Header | Header |\n| --- | --- |\n| Value | Value |");
-    case "divider":
-      return insertBlock(view, "---");
-    default:
-      return false;
-  }
-}
-
-function wrapSelection(view, before, after, placeholder) {
-  const transaction = view.state.changeByRange(range => {
-    const selectedText = view.state.sliceDoc(range.from, range.to) || placeholder;
-    const insert = before + selectedText + after;
-    const selectionFrom = range.from + before.length;
-    const selectionTo = selectionFrom + selectedText.length;
-
-    return {
-      changes: {
-        from: range.from,
-        to: range.to,
-        insert
-      },
-      range: EditorSelection.range(selectionFrom, selectionTo)
-    };
-  });
-
-  view.dispatch({
-    ...transaction,
-    scrollIntoView: true
-  });
-  view.focus();
-
-  return true;
-}
-
-function setHeadingLevel(view, level) {
-  const headingPrefix = "#".repeat(level) + " ";
-  const transaction = view.state.changeByRange(range => {
-    const lines = getSelectedLines(view.state, range);
-    const shouldRemove = lines.every(line => {
-      const text = view.state.sliceDoc(line.from, line.to);
-      return text.length === 0 || text.startsWith(headingPrefix);
-    });
-    const changes = [];
-
-    for (const line of lines) {
-      const text = view.state.sliceDoc(line.from, line.to);
-      if (shouldRemove) {
-        if (text.startsWith(headingPrefix)) {
-          changes.push({
-            from: line.from,
-            to: line.from + headingPrefix.length,
-            insert: ""
-          });
-        }
-
-        continue;
-      }
-
-      const existingHeading = /^(#{1,6}\s+)/.exec(text);
-      changes.push({
-        from: line.from,
-        to: existingHeading ? line.from + existingHeading[0].length : line.from,
-        insert: headingPrefix
-      });
-    }
-
-    return withMappedSelection(view.state, changes, range);
-  });
-
-  view.dispatch({
-    ...transaction,
-    scrollIntoView: true
-  });
-  view.focus();
-
-  return true;
-}
-
-function toggleLinePrefix(view, prefix) {
-  const transaction = view.state.changeByRange(range => {
-    const lines = getSelectedLines(view.state, range);
-    const shouldRemove = lines.every(line => {
-      const text = view.state.sliceDoc(line.from, line.to);
-      return text.length === 0 || text.startsWith(prefix);
-    });
-    const changes = [];
-
-    for (const line of lines) {
-      const text = view.state.sliceDoc(line.from, line.to);
-      if (shouldRemove) {
-        if (text.startsWith(prefix)) {
-          changes.push({
-            from: line.from,
-            to: line.from + prefix.length,
-            insert: ""
-          });
-        }
-      } else {
-        changes.push({
-          from: line.from,
-          insert: prefix
-        });
-      }
-    }
-
-    return withMappedSelection(view.state, changes, range);
-  });
-
-  view.dispatch({
-    ...transaction,
-    scrollIntoView: true
-  });
-  view.focus();
-
-  return true;
-}
-
-function toggleOrderedList(view) {
-  const transaction = view.state.changeByRange(range => {
-    const lines = getSelectedLines(view.state, range);
-    const shouldRemove = lines.every(line => {
-      const text = view.state.sliceDoc(line.from, line.to);
-      return text.length === 0 || /^\d+\.\s+/.test(text);
-    });
-    const changes = [];
-    let index = 1;
-
-    for (const line of lines) {
-      const text = view.state.sliceDoc(line.from, line.to);
-      if (shouldRemove) {
-        const existingMarker = /^(\d+\.\s+)/.exec(text);
-        if (existingMarker) {
-          changes.push({
-            from: line.from,
-            to: line.from + existingMarker[0].length,
-            insert: ""
-          });
-        }
-      } else {
-        const existingMarker = /^(\d+\.\s+)/.exec(text);
-        changes.push({
-          from: line.from,
-          to: existingMarker ? line.from + existingMarker[0].length : line.from,
-          insert: `${index}. `
-        });
-      }
-
-      index += 1;
-    }
-
-    return withMappedSelection(view.state, changes, range);
-  });
-
-  view.dispatch({
-    ...transaction,
-    scrollIntoView: true
-  });
-  view.focus();
-
-  return true;
-}
-
-function wrapBlockSelection(view, before, after, placeholder) {
-  const transaction = view.state.changeByRange(range => {
-    const selectedText = view.state.sliceDoc(range.from, range.to) || placeholder;
-    const insert = before + selectedText + after;
-    const selectionFrom = range.from + before.length;
-    const selectionTo = selectionFrom + selectedText.length;
-
-    return {
-      changes: {
-        from: range.from,
-        to: range.to,
-        insert
-      },
-      range: EditorSelection.range(selectionFrom, selectionTo)
-    };
-  });
-
-  view.dispatch({
-    ...transaction,
-    scrollIntoView: true
-  });
-  view.focus();
-
-  return true;
-}
-
-function insertBlock(view, text) {
-  const transaction = view.state.changeByRange(range => {
-    const needsLeadingBreak = range.from > 0 && view.state.sliceDoc(range.from - 1, range.from) !== "\n";
-    const needsTrailingBreak = range.to < view.state.doc.length && view.state.sliceDoc(range.to, range.to + 1) !== "\n";
-    const before = needsLeadingBreak ? "\n\n" : "";
-    const after = needsTrailingBreak ? "\n\n" : "\n";
-    const insert = before + text + after;
-    const cursor = range.from + insert.length;
-
-    return {
-      changes: {
-        from: range.from,
-        to: range.to,
-        insert
-      },
-      range: EditorSelection.cursor(cursor)
-    };
-  });
-
-  view.dispatch({
-    ...transaction,
-    scrollIntoView: true
-  });
-  view.focus();
-
-  return true;
-}
-
-function insertInline(view, text) {
-  const transaction = view.state.changeByRange(range => {
-    const insert = text ?? "";
-    const cursor = range.from + insert.length;
-
-    return {
-      changes: {
-        from: range.from,
-        to: range.to,
-        insert
-      },
-      range: EditorSelection.cursor(cursor)
-    };
-  });
-
-  view.dispatch({
-    ...transaction,
-    scrollIntoView: true
-  });
-  view.focus();
-}
-
-function getSelectedLines(state, range) {
-  const document = state.doc;
-  const startLine = document.lineAt(range.from);
-  const endPosition = range.to > range.from ? range.to - 1 : range.to;
-  const endLine = document.lineAt(endPosition);
-  const lines = [];
-
-  for (let lineNumber = startLine.number; lineNumber <= endLine.number; lineNumber += 1) {
-    lines.push(document.line(lineNumber));
-  }
-
-  return lines;
-}
-
-function withMappedSelection(state, changes, range) {
-  const changeSet = state.changes(changes);
-
-  return {
-    changes,
-    range: EditorSelection.range(
-      changeSet.mapPos(range.from, 1),
-      changeSet.mapPos(range.to, -1))
-  };
 }

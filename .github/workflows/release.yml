@@ -62,6 +62,14 @@ jobs:
       - name: Test service worker
         run: node --test tests/service-worker.test.mjs
 
+      - name: Install editor test browsers
+        working-directory: src/Markazor
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Test Markdown editor
+        working-directory: src/Markazor
+        run: npm run test:editor
+
       - name: Pack
         shell: pwsh
         run: ./build/Pack-Markazor.ps1 -Version '${{ steps.version.outputs.value }}'
@@ -69,6 +77,9 @@ jobs:
       - name: Template smoke
         shell: pwsh
         run: ./build/Test-MarkazorTemplate.ps1 -Version '${{ steps.version.outputs.value }}' -PackageSource artifacts/packages
+
+      - name: Test published Studio
+        run: node --test tests/studio-published.test.mjs
 
       - name: Materialize template repo
         shell: pwsh

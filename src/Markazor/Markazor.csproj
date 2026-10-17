@@ -6,7 +6,6 @@
     <Description>Blazor components, editor UI, and build integration for Markazor sites.</Description>
     <MarkazorEditorBundleFileName>markazor-markdown-editor.js</MarkazorEditorBundleFileName>
     <MarkazorEditorBundleRelativePath>$([System.IO.Path]::Combine('wwwroot', 'markazor-markdown-editor.js'))</MarkazorEditorBundleRelativePath>
-    <MarkazorEditorBundleSourcePath>$([System.IO.Path]::Combine('assets', 'markazor-markdown-editor.js'))</MarkazorEditorBundleSourcePath>
     <MarkazorEditorBundleContentRoot>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', '$(Configuration)', '$(TargetFramework)', 'markazor-editor'))))</MarkazorEditorBundleContentRoot>
     <MarkazorEditorBundleOutput>$([System.IO.Path]::Combine('$(MarkazorEditorBundleContentRoot)', '$(MarkazorEditorBundleFileName)'))</MarkazorEditorBundleOutput>
     <MarkazorEditorNodeModulesPackageLock>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', 'node_modules', '.package-lock.json'))</MarkazorEditorNodeModulesPackageLock>
@@ -19,8 +18,7 @@
     <_MarkazorEditorRestoreInput Include="package-lock.json" />
     <_MarkazorEditorBundleInput Include="package.json" />
     <_MarkazorEditorBundleInput Include="package-lock.json" />
-    <_MarkazorEditorBundleInput Include="$(MarkazorEditorBundleSourcePath)" />
-    <_MarkazorEditorBundleInput Include="assets/markazor-reader.js" />
+    <_MarkazorEditorBundleInput Include="assets/**/*" />
     <_MarkazorEditorBundleInput Include="wwwroot/markazor-pwa.js" />
   </ItemGroup>
 
@@ -223,12 +221,12 @@ if (!IsUpToDate())
           BeforeTargets="ResolveStaticWebAssetsInputs"
           DependsOnTargets="RestoreMarkazorEditorAssets"
           Inputs="@(_MarkazorEditorBundleInput)"
-          Outputs="$(MarkazorEditorBundleOutput);$(MarkazorEditorBundleContentRoot)markazor-reader.js"
+          Outputs="$(MarkazorEditorBundleOutput);$(MarkazorEditorBundleContentRoot)markazor-markdown-editor.css;$(MarkazorEditorBundleContentRoot)markazor-reader.js;$(MarkazorEditorBundleContentRoot)markazor-editor-assets.txt"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(TargetFramework)' != ''">
     <MakeDir Directories="$(MarkazorEditorBundleContentRoot)" />
-    <Exec Command="npx esbuild assets/markazor-markdown-editor.js assets/markazor-reader.js --bundle --format=esm --target=es2022 --outdir=&quot;$(MarkazorEditorBundleContentRoot).&quot; --minify" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="node assets/build-editor.mjs &quot;$(MarkazorEditorBundleContentRoot).&quot;" WorkingDirectory="$(MSBuildProjectDirectory)" />
     <ItemGroup>
-      <FileWrites Include="$(MarkazorEditorBundleOutput);$(MarkazorEditorBundleContentRoot)markazor-reader.js" />
+      <FileWrites Include="$(MarkazorEditorBundleContentRoot)**/*" />
     </ItemGroup>
   </Target>
 
@@ -236,13 +234,14 @@ if (!IsUpToDate())
           BeforeTargets="ResolveStaticWebAssetsInputs"
           DependsOnTargets="BuildMarkazorEditorAssets"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(TargetFramework)' != '' and Exists('$(MarkazorEditorBundleOutput)')">
+    <ReadLinesFromFile File="$(MarkazorEditorBundleContentRoot)markazor-editor-assets.txt">
+      <Output TaskParameter="Lines" ItemName="_MarkazorEditorAssetFile" />
+    </ReadLinesFromFile>
     <ItemGroup>
-      <Content Remove="$(MarkazorEditorBundleRelativePath)" />
-      <_MarkazorEditorStaticWebAssetCandidate Include="$(MarkazorEditorBundleOutput)">
-        <RelativePath>$(MarkazorEditorBundleFileName)</RelativePath>
-      </_MarkazorEditorStaticWebAssetCandidate>
-      <_MarkazorEditorStaticWebAssetCandidate Include="$(MarkazorEditorBundleContentRoot)markazor-reader.js">
-        <RelativePath>markazor-reader.js</RelativePath>
+      <Content Remove="$(MarkazorEditorBundleRelativePath);wwwroot/markazor-markdown-editor.css" />
+      <_MarkazorEditorStaticWebAssetCandidate Include="@(_MarkazorEditorAssetFile)">
+        <RelativePath>$([MSBuild]::MakeRelative('$(MarkazorEditorBundleContentRoot)', '%(_MarkazorEditorAssetFile.Identity)'))</RelativePath>
+        <Link>$([MSBuild]::MakeRelative('$(MarkazorEditorBundleContentRoot)', '%(_MarkazorEditorAssetFile.Identity)'))</Link>
       </_MarkazorEditorStaticWebAssetCandidate>
     </ItemGroup>
 

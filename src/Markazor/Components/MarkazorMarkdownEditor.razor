@@ -2,20 +2,20 @@
 @using Microsoft.AspNetCore.Components.Forms
 @implements IAsyncDisposable
 
+<HeadContent><link rel="stylesheet" href="./_content/Markazor/markazor-markdown-editor.css" /></HeadContent>
+
 <div class="markazor-markdown-editor" @ref="rootElement">
-    <div class="markazor-markdown-toolbar" role="toolbar" aria-label="Markdown tools">
+    <div class="markazor-markdown-toolbar" role="toolbar" aria-label="Markdown tools" @onmousedown:preventDefault>
         <span class="markazor-markdown-tool-group">
             <button type="button" title="Undo" aria-label="Undo" @onclick='() => FormatAsync("undo")' disabled="@ToolbarDisabled">Undo</button>
             <button type="button" title="Redo" aria-label="Redo" @onclick='() => FormatAsync("redo")' disabled="@ToolbarDisabled">Redo</button>
         </span>
         <span class="markazor-markdown-tool-group">
             <button type="button" title="Heading 2" aria-label="Heading 2" @onclick='() => FormatAsync("heading2")' disabled="@ToolbarDisabled">H2</button>
-            <button type="button" title="Heading 3" aria-label="Heading 3" @onclick='() => FormatAsync("heading3")' disabled="@ToolbarDisabled">H3</button>
         </span>
         <span class="markazor-markdown-tool-group">
             <button type="button" title="Bold" aria-label="Bold" @onclick='() => FormatAsync("bold")' disabled="@ToolbarDisabled"><strong>B</strong></button>
             <button type="button" title="Italic" aria-label="Italic" @onclick='() => FormatAsync("italic")' disabled="@ToolbarDisabled"><em>I</em></button>
-            <button type="button" title="Inline code" aria-label="Inline code" @onclick='() => FormatAsync("code")' disabled="@ToolbarDisabled">`</button>
         </span>
         <span class="markazor-markdown-tool-group">
             <button type="button" title="Link" aria-label="Link" @onclick='() => FormatAsync("link")' disabled="@ToolbarDisabled">Link</button>
@@ -60,14 +60,22 @@
             }
         </span>
         <span class="markazor-markdown-tool-group">
-            <button type="button" title="Bulleted list" aria-label="Bulleted list" @onclick='() => FormatAsync("unordered-list")' disabled="@ToolbarDisabled">-</button>
-            <button type="button" title="Numbered list" aria-label="Numbered list" @onclick='() => FormatAsync("ordered-list")' disabled="@ToolbarDisabled">1.</button>
-            <button type="button" title="Quote" aria-label="Quote" @onclick='() => FormatAsync("quote")' disabled="@ToolbarDisabled">&gt;</button>
-            <button type="button" title="Divider" aria-label="Divider" @onclick='() => FormatAsync("divider")' disabled="@ToolbarDisabled">HR</button>
+            <button type="button" title="Bulleted list" aria-label="Bulleted list" @onclick='() => FormatAsync("unordered-list")' disabled="@ToolbarDisabled">List</button>
         </span>
+        <details class="markazor-editor-more">
+            <summary>More</summary>
+            <div class="markazor-editor-more-tools">
+                <button type="button" @onclick='() => FormatAsync("heading3")' disabled="@ToolbarDisabled">Heading 3</button>
+                <button type="button" @onclick='() => FormatAsync("code")' disabled="@ToolbarDisabled">Inline code</button>
+                <button type="button" @onclick='() => FormatAsync("ordered-list")' disabled="@ToolbarDisabled">Numbered list</button>
+                <button type="button" @onclick='() => FormatAsync("quote")' disabled="@ToolbarDisabled">Quote</button>
+                <button type="button" @onclick='() => FormatAsync("divider")' disabled="@ToolbarDisabled">Divider</button>
+                <button type="button" @onclick='() => FormatAsync("table")' disabled="@ToolbarDisabled">Table</button>
+                <button type="button" @onclick='() => FormatAsync("code-block")' disabled="@ToolbarDisabled">Code block</button>
+            </div>
+        </details>
         <span class="markazor-markdown-tool-group">
-            <button type="button" title="Table" aria-label="Table" @onclick='() => FormatAsync("table")' disabled="@ToolbarDisabled">Tbl</button>
-            <button type="button" title="Code block" aria-label="Code block" @onclick='() => FormatAsync("code-block")' disabled="@ToolbarDisabled">&#96;&#96;&#96;</button>
+            <button type="button" title="Find" aria-label="Find in article" @onclick="ToggleSearch" disabled="@ToolbarDisabled">Find</button>
         </span>
         @if (editorUnavailable)
         {
@@ -78,8 +86,22 @@
             <span class="markazor-markdown-toolbar-status">@PendingAssetCount @(PendingAssetCount == 1 ? "image" : "images") to upload on save</span>
         }
     </div>
-    <div class="markazor-codemirror-host" @ref="hostElement"></div>
+    @if (searchOpen)
+    {
+        <div class="markazor-editor-search" role="search" aria-label="Find in article">
+            <input type="search" aria-label="Find text" value="@searchText" @oninput="SearchChangedAsync" />
+            <button type="button" @onclick='() => SearchAsync("previous")'>Previous</button>
+            <button type="button" @onclick='() => SearchAsync("next")'>Next</button>
+            <button type="button" @onclick="CloseSearchAsync">Close</button>
+        </div>
+    }
+    @if (editorError is not null)
+    {
+        <p class="markazor-error" role="alert">@editorError</p>
+    }
+    <div class="markazor-muya-host" role="region" aria-label="Article body" @ref="hostElement"></div>
     <textarea class="markazor-editor-textarea markazor-markdown-editor-fallback"
+              aria-label="Markdown text"
               value="@Value"
               @oninput="OnFallbackInputAsync"
               disabled="@Disabled"
@@ -97,7 +119,12 @@
     private bool editorUnavailable;
     private bool lastDisabled;
     private bool imageMenuOpen;
+    private bool searchOpen;
+    private string searchText = string.Empty;
+    private string? editorError;
+    private Dictionary<string, string> lastImageSources = [];
     private string lastValue = string.Empty;
+    private string? lastDocumentKey;
 
     private bool ToolbarDisabled => Disabled || !isEditorReady;
     private bool ImageToolbarDisabled => Disabled;
@@ -106,6 +133,9 @@
 
     [Parameter]
     public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? DocumentKey { get; set; }
 
     [Parameter]
     public EventCallback<string> ValueChanged { get; set; }
@@ -127,6 +157,12 @@
 
     [Parameter]
     public int PendingAssetCount { get; set; }
+
+    [Parameter]
+    public IReadOnlyDictionary<string, string> ImageSources { get; set; } = new Dictionary<string, string>();
+
+    [Parameter]
+    public long MaxImageBytes { get; set; } = 8L * 1024 * 1024;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -156,6 +192,7 @@
 
             dotNetReference = DotNetObjectReference.Create(this);
             lastValue = Value ?? string.Empty;
+            lastDocumentKey = DocumentKey;
             lastDisabled = Disabled;
 
             await module.InvokeVoidAsync(
@@ -165,7 +202,15 @@
                 hostElement,
                 dotNetReference,
                 lastValue,
-                lastDisabled).ConfigureAwait(false);
+                lastDisabled,
+                ImageSources,
+                new Dictionary<string, object?>
+                {
+                    ["enabled"] = ImageUploadRequested.HasDelegate,
+                    ["maxBytes"] = MaxImageBytes,
+                    ["documentKey"] = DocumentKey,
+                }).ConfigureAwait(false);
+            lastImageSources = new Dictionary<string, string>(ImageSources, StringComparer.Ordinal);
 
             initialized = true;
             isEditorReady = true;
@@ -192,10 +237,18 @@
         }
 
         string currentValue = Value ?? string.Empty;
-        if (!string.Equals(currentValue, lastValue, StringComparison.Ordinal))
+        if (!string.Equals(currentValue, lastValue, StringComparison.Ordinal) || !string.Equals(DocumentKey, lastDocumentKey, StringComparison.Ordinal))
         {
             lastValue = currentValue;
-            await module.InvokeVoidAsync("setValue", editorId, currentValue).ConfigureAwait(false);
+            lastDocumentKey = DocumentKey;
+            await module.InvokeVoidAsync("setValue", editorId, currentValue, ImageSources, DocumentKey).ConfigureAwait(false);
+            lastImageSources = new Dictionary<string, string>(ImageSources, StringComparer.Ordinal);
+        }
+
+        if (lastImageSources.Count != ImageSources.Count || ImageSources.Any(pair => !lastImageSources.TryGetValue(pair.Key, out string? value) || !string.Equals(pair.Value, value, StringComparison.Ordinal)))
+        {
+            await module.InvokeVoidAsync("setImageSources", editorId, ImageSources).ConfigureAwait(false);
+            lastImageSources = new Dictionary<string, string>(ImageSources, StringComparer.Ordinal);
         }
 
         if (Disabled != lastDisabled)
@@ -253,7 +306,7 @@
         }
     }
 
-    public async Task InsertMarkdownAsync(string markdown)
+    public async Task InsertMarkdownAsync(string markdown, IReadOnlyDictionary<string, string>? imageSources = null)
     {
         ArgumentNullException.ThrowIfNull(markdown);
 
@@ -264,7 +317,7 @@
 
         if (module is not null && isEditorReady)
         {
-            await module.InvokeVoidAsync("insertText", editorId, markdown).ConfigureAwait(false);
+            await module.InvokeVoidAsync("insertText", editorId, markdown, imageSources ?? ImageSources).ConfigureAwait(false);
 
             return;
         }
@@ -275,8 +328,13 @@
     }
 
     [JSInvokable]
-    public async Task NotifyEditorChanged(string value)
+    public async Task NotifyEditorChanged(string value, string? documentKey = null)
     {
+        if (!string.Equals(documentKey, DocumentKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+        editorError = null;
         lastValue = value;
         await ValueChanged.InvokeAsync(value).ConfigureAwait(false);
     }
@@ -287,6 +345,88 @@
         if (!Disabled)
         {
             await SaveRequested.InvokeAsync().ConfigureAwait(false);
+        }
+    }
+
+    public async Task FlushAsync()
+    {
+        if (module is null || !isEditorReady)
+        {
+            return;
+        }
+
+        string? value = await module.InvokeAsync<string?>("getValue", editorId).ConfigureAwait(false);
+        if (value is not null && !string.Equals(value, lastValue, StringComparison.Ordinal))
+        {
+            lastValue = value;
+            await ValueChanged.InvokeAsync(value).ConfigureAwait(false);
+        }
+    }
+
+    [JSInvokable]
+    public async Task NotifyImageFile(string name, string contentType, byte[] content, string? documentKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        if (Disabled || !ImageUploadRequested.HasDelegate || !string.Equals(documentKey, DocumentKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (content.LongLength > MaxImageBytes)
+        {
+            await NotifyEditorError("Image uploads are limited to 8 MB.").ConfigureAwait(false);
+            return;
+        }
+
+        await ImageUploadRequested.InvokeAsync(new InputFileChangeEventArgs([new PastedImageFile(name, contentType, content)])).ConfigureAwait(false);
+    }
+
+    [JSInvokable]
+    public Task NotifyEditorError(string message)
+    {
+        editorError = message;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleSearch() => searchOpen = !searchOpen;
+
+    private async Task SearchChangedAsync(ChangeEventArgs args)
+    {
+        searchText = args.Value?.ToString() ?? string.Empty;
+        await SearchAsync(null).ConfigureAwait(false);
+    }
+
+    private async Task SearchAsync(string? direction)
+    {
+        if (module is not null)
+        {
+            await module.InvokeVoidAsync("search", editorId, searchText, direction).ConfigureAwait(false);
+        }
+    }
+
+    private async Task CloseSearchAsync()
+    {
+        searchOpen = false;
+        searchText = string.Empty;
+        await SearchAsync(null).ConfigureAwait(false);
+    }
+
+    private sealed class PastedImageFile(string name, string contentType, byte[] content) : IBrowserFile
+    {
+        public string Name => name;
+        public string ContentType => contentType;
+        public long Size => content.LongLength;
+        public DateTimeOffset LastModified => DateTimeOffset.UtcNow;
+
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Size > maxAllowedSize)
+            {
+                throw new IOException("Image exceeds the allowed upload size.");
+            }
+
+            return new MemoryStream(content, writable: false);
         }
     }
 
