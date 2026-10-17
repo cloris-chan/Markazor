@@ -122,7 +122,9 @@ Wait for the deployment to succeed in GitHub **Actions**, then choose **Check se
 
 Studio reads GitHub directly, so saved files appear there immediately. The public site updates after deployment. Drafts stay in the repository and are excluded from the published site.
 
-Use the toolbar or Markdown shortcuts to format text: type `## ` for a section heading, `- ` for a list, or use **Ctrl/Cmd+B** and **Ctrl/Cmd+I** for bold and italic. **Find** searches within the article. Use **Image** to insert a URL or upload a local PNG, JPEG, WebP, or GIF; you can also paste or drop an image into the editor. Images upload to the repository when you save or publish. Each file can be up to 8 MB.
+Select text to show formatting tools for bold, italic, strikethrough, inline code, and links. Use **Insert** to add a heading, list, quote, table, code block, or divider after the current block. You can also type `/` in an empty paragraph, then type a block name and press **Enter**. Hover over a block (or tap it on a touch screen) to reveal its handle on the left. Choose the handle to change the block's type, duplicate it, add a paragraph, or delete it.
+
+Markdown shortcuts work as you type: `## ` starts a section heading and `- ` starts a list. **Ctrl/Cmd+B** and **Ctrl/Cmd+I** toggle bold and italic. The magnifying glass searches the article; **Enter** finds the next match and **Escape** closes search. Use **Image** to insert a URL or upload a local PNG, JPEG, WebP, or GIF; you can also paste or drop an image into the editor. Images upload to the repository when you save or publish. Each file can be up to 8 MB. On small screens, toolbar actions use icons with the same functions.
 
 The editor keeps articles as Markdown files. Opening an article alone does not change it. After editing, Markdown spacing and table formatting may be normalized while preserving the content.
 

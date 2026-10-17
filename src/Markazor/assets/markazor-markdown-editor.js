@@ -5,6 +5,7 @@ import {
 import '@muyajs/core/lib/core.css';
 import './markazor-muya.css';
 import { rewriteImageUrls, restoreDisplayUrls } from './markdown-images.js';
+import { bindEditorTools, focusEditor, openInsertMenu, showBlockHandle } from './muya-tools.js';
 
 const editors = new Map();
 const settled = () => new Promise(resolve => requestAnimationFrame(resolve));
@@ -42,6 +43,7 @@ function updateSources(instance, sources) {
 
 function load(instance, value) {
   instance.loading = true;
+  instance.muya.ui.hideAllFloatTools();
   instance.initialValue = instance.value = value;
   if (instance.searchResult) instance.muya.search('');
   instance.searchText = null;
@@ -72,20 +74,17 @@ export function initialize(id, root, host, dotNetReference, value, disabled, sou
     documentKey: uploads.documentKey ?? null, inputRevision: 0, acknowledgedRevision: 0
   };
   updateSources(instance, sources);
+  const previousChildren = new Set(document.body.children);
   const muya = instance.muya = new Muya(mount, {
     markdown: rewriteImageUrls(instance.value, instance.imageSources),
     frontMatter: false, math: false, footnote: true, superSubScript: true,
-    hideQuickInsertHint: true, fontSize: 18, lineHeight: 1.75
+    hideQuickInsertHint: false, fontSize: 18, lineHeight: 1.75
   });
   muya.init();
+  instance.tools = bindEditorTools(muya, root, previousChildren, () => instance.disabled || instance.disposed);
   instance.initialNormalized = restoreDisplayUrls(muya.getMarkdown(), instance.originalUrls);
   instance.loading = false;
   muya.on('json-change', () => { instance.searchText = null; void notify(instance); });
-  const closeMore = event => {
-    if (event.target.closest('.markazor-editor-more-tools button')) event.target.closest('details').open = false;
-  };
-  root.addEventListener('click', closeMore);
-  instance.cleanups.push(() => root.removeEventListener('click', closeMore));
   const beforeUnload = event => {
     if (read(instance) !== instance.acknowledgedValue || instance.inputRevision !== instance.acknowledgedRevision) {
       event.preventDefault();
@@ -98,6 +97,49 @@ export function initialize(id, root, host, dotNetReference, value, disabled, sou
     host.addEventListener(name, handler, capture);
     instance.cleanups.push(() => host.removeEventListener(name, handler, capture));
   };
+  on('pointerup', async event => {
+    if (event.pointerType !== 'touch' || instance.disabled) return;
+    const documentKey = instance.documentKey;
+    // Muya updates the clicked selection on the frame after pointerup.
+    await settled();
+    await settled();
+    if (!instance.disposed && !instance.disabled && instance.documentKey === documentKey) showBlockHandle(muya, activeBlock(instance));
+  });
+  const toolbarKeys = event => {
+    if (!event.target.closest('.markazor-markdown-toolbar')) return;
+    const menu = event.target.closest('[role=menu]');
+    if (menu) {
+      const item = event.target.closest('[role=menuitem]');
+      if (item?.tagName === 'LABEL' && ['Enter', ' '].includes(event.key)) {
+        event.preventDefault();
+        item.querySelector('input')?.click();
+      } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault();
+        const items = [...menu.querySelectorAll('[role=menuitem]')];
+        const index = items.indexOf(item);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+          : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+        items[next]?.focus();
+      }
+      return;
+    }
+    const imageMenu = event.target.closest('.markazor-markdown-image-menu')?.querySelector('[role=menu]');
+    if (imageMenu && event.key === 'ArrowDown') {
+      event.preventDefault();
+      imageMenu.querySelector('[role=menuitem]')?.focus();
+      return;
+    }
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = [...root.querySelectorAll('.markazor-markdown-toolbar button:not(:disabled):not(.markazor-markdown-menu-backdrop)')];
+    const index = buttons.indexOf(event.target);
+    if (index < 0) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+      : (index + (event.key === 'ArrowLeft' ? -1 : 1) + buttons.length) % buttons.length;
+    buttons[next]?.focus();
+  };
+  root.addEventListener('keydown', toolbarKeys);
+  instance.cleanups.push(() => root.removeEventListener('keydown', toolbarKeys));
   on('input', () => {
     instance.inputRevision++;
     queueMicrotask(() => requestAnimationFrame(() => {
@@ -197,11 +239,30 @@ export function setDisabled(id, disabled) {
   instance.disabled = !!disabled;
   instance.host.inert = instance.disabled;
   instance.host.setAttribute('aria-disabled', String(instance.disabled));
+  if (instance.disabled) {
+    instance.tools.disable();
+    if (instance.searchText) search(id, '');
+  }
+}
+
+export async function showInsertMenu(id, reference) {
+  const instance = editors.get(id);
+  if (!instance || instance.disabled) return;
+  // Let the opening click finish before Muya's document click listener runs.
+  const documentKey = instance.documentKey;
+  await settled();
+  if (!instance.disposed && !instance.disabled && instance.documentKey === documentKey && reference.isConnected) {
+    openInsertMenu(instance.muya, reference, activeBlock(instance));
+  }
+}
+
+export function hideTools(id) {
+  editors.get(id)?.muya.ui.hideAllFloatTools();
 }
 
 export function focus(id) {
   const instance = editors.get(id);
-  if (instance && !instance.disabled) instance.muya.focus();
+  if (instance && !instance.disabled) focusEditor(instance.muya);
 }
 
 export async function insertText(id, markdown, sources = {}) {
@@ -223,35 +284,10 @@ export async function format(id, command) {
   const instance = editors.get(id);
   if (!instance || instance.disabled) return;
   const muya = instance.muya;
-  if (command === 'undo' || command === 'redo') { await settled(); muya[command](); await notify(instance); return; }
+  if (command === 'undo' || command === 'redo') { await settled(); muya.ui.hideAllFloatTools(); muya[command](); await notify(instance); return; }
   const block = activeBlock(instance);
   const inline = { bold: 'strong', italic: 'em', code: 'inline_code', link: 'link', image: 'image' }[command];
   if (inline) { block?.format?.(inline); await settled(); await notify(instance); return; }
-  const anchor = block?.getAnchor();
-  if (!anchor) return;
-  const text = block.text.replace(/^#{1,6}\s+/, '');
-  const original = anchor.getState();
-  const states = {
-    heading2: { name: 'atx-heading', meta: { level: 2 }, text: `## ${text}` },
-    heading3: { name: 'atx-heading', meta: { level: 3 }, text: `### ${text}` },
-    'unordered-list': { name: 'bullet-list', meta: { marker: '-', loose: false }, children: original.name === 'order-list' ? original.children : [{ name: 'list-item', children: [original] }] },
-    'ordered-list': { name: 'order-list', meta: { start: 1, delimiter: '.', loose: false }, children: original.name === 'bullet-list' ? original.children : [{ name: 'list-item', children: [original] }] },
-    quote: { name: 'block-quote', children: [original] },
-    divider: { name: 'thematic-break', text: '---' },
-    'code-block': { name: 'code-block', meta: { type: 'fenced', lang: '' }, text },
-    table: { name: 'table', children: ['Heading', 'Text'].map(value => ({ name: 'table.row', children: [value, ''].map(cell => ({ name: 'table.cell', meta: { align: 'none' }, text: cell })) })) }
-  };
-  const state = states[command];
-  if (!state) return;
-  const type = muya.editor.scrollPage.constructor.loadBlock(state.name);
-  const replacement = type.create(muya, state);
-  const insert = command === 'table' || command === 'divider' || (original.children && !['quote', 'unordered-list', 'ordered-list'].includes(command));
-  if (insert) anchor.parent.insertAfter(replacement, anchor);
-  else anchor.replaceWith(replacement);
-  const content = replacement.firstContentInDescendant();
-  content?.setCursor(content.text.length, content.text.length, true);
-  await settled();
-  await notify(instance);
 }
 
 export function search(id, value, direction) {
@@ -270,6 +306,8 @@ export function dispose(id) {
   if (!instance) return;
   instance.disposed = true;
   instance.cleanups.forEach(cleanup => cleanup());
+  instance.tools.disable();
+  instance.tools.dispose();
   instance.muya.destroy();
   instance.root.classList.remove('is-muya-ready');
   editors.delete(id);

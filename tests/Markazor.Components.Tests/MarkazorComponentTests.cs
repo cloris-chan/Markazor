@@ -285,17 +285,39 @@ public sealed class MarkazorComponentTests
             .Add(static editor => editor.Value, "# Hello")
             .Add(static editor => editor.ValueChanged, value => editedMarkdown = value));
 
-        Assert.Contains("Markdown tools", component.Markup, StringComparison.Ordinal);
+        Assert.Contains("Article tools", component.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Heading 1", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("Code block", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("Table", component.Markup, StringComparison.Ordinal);
-        Assert.Contains("Image", component.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("More", component.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Bold", component.Markup, StringComparison.Ordinal);
+        Assert.Contains("Insert block", component.Markup, StringComparison.Ordinal);
+        Assert.Equal(5, component.FindAll(".markazor-markdown-toolbar button").Count);
         Assert.Contains("markazor-muya-host", component.Markup, StringComparison.Ordinal);
         Assert.Equal("# Hello", component.Find(".markazor-editor-textarea").GetAttribute("value"));
 
         component.Find(".markazor-editor-textarea").Input("Updated");
 
         Assert.Equal("Updated", editedMarkdown);
+    }
+
+    [Fact]
+    public void MarkdownToolbarUsesNativeInsertAndClearsSearchWhenClosed()
+    {
+        using BunitContext context = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = context.JSInterop.SetupModule("./_content/Markazor/markazor-markdown-editor.js");
+        IRenderedComponent<MarkazorMarkdownEditor> component = context.Render<MarkazorMarkdownEditor>();
+
+        component.Find("button[aria-label='Insert block']").Click();
+        Assert.Single(module.Invocations["showInsertMenu"]);
+
+        component.Find("button[aria-label='Find in article']").Click();
+        Assert.True(component.Find("button[aria-label='Previous match']").HasAttribute("disabled"));
+        Assert.True(component.Find("button[aria-label='Next match']").HasAttribute("disabled"));
+        component.Find("input[aria-label='Find text']").Input("Word");
+        Assert.False(component.Find("button[aria-label='Next match']").HasAttribute("disabled"));
+        component.Find("input[aria-label='Find text']").KeyDown("Escape");
+        Assert.Empty(component.FindAll(".markazor-editor-search"));
+        Assert.Equal(string.Empty, module.Invocations["search"][^1].Arguments[1]);
     }
 
     [Fact]

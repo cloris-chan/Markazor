@@ -35,6 +35,43 @@ const markazorMarkdown = {
         } catch {}
         return { isUnknownType: false, src: '' };
       }`);
+      const inlineRegion = /\/\/#region src\/ui\/inlineFormatToolbar\/config\.ts\n[\s\S]*?(?=\/\/#region src\/ui\/linkTools\/config\.ts)/;
+      const inlineSource = contents.match(inlineRegion)?.[0];
+      const icons = inlineSource?.match(/"_icons", (\w+)\)/)?.[1];
+      const shortcut = 'i && (e.preventDefault(), r.format(i));';
+      if (!icons || inlineSource.split(shortcut).length !== 2) throw new Error('Review Muya inline tools before updating the editor dependency.');
+      contents = contents.replace(inlineRegion, inlineSource.replace(shortcut, 'i && this._icons.some(item => item.type === i) && (e.preventDefault(), r.format(i));') + `
+        ${icons} = ${icons}.filter(item => ['strong', 'em', 'del', 'inline_code', 'link', 'clear'].includes(item.type))
+          .map(item => ({ ...item, tooltip: ({ strong: 'Bold', clear: 'Clear formatting' })[item.type] || item.tooltip }));
+      `);
+      const blocks = contents.match(/(\w+) = \[\n\s*\{\n\s*name: "basic blocks"/)?.[1];
+      const menuBoundary = '//#region src/ui/paragraphFrontMenu/config.ts';
+      if (!blocks || contents.split(menuBoundary).length !== 2) throw new Error('Review Muya block menus before updating the editor dependency.');
+      contents = contents.replace(menuBoundary, `
+        const markazorBlocks = ${blocks}.flatMap(group => group.children)
+          .filter(item => /^(paragraph|thematic-break|atx-heading [2-6]|table|code-block|block-quote|order-list|bullet-list|task-list)$/.test(item.label))
+          .map(item => ({ ...item, title: ({ paragraph: 'Text', 'thematic-break': 'Divider', table: 'Table', 'code-block': 'Code block', 'block-quote': 'Quote', 'order-list': 'Numbered list', 'bullet-list': 'Bulleted list', 'task-list': 'Task list' })[item.label] || item.title.replace('Header', 'Heading') }));
+        ${blocks} = [
+          { name: 'Text', labels: ['paragraph', ...[2, 3, 4, 5, 6].map(level => 'atx-heading ' + level)] },
+          { name: 'Lists', labels: ['bullet-list', 'order-list', 'task-list'] },
+          { name: 'Blocks', labels: ['block-quote', 'table', 'code-block', 'thematic-break'] }
+        ].map(group => ({ name: group.name, children: group.labels.map(label => markazorBlocks.find(item => item.label === label)) }));
+        ${menuBoundary}`);
+      const floatRegion = /\/\/#region src\/ui\/baseFloat\/index\.ts\n[\s\S]*?\/\/#endregion/;
+      const floatSource = contents.match(floatRegion)?.[0];
+      const position = 'left: `${e}px`';
+      const verticalPosition = 'top: `${t}px`';
+      if (floatSource?.split(position).length !== 2 || floatSource?.split(verticalPosition).length !== 2) throw new Error('Review Muya floating menu positioning before updating the editor dependency.');
+      contents = contents.replace(floatRegion, floatSource
+        .replace(position, 'left: `${Math.max(window.scrollX + 8, Math.min(e, window.scrollX + window.innerWidth - n.offsetWidth - 8))}px`')
+        .replace(verticalPosition, 'top: `${Math.max(window.scrollY + 8, Math.min(t, window.scrollY + window.innerHeight - n.offsetHeight - 8))}px`'));
+      const destroy = 'this.eventCenter.detachAllDomEvents(), this.eventCenter.unsubscribeAll(), this.domNode.remove && this.domNode.remove(), this.ui && this.ui.hideAllFloatTools();';
+      if (contents.split(destroy).length !== 2) throw new Error('Review Muya plugin cleanup before updating the editor dependency.');
+      contents = contents.replace(destroy, `
+        this.ui?.hideAllFloatTools();
+        for (const plugin of Object.values(this._uiPlugins)) plugin.destroy?.();
+        this._uiPlugins = {};
+        ${destroy}`);
       const license = await readFile(resolve(project, 'assets/muya-license.txt'), 'utf8');
       return { contents: `/*! @license Muya (MIT)\n${license}\n*/\n${contents}`, loader: 'js' };
     });

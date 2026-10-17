@@ -38,7 +38,7 @@ before(async () => {
     try {
       if (path === '/') {
         response.setHeader('Content-Type', 'text/html');
-        response.end('<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="/_content/Markazor/markazor-markdown-editor.css"></head><body><div id="root"><div id="host"></div></div><script type="module">import * as adapter from "/_content/Markazor/markazor-markdown-editor.js"; window.adapter = adapter;</script></body></html>');
+        response.end('<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="/_content/Markazor/markazor-markdown-editor.css"></head><body><div id="root"><button data-insert-block onmousedown="event.preventDefault()" onclick="window.adapter.showInsertMenu(\'editor\', this)">Insert block</button><div id="host"></div></div><script type="module">import * as adapter from "/_content/Markazor/markazor-markdown-editor.js"; window.adapter = adapter;</script></body></html>');
         return;
       }
       if (path.startsWith('/assets/')) { response.setHeader('Content-Type', 'image/png'); response.end(pixel); return; }
@@ -76,6 +76,7 @@ for (const engine of browsers) {
     const browser = await engines[engine].launch();
     t.after(() => browser.close());
     const page = await browser.newPage({ viewport: { width: 900, height: 800 } });
+    page.setDefaultTimeout(8000);
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(origin);
@@ -141,13 +142,90 @@ for (const engine of browsers) {
     assert.ok(table.includes('One edited'), table);
     assert.ok(table.includes('Next'), table);
 
-    for (const command of ['heading2', 'heading3', 'unordered-list', 'ordered-list', 'quote', 'code-block', 'table', 'divider']) {
-      await load('Convert me');
+    const insertMenu = page.locator('.markazor-muya-popover:not([inert]) .mu-quick-insert');
+    const formatToolbar = page.locator('.markazor-muya-popover:not([inert]) .mu-format-picker');
+    await load('Select these words');
+    await page.locator('.mu-paragraph-content').click();
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Shift+End');
+    await formatToolbar.getByRole('button', { name: 'Bold', exact: true }).click();
+    assert.ok((await value()).includes('**Select these words**'));
+    assert.equal(await formatToolbar.getByRole('button', { name: 'Bold', exact: true }).getAttribute('aria-pressed'), 'true');
+    assert.equal(await formatToolbar.getByRole('button').count(), 6, 'Only supported inline tools belong in the selection toolbar');
+    await page.keyboard.press('Escape');
+
+    await load('Keep this paragraph');
+    await page.locator('.mu-paragraph-content').click();
+    await page.keyboard.press('Home');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.getByRole('button', { name: 'Insert block', exact: true }).click();
+    assert.equal(await value(), 'Keep this paragraph', 'Opening Insert must not dirty the document');
+    await page.keyboard.press('Escape');
+    assert.equal(await value(), 'Keep this paragraph', 'Cancelling Insert must not add an empty block');
+    assert.equal(await page.evaluate(() => getSelection().anchorOffset), 2, 'Closing Insert must restore the original caret');
+    assert.equal(await page.locator('[data-insert-block]').getAttribute('aria-expanded'), 'false');
+
+    await page.getByRole('button', { name: 'Insert block', exact: true }).click();
+    await insertMenu.getByRole('menuitem', { name: 'Text', exact: true }).waitFor();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('h2').count(), 1, 'Insert must be operable with the keyboard');
+    assert.ok((await value()).includes('Keep this paragraph'));
+
+    for (const [name, selector] of [['Heading 2', 'h2'], ['Heading 3', 'h3'], ['Bulleted list', 'ul'], ['Numbered list', 'ol'], ['Task list', '.mu-task-list'], ['Quote', 'blockquote'], ['Code block', '.mu-code-block'], ['Table', 'table'], ['Divider', '.mu-thematic-break']]) {
+      await load('Keep existing text');
       await page.locator('.mu-paragraph-content').click();
-      await page.evaluate(command => window.adapter.format('editor', command), command);
-      assert.ok((await value()).trim().length > 0, `Empty Markdown after ${command}`);
-      assert.ok((await value()).includes('Convert me'), `Formatting ${command} lost existing text`);
+      await page.getByRole('button', { name: 'Insert block', exact: true }).click();
+      assert.equal(await insertMenu.getByText(/Front Matter|Display Math|Mermaid|Vega Chart|Plantuml|Header 1/).count(), 0);
+      await insertMenu.getByRole('menuitem', { name, exact: true }).click();
+      assert.ok((await value()).includes('Keep existing text'), `Inserting ${name} lost existing text`);
+      assert.equal(await page.locator('#host').locator(selector).count(), 1, `Insert ${name} must create its block`);
     }
+
+    await load('');
+    await page.locator('.mu-paragraph-content').click();
+    await page.keyboard.type('/task');
+    await insertMenu.getByRole('menuitem', { name: 'Task list', exact: true }).waitFor();
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('From slash menu');
+    assert.match(await value(), /[-*] \[ \] From slash menu/);
+
+    await load('');
+    await page.locator('.mu-paragraph-content').click();
+    await page.keyboard.type('/zzzzzzzz');
+    await insertMenu.getByText('No result', { exact: true }).waitFor();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    assert.ok((await value()).includes('/zzzzzzzz'), 'An unmatched slash command must not insert an earlier result');
+    await page.keyboard.press('Escape');
+
+    await load('Block to convert');
+    await page.locator('.mu-paragraph-content').hover();
+    await page.locator('.markazor-muya-popover:not([inert]) .mu-front-button').click();
+    const blockMenu = page.locator('.markazor-muya-popover:not([inert]) .mu-front-menu');
+    await blockMenu.getByRole('menuitem', { name: 'Heading 2', exact: true }).click();
+    assert.equal((await value()).trim(), '## Block to convert');
+    await page.locator('h2').hover();
+    await page.locator('.markazor-muya-popover:not([inert]) .mu-front-button').click();
+    await blockMenu.getByRole('menuitem', { name: 'Duplicate', exact: true }).hover();
+    await page.waitForFunction(() => document.querySelector('.mu-front-button-wrapper').inert);
+    await blockMenu.getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
+    assert.equal((await value()).match(/## Block to convert/g)?.length, 2);
+    await page.locator('h2').last().hover();
+    await page.locator('.markazor-muya-popover:not([inert]) .mu-front-button').click();
+    await blockMenu.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+    assert.equal((await value()).match(/## Block to convert/g)?.length, 1);
+
+    await page.setViewportSize({ width: 320, height: 700 });
+    await load('Narrow screen');
+    await page.locator('.mu-paragraph-content').click();
+    await page.getByRole('button', { name: 'Insert block', exact: true }).click();
+    const menuBounds = await insertMenu.boundingBox();
+    assert.ok(menuBounds.x >= 0 && menuBounds.x + menuBounds.width <= 320, JSON.stringify(menuBounds));
+    await page.evaluate(() => window.adapter.setDisabled('editor', true));
+    assert.equal(await page.locator('.markazor-muya-popover:not([inert])').count(), 0, 'Disabling must also disable tools mounted outside the editor');
+    await page.setViewportSize({ width: 900, height: 800 });
 
     const blob = await page.evaluate(async () => {
       const canvas = document.createElement('canvas');
@@ -186,10 +264,11 @@ for (const engine of browsers) {
     assert.ok(await page.evaluate(() => window.calls.some(call => call.method === 'NotifyImageFile')), JSON.stringify(await page.evaluate(() => window.calls)));
     assert.equal(await page.evaluate(() => window.calls.find(call => call.method === 'NotifyImageFile').args[0]), 'pasted.png');
     await page.evaluate(() => window.adapter.setDisabled('editor', true));
-    await page.evaluate(() => window.adapter.format('editor', 'heading2'));
+    await page.evaluate(() => window.adapter.showInsertMenu('editor', document.querySelector('[data-insert-block]')));
     assert.equal(await value(), 'Drop here.');
     await page.evaluate(() => window.adapter.dispose('editor'));
     assert.equal(await page.locator('.mu-container').count(), 0);
+    assert.equal(await page.locator('.markazor-muya-popover').count(), 0);
     for (const language of ['mermaid', 'vega-lite', 'plantuml', 'math']) {
       const markdown = '```' + language + '\nExample code\n```';
       await load(markdown);

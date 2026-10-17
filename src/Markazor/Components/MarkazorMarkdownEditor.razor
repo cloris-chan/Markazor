@@ -5,94 +5,71 @@
 <HeadContent><link rel="stylesheet" href="./_content/Markazor/markazor-markdown-editor.css" /></HeadContent>
 
 <div class="markazor-markdown-editor" @ref="rootElement">
-    <div class="markazor-markdown-toolbar" role="toolbar" aria-label="Markdown tools" @onmousedown:preventDefault>
-        <span class="markazor-markdown-tool-group">
-            <button type="button" title="Undo" aria-label="Undo" @onclick='() => FormatAsync("undo")' disabled="@ToolbarDisabled">Undo</button>
-            <button type="button" title="Redo" aria-label="Redo" @onclick='() => FormatAsync("redo")' disabled="@ToolbarDisabled">Redo</button>
+    <div class="markazor-markdown-toolbar" role="toolbar" aria-label="Article tools" @onmousedown:preventDefault>
+        <span class="markazor-editor-history">
+            <button type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" @onclick='() => FormatAsync("undo")' disabled="@ToolbarDisabled"><MarkazorIcon Kind="MarkazorIconKind.Undo" /></button>
+            <button type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" @onclick='() => FormatAsync("redo")' disabled="@ToolbarDisabled"><MarkazorIcon Kind="MarkazorIconKind.Redo" /></button>
         </span>
-        <span class="markazor-markdown-tool-group">
-            <button type="button" title="Heading 2" aria-label="Heading 2" @onclick='() => FormatAsync("heading2")' disabled="@ToolbarDisabled">H2</button>
-        </span>
-        <span class="markazor-markdown-tool-group">
-            <button type="button" title="Bold" aria-label="Bold" @onclick='() => FormatAsync("bold")' disabled="@ToolbarDisabled"><strong>B</strong></button>
-            <button type="button" title="Italic" aria-label="Italic" @onclick='() => FormatAsync("italic")' disabled="@ToolbarDisabled"><em>I</em></button>
-        </span>
-        <span class="markazor-markdown-tool-group">
-            <button type="button" title="Link" aria-label="Link" @onclick='() => FormatAsync("link")' disabled="@ToolbarDisabled">Link</button>
-            @if (UsesImageAssetToolbar)
-            {
-                <span class="markazor-markdown-image-menu">
+        <button type="button" class="markazor-editor-insert" title="Insert block" aria-label="Insert block" aria-haspopup="true" aria-expanded="false" data-insert-block @ref="insertButton" @onclick="ShowInsertMenuAsync" disabled="@ToolbarDisabled">
+            <MarkazorIcon Kind="MarkazorIconKind.Plus" /><span class="markazor-editor-tool-label">Insert</span><MarkazorIcon Kind="MarkazorIconKind.ChevronDown" Class="markazor-editor-chevron" />
+        </button>
+        @if (UsesImageAssetToolbar)
+        {
+            <span class="markazor-markdown-image-menu" @onkeydown="ImageMenuKeyDown">
+                <button type="button"
+                        title="Insert image"
+                        aria-label="Insert image"
+                        aria-haspopup="menu"
+                        aria-expanded="@imageMenuOpen"
+                        @onclick="ToggleImageMenuAsync"
+                        disabled="@ImageToolbarDisabled"><MarkazorIcon Kind="MarkazorIconKind.Image" /><span class="markazor-editor-tool-label">Image</span></button>
+                @if (imageMenuOpen)
+                {
                     <button type="button"
-                            class="markazor-markdown-menu-trigger"
-                            title="Insert image"
-                            aria-label="Insert image"
-                            aria-haspopup="menu"
-                            aria-expanded="@imageMenuOpen"
-                            @onclick="ToggleImageMenu"
-                            disabled="@ImageToolbarDisabled">Image</button>
-                    @if (imageMenuOpen)
-                    {
-                        <button type="button"
-                                class="markazor-markdown-menu-backdrop"
-                                aria-label="Close image menu"
-                                @onclick="CloseImageMenu"></button>
-                        <span class="markazor-markdown-image-menu-panel" role="menu" aria-label="Image source">
-                            @if (ExternalImageRequested.HasDelegate)
-                            {
-                                <button type="button" role="menuitem" @onclick="RequestExternalImageAsync">From URL</button>
-                            }
-                            @if (ImageUploadRequested.HasDelegate)
-                            {
-                                <label class="@UploadButtonClass" role="menuitem" title="Upload local image" aria-label="Upload local image">
-                                    <span>Upload local image</span>
-                                    <InputFile OnChange="RequestImageUploadAsync"
-                                               accept="@AcceptedImageTypes"
-                                               disabled="@ImageToolbarDisabled" />
-                                </label>
-                            }
-                        </span>
-                    }
-                </span>
-            }
-            else
-            {
-                <button type="button" title="Image" aria-label="Image" @onclick='() => FormatAsync("image")' disabled="@ToolbarDisabled">Img</button>
-            }
-        </span>
-        <span class="markazor-markdown-tool-group">
-            <button type="button" title="Bulleted list" aria-label="Bulleted list" @onclick='() => FormatAsync("unordered-list")' disabled="@ToolbarDisabled">List</button>
-        </span>
-        <details class="markazor-editor-more">
-            <summary>More</summary>
-            <div class="markazor-editor-more-tools">
-                <button type="button" @onclick='() => FormatAsync("heading3")' disabled="@ToolbarDisabled">Heading 3</button>
-                <button type="button" @onclick='() => FormatAsync("code")' disabled="@ToolbarDisabled">Inline code</button>
-                <button type="button" @onclick='() => FormatAsync("ordered-list")' disabled="@ToolbarDisabled">Numbered list</button>
-                <button type="button" @onclick='() => FormatAsync("quote")' disabled="@ToolbarDisabled">Quote</button>
-                <button type="button" @onclick='() => FormatAsync("divider")' disabled="@ToolbarDisabled">Divider</button>
-                <button type="button" @onclick='() => FormatAsync("table")' disabled="@ToolbarDisabled">Table</button>
-                <button type="button" @onclick='() => FormatAsync("code-block")' disabled="@ToolbarDisabled">Code block</button>
-            </div>
-        </details>
-        <span class="markazor-markdown-tool-group">
-            <button type="button" title="Find" aria-label="Find in article" @onclick="ToggleSearch" disabled="@ToolbarDisabled">Find</button>
-        </span>
-        @if (editorUnavailable)
-        {
-            <span class="markazor-markdown-toolbar-status">Formatting tools unavailable. You can still type.</span>
+                            class="markazor-markdown-menu-backdrop"
+                            aria-label="Close image menu"
+                            @onclick="CloseImageMenu"></button>
+                    <span class="markazor-markdown-image-menu-panel" role="menu" aria-label="Image source">
+                        @if (ExternalImageRequested.HasDelegate)
+                        {
+                            <button type="button" role="menuitem" @onclick="RequestExternalImageAsync">From URL</button>
+                        }
+                        @if (ImageUploadRequested.HasDelegate)
+                        {
+                            <label class="@UploadButtonClass" role="menuitem" tabindex="0" title="Upload local image" aria-label="Upload local image">
+                                <span>Upload local image</span>
+                                <InputFile OnChange="RequestImageUploadAsync"
+                                           accept="@AcceptedImageTypes"
+                                           disabled="@ImageToolbarDisabled" />
+                            </label>
+                        }
+                    </span>
+                }
+            </span>
         }
-        @if (PendingAssetCount > 0)
+        else
         {
-            <span class="markazor-markdown-toolbar-status">@PendingAssetCount @(PendingAssetCount == 1 ? "image" : "images") to upload on save</span>
+            <button type="button" title="Insert image" aria-label="Insert image" @onclick='() => FormatAsync("image")' disabled="@ToolbarDisabled"><MarkazorIcon Kind="MarkazorIconKind.Image" /></button>
         }
+        <button type="button" class="markazor-editor-find" title="Find in article" aria-label="Find in article" aria-expanded="@searchOpen" @onclick="ToggleSearchAsync" disabled="@ToolbarDisabled"><MarkazorIcon Kind="MarkazorIconKind.Search" /></button>
     </div>
+    @if (editorUnavailable)
+    {
+        <p class="markazor-markdown-toolbar-status" role="status">Formatting tools unavailable. You can still type.</p>
+    }
+    @if (PendingAssetCount > 0)
+    {
+        <p class="markazor-markdown-toolbar-status" role="status">@PendingAssetCount @(PendingAssetCount == 1 ? "image" : "images") to upload on save</p>
+    }
     @if (searchOpen)
     {
         <div class="markazor-editor-search" role="search" aria-label="Find in article">
-            <input type="search" aria-label="Find text" value="@searchText" @oninput="SearchChangedAsync" />
-            <button type="button" @onclick='() => SearchAsync("previous")'>Previous</button>
-            <button type="button" @onclick='() => SearchAsync("next")'>Next</button>
-            <button type="button" @onclick="CloseSearchAsync">Close</button>
+            <input type="search" aria-label="Find text" placeholder="Find in article" value="@searchText" @oninput="SearchChangedAsync" @onkeydown="SearchKeyDownAsync" @ref="searchInput" />
+            <span class="markazor-editor-search-actions" role="group" aria-label="Search navigation">
+                <button type="button" title="Previous match (Shift+Enter)" aria-label="Previous match" @onclick='() => SearchAsync("previous")' disabled="@string.IsNullOrEmpty(searchText)"><MarkazorIcon Kind="MarkazorIconKind.ArrowUp" /></button>
+                <button type="button" title="Next match (Enter)" aria-label="Next match" @onclick='() => SearchAsync("next")' disabled="@string.IsNullOrEmpty(searchText)"><MarkazorIcon Kind="MarkazorIconKind.ArrowDown" /></button>
+                <button type="button" title="Close search (Escape)" aria-label="Close search" @onclick="CloseSearchAsync"><MarkazorIcon Kind="MarkazorIconKind.Close" /></button>
+            </span>
         </div>
     }
     @if (editorError is not null)
@@ -113,6 +90,9 @@
     private DotNetObjectReference<MarkazorMarkdownEditor>? dotNetReference;
     private ElementReference rootElement;
     private ElementReference hostElement;
+    private ElementReference insertButton;
+    private ElementReference searchInput;
+    private bool focusSearch;
     private IJSObjectReference? module;
     private bool initialized;
     private bool isEditorReady;
@@ -164,6 +144,17 @@
     [Parameter]
     public long MaxImageBytes { get; set; } = 8L * 1024 * 1024;
 
+    protected override void OnParametersSet()
+    {
+        if (Disabled || (initialized && !string.Equals(DocumentKey, lastDocumentKey, StringComparison.Ordinal)))
+        {
+            imageMenuOpen = false;
+            searchOpen = false;
+            searchText = string.Empty;
+            focusSearch = false;
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!initialized)
@@ -173,6 +164,11 @@
         }
 
         await SynchronizeEditorAsync().ConfigureAwait(false);
+        if (focusSearch)
+        {
+            focusSearch = false;
+            await searchInput.FocusAsync().ConfigureAwait(false);
+        }
     }
 
     private async Task InitializeEditorAsync()
@@ -275,12 +271,35 @@
         await module.InvokeVoidAsync("format", editorId, command).ConfigureAwait(false);
     }
 
-    private void ToggleImageMenu()
+    private async Task HideToolsAsync()
+    {
+        if (module is not null && isEditorReady)
+        {
+            await module.InvokeVoidAsync("hideTools", editorId).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ShowInsertMenuAsync()
+    {
+        if (module is not null && !ToolbarDisabled)
+        {
+            imageMenuOpen = false;
+            await module.InvokeVoidAsync("showInsertMenu", editorId, insertButton).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ToggleImageMenuAsync()
     {
         if (!ImageToolbarDisabled)
         {
+            await HideToolsAsync().ConfigureAwait(false);
             imageMenuOpen = !imageMenuOpen;
         }
+    }
+
+    private void ImageMenuKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") CloseImageMenu();
     }
 
     private void CloseImageMenu()
@@ -388,7 +407,24 @@
         return InvokeAsync(StateHasChanged);
     }
 
-    private void ToggleSearch() => searchOpen = !searchOpen;
+    private async Task ToggleSearchAsync()
+    {
+        if (searchOpen)
+        {
+            await CloseSearchAsync().ConfigureAwait(false);
+            return;
+        }
+        await HideToolsAsync().ConfigureAwait(false);
+        imageMenuOpen = false;
+        searchOpen = true;
+        focusSearch = true;
+    }
+
+    private async Task SearchKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") await CloseSearchAsync().ConfigureAwait(false);
+        else if (args.Key == "Enter") await SearchAsync(args.ShiftKey ? "previous" : "next").ConfigureAwait(false);
+    }
 
     private async Task SearchChangedAsync(ChangeEventArgs args)
     {
@@ -409,6 +445,10 @@
         searchOpen = false;
         searchText = string.Empty;
         await SearchAsync(null).ConfigureAwait(false);
+        if (module is not null && isEditorReady)
+        {
+            await module.InvokeVoidAsync("focus", editorId).ConfigureAwait(false);
+        }
     }
 
     private sealed class PastedImageFile(string name, string contentType, byte[] content) : IBrowserFile

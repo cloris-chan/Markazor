@@ -437,49 +437,53 @@
 
 .markazor-markdown-toolbar {
   align-items: center;
-  background: var(--mk-soft);
+  background: var(--mk-surface);
   border-bottom: 1px solid var(--mk-line);
   display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  min-height: 2.4rem;
-  overflow: visible;
+  gap: 0.25rem;
+  min-height: 3.5rem;
+  padding: 0.35rem 0.5rem;
   position: relative;
   z-index: 3;
 }
-
-.markazor-markdown-tool-group {
-  border-right: 1px solid var(--mk-line);
+.markazor-editor-history {
+  border-inline-end: 1px solid var(--mk-line);
   display: inline-flex;
-  flex: 0 0 auto;
+  margin-inline-end: 0.25rem;
+  padding-inline-end: 0.25rem;
 }
-
-.markazor-markdown-toolbar button {
+.markazor-markdown-toolbar button,
+.markazor-markdown-upload-button {
+  align-items: center;
   background: transparent;
   border: 0;
-  border-left: 1px solid var(--mk-line);
-  border-radius: 0;
-  color: var(--mk-ink);
+  border-radius: 0.25rem;
+  color: var(--mk-muted);
   cursor: pointer;
-  font: 0.78rem/1 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  letter-spacing: 0;
-  min-height: 2.4rem;
-  min-width: 2.35rem;
-  padding: 0 0.62rem;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.85rem;
+  gap: 0.45rem;
+  justify-content: center;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.5rem 0.7rem;
   white-space: nowrap;
 }
-
-.markazor-markdown-image-menu {
-  display: inline-flex;
-  position: relative;
+.markazor-markdown-toolbar .markazor-icon { height: 1.15rem; width: 1.15rem; }
+.markazor-markdown-toolbar .markazor-editor-chevron { height: 0.8rem; width: 0.8rem; }
+.markazor-markdown-toolbar .markazor-editor-find { margin-inline-start: auto; }
+.markazor-markdown-toolbar button:not(.markazor-markdown-menu-backdrop):is(:hover, :focus-visible, [aria-expanded=true]):not(:disabled),
+.markazor-markdown-upload-button:is(:hover, :focus-within) {
+  background: var(--mk-accent-soft);
+  color: var(--mk-accent);
 }
-
-.markazor-markdown-menu-trigger::after {
-  content: " v";
-  font-size: 0.7rem;
-}
-
-.markazor-markdown-menu-backdrop {
+.markazor-markdown-toolbar button:focus-visible,
+.markazor-markdown-upload-button:focus-within { outline: 2px solid var(--mk-accent); outline-offset: -2px; }
+.markazor-markdown-toolbar button:disabled,
+.markazor-markdown-upload-button.is-disabled { cursor: not-allowed; opacity: 0.4; }
+.markazor-markdown-image-menu { display: inline-flex; position: relative; }
+.markazor-markdown-toolbar .markazor-markdown-menu-backdrop {
   background: transparent;
   border: 0;
   inset: 0;
@@ -489,80 +493,34 @@
   position: fixed;
   z-index: 18;
 }
-
 .markazor-markdown-image-menu-panel {
-  background: var(--mk-soft);
+  background: var(--mk-surface);
   border: 1px solid var(--mk-line);
+  border-radius: 0.35rem;
   box-shadow: var(--mk-shadow);
   display: grid;
-  left: 0;
   min-width: 11rem;
+  padding: 0.25rem;
   position: absolute;
-  top: calc(100% + 1px);
+  right: 0;
+  top: calc(100% + 0.5rem);
   z-index: 20;
 }
-
 .markazor-markdown-image-menu-panel button,
-.markazor-markdown-image-menu-panel .markazor-markdown-upload-button {
-  border-left: 0;
-  justify-content: flex-start;
-  min-width: 100%;
-  text-align: left;
-}
-
-.markazor-markdown-upload-button {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-left: 1px solid var(--mk-line);
-  border-radius: 0;
-  color: var(--mk-ink);
-  cursor: pointer;
-  display: inline-flex;
-  font: 0.78rem/1 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  letter-spacing: 0;
-  min-height: 2.4rem;
-  min-width: 2.35rem;
-  padding: 0 0.62rem;
-  position: relative;
-  white-space: nowrap;
-}
-
-.markazor-markdown-tool-group button:first-child,
-.markazor-markdown-tool-group .markazor-markdown-upload-button:first-child,
-.markazor-markdown-image-menu:first-child .markazor-markdown-menu-trigger {
-  border-left: 0;
-}
-
-.markazor-markdown-toolbar button:not(.markazor-markdown-menu-backdrop):hover:not(:disabled),
-.markazor-markdown-toolbar button:not(.markazor-markdown-menu-backdrop):focus-visible,
-.markazor-markdown-upload-button:hover,
-.markazor-markdown-upload-button:focus-within {
-  background: var(--mk-soft);
-  color: var(--mk-surface);
-}
-
-.markazor-markdown-toolbar button:disabled,
-.markazor-markdown-upload-button.is-disabled {
-  color: var(--mk-muted);
-  cursor: not-allowed;
-}
-
-.markazor-markdown-upload-button input {
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-  position: absolute;
-  width: 1px;
-}
-
+.markazor-markdown-image-menu-panel .markazor-markdown-upload-button { justify-content: flex-start; width: 100%; }
+.markazor-markdown-upload-button { position: relative; }
+.markazor-markdown-upload-button input { height: 1px; opacity: 0; overflow: hidden; position: absolute; width: 1px; }
 .markazor-markdown-toolbar-status {
-  color: var(--mk-warning);
-  flex: 0 0 auto;
+  border-bottom: 1px solid var(--mk-line);
+  color: var(--mk-muted);
   font-size: 0.75rem;
-  line-height: 1.3;
-  padding: 0.45rem 0.75rem;
-  white-space: nowrap;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+}
+@media (max-width: 480px) {
+  .markazor-editor-tool-label,
+  .markazor-markdown-toolbar .markazor-editor-chevron { display: none; }
 }
 
 .markazor-muya-host {
@@ -572,10 +530,6 @@
 }
 
 .markazor-actions .markazor-browser-toggle { display: none; }
-.markazor-editor-more { position: relative; }
-.markazor-editor-more > summary { cursor: pointer; font: inherit; min-height: 2.75rem; padding: 0.75rem; }
-.markazor-editor-more-tools { background: var(--mk-surface); border: 1px solid var(--mk-line-strong); box-shadow: var(--mk-shadow); display: grid; right: 0; min-width: 11rem; padding: 0.25rem; position: absolute; top: 100%; z-index: 30; }
-.markazor-editor-more-tools button { border: 0; text-align: left; width: 100%; }
 @media (max-width: 1120px) {
   .markazor-actions .markazor-browser-toggle { display: inline-flex; }
   .markazor-content-browser:not(.is-open) { display: none; }

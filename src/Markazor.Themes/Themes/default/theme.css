@@ -948,20 +948,6 @@ input[type=radio] {
 .markazor-metadata-toolbar .markazor-checkbox-field input {
   min-height: auto;
 }
-.markazor-markdown-toolbar button,
-.markazor-markdown-upload-button {
-  min-height: 2.75rem;
-  min-width: 2.75rem;
-}
-.markazor-markdown-toolbar button:not(.markazor-markdown-menu-backdrop):is(:hover, :focus-visible):not(:disabled),
-.markazor-markdown-upload-button:is(:hover, :focus-visible) {
-  background: var(--mk-accent-soft);
-  color: var(--mk-accent);
-}
-.markazor-markdown-toolbar .markazor-markdown-menu-backdrop {
-  min-height: 0;
-  min-width: 0;
-}
 .markazor-conflict {
   border-color: var(--mk-danger);
   padding-top: 1.25rem;

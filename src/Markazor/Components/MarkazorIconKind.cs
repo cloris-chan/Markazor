@@ -13,4 +13,10 @@ public enum MarkazorIconKind
     Settings,
     Book,
     Bookmark,
+    Undo,
+    Redo,
+    Plus,
+    ChevronDown,
+    Image,
+    Search,
 }
