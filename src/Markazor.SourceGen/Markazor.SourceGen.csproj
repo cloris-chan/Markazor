@@ -8,10 +8,15 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\Markazor\Content\MarkdownFrontMatter.cs" Link="Content\MarkdownFrontMatter.cs" />
+    <Compile Include="..\Markazor.Core\Setup\MarkazorSiteSettings.Data.cs" Link="Setup\MarkazorSiteSettings.Data.cs" />
+    <Compile Include="..\Markazor.Core\Setup\MarkazorSiteSettingsJson.cs" Link="Setup\MarkazorSiteSettingsJson.cs" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="System.Text.Json" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,7 +25,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="$(OutputPath)$(AssemblyName).dll"
+    <None Include="$(OutputPath)*.dll"
+          Exclude="$(OutputPath)Microsoft.CodeAnalysis*.dll;$(OutputPath)System.Collections.Immutable.dll;$(OutputPath)System.Reflection.Metadata.dll;$(OutputPath)System.Text.Encoding.CodePages.dll"
           Pack="true"
           PackagePath="analyzers/dotnet/cs"
           Visible="false" />

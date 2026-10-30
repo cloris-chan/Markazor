@@ -24,6 +24,5 @@ namespace Markazor.Core.Serialization;
 [JsonSerializable(typeof(MarkazorGitHubAuthorizationRequest))]
 [JsonSerializable(typeof(MarkazorGitHubAuthorizationResponse))]
 [JsonSerializable(typeof(MarkazorGitHubCallbackRequest))]
-[JsonSerializable(typeof(MarkazorSiteSettings))]
 [JsonSerializable(typeof(MarkazorSetupStatus))]
 public sealed partial class MarkazorCoreJsonSerializerContext : JsonSerializerContext;

@@ -34,14 +34,25 @@ internal static class StaticSiteGenerator
         string shellPath = Path.Combine(output, "index.html");
         string shell = PrepareApplicationShell(await File.ReadAllTextAsync(shellPath, cancellationToken).ConfigureAwait(false));
         string settingsPath = Path.Combine(source, "public", "markazor.settings.json");
-        MarkazorSiteSettings settings = File.Exists(settingsPath)
-            ? JsonSerializer.Deserialize<MarkazorSiteSettings>(await File.ReadAllTextAsync(settingsPath, cancellationToken).ConfigureAwait(false), JsonOptions) ?? throw new InvalidDataException("Site settings are empty.")
-            : new MarkazorSiteSettings();
+        MarkazorSiteSettings settings = MarkazorSiteSettingsLoader.Load(settingsPath);
         MarkazorSitePublicSettings site = settings.Site ?? throw new InvalidDataException("The site settings object is required.");
         MarkazorOptions options = new();
         options.Site.Name = MarkazorSitePublicSettings.NormalizeName(site.Name);
         options.Site.Description = MarkazorSitePublicSettings.NormalizeDescription(site.Description);
         options.Site.BaseUrl = ValidateBaseUrl(site.PrimaryBaseUrl);
+
+        string manifestPath = Path.Combine(output, "manifest.webmanifest");
+        if (!File.Exists(manifestPath))
+        {
+            JsonObject manifest = new()
+            {
+                ["name"] = site.Name, ["short_name"] = site.Name, ["description"] = site.Description,
+                ["lang"] = "en", ["id"] = "/", ["start_url"] = "/", ["scope"] = "/", ["display"] = "standalone",
+                ["background_color"] = "#f4f1e9", ["theme_color"] = "#2f4a56", ["prefer_related_applications"] = false,
+                ["icons"] = new JsonArray(new JsonObject { ["src"] = "/assets/site-icon.png", ["sizes"] = "512x512", ["type"] = "image/png", ["purpose"] = "any maskable" }),
+            };
+            await File.WriteAllTextAsync(manifestPath, manifest.ToJsonString(JsonOptions), cancellationToken).ConfigureAwait(false);
+        }
 
         List<ArticleMeta> articles = [];
         Dictionary<string, string> markdownFiles = new(StringComparer.Ordinal);

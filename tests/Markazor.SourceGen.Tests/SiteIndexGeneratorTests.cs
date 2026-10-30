@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading;
 using Markazor.Configuration;
 using Markazor.Content;
 using Microsoft.CodeAnalysis;
@@ -22,6 +17,34 @@ public sealed class SiteIndexGeneratorTests
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
     private readonly IReadOnlyList<MetadataReference> references = CreateReferences();
+
+    [Theory]
+    [InlineData("---\ntitle: \"Hello \\\"World\\\"\"\nsummary: \"C:\\\\docs\\\\\"\ntags: [one, \"reader, writer\", don't, 'it''s']\n---\nBody")]
+    [InlineData("---\ntitle: Unterminated\ntags: [ignored]")]
+    public void GeneratesMetadataConsistentlyWithRuntime(string markdown)
+    {
+        GeneratorExecution execution = RunGenerator([new TestAdditionalText(RepositoryPath("posts", "hello.md"), markdown)]);
+        ArticleMeta generated = Assert.Single(LoadArticles(execution.OutputCompilation));
+        ArticleMeta runtime = MarkdownContent.ParseArticleMeta(RepositoryContentPath("posts", "hello.md"), markdown);
+        Assert.Equal(runtime.Title, generated.Title);
+        Assert.Equal(runtime.Summary, generated.Summary);
+        Assert.Equal(runtime.Tags, generated.Tags);
+        Assert.Equal(runtime.PublishedAtUtc, generated.PublishedAtUtc);
+        Assert.Empty(execution.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("{")]
+    [InlineData("{\"site\":null}")]
+    [InlineData("{\"site\":{\"name\":\"one\",\"name\":\"two\"}}")]
+    [InlineData("{\"site\":{\"baseUrls\":[\"/relative\"]}}")]
+    public void ReportsInvalidSiteSettings(string json)
+    {
+        GeneratorExecution execution = RunGenerator([new TestAdditionalText(RepositoryPath("public", "markazor.settings.json"), json)]);
+        Diagnostic diagnostic = Assert.Single(execution.Diagnostics);
+        Assert.Equal("MZ002", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+    }
 
     [Fact]
     public void GeneratesArticleMetadataFromMarkdownFiles()

@@ -5,7 +5,7 @@ using Markazor.Core.Configuration;
 using Markazor.Core.GitHub;
 using Markazor.Core.Security;
 using Markazor.Core.Setup;
-using Markazor.Serialization;
+using Markazor.Core.Serialization;
 
 namespace Markazor.Client;
 
@@ -40,7 +40,7 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
             using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             SetupStatus = await JsonSerializer.DeserializeAsync(
                 stream,
-                MarkazorJsonSerializerContext.Default.MarkazorSetupStatus,
+                MarkazorCoreJsonSerializerContext.Default.MarkazorSetupStatus,
                 cancellationToken).ConfigureAwait(false);
 
             return SetupStatus
@@ -61,14 +61,14 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
         using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
             AuthStartUri,
             request ?? new MarkazorGitHubAuthorizationRequest(null, null),
-            MarkazorJsonSerializerContext.Default.MarkazorGitHubAuthorizationRequest,
+            MarkazorCoreJsonSerializerContext.Default.MarkazorGitHubAuthorizationRequest,
             cancellationToken).ConfigureAwait(false);
         _ = response.EnsureSuccessStatusCode();
 
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         MarkazorGitHubAuthorizationResponse? authorization = await JsonSerializer.DeserializeAsync(
             stream,
-            MarkazorJsonSerializerContext.Default.MarkazorGitHubAuthorizationResponse,
+            MarkazorCoreJsonSerializerContext.Default.MarkazorGitHubAuthorizationResponse,
             cancellationToken).ConfigureAwait(false);
 
         return authorization ?? throw new InvalidOperationException("The authorization endpoint returned an empty response.");
@@ -83,7 +83,7 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
         using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
             AuthCallbackUri,
             request,
-            MarkazorJsonSerializerContext.Default.MarkazorGitHubCallbackRequest,
+            MarkazorCoreJsonSerializerContext.Default.MarkazorGitHubCallbackRequest,
             cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
@@ -96,7 +96,7 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         MarkazorGitHubAccessTokenResponse? token = await JsonSerializer.DeserializeAsync(
             stream,
-            MarkazorJsonSerializerContext.Default.MarkazorGitHubAccessTokenResponse,
+            MarkazorCoreJsonSerializerContext.Default.MarkazorGitHubAccessTokenResponse,
             cancellationToken).ConfigureAwait(false);
 
         AccessToken = token?.AccessToken;
@@ -130,7 +130,7 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
             using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             MarkazorGitHubAccessTokenResponse? token = await JsonSerializer.DeserializeAsync(
                 stream,
-                MarkazorJsonSerializerContext.Default.MarkazorGitHubAccessTokenResponse,
+                MarkazorCoreJsonSerializerContext.Default.MarkazorGitHubAccessTokenResponse,
                 cancellationToken).ConfigureAwait(false);
 
             AccessToken = token?.AccessToken;

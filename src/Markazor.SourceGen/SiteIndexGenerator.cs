@@ -5,6 +5,9 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using Markazor.Content;
+using Markazor.Core.Setup;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
@@ -19,6 +22,14 @@ public sealed class SiteIndexGenerator : IIncrementalGenerator
         title: "Draft content cannot be published",
         messageFormat: "Published content '{0}' declares 'draft: true'. Move it to drafts/ or remove the draft flag.",
         category: "Markazor.Content",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor InvalidSettingsDescriptor = new(
+        id: "MZ002",
+        title: "Invalid site settings",
+        messageFormat: "Site settings '{0}' are invalid: {1}",
+        category: "Markazor.Configuration",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
@@ -68,13 +79,18 @@ public sealed class SiteIndexGenerator : IIncrementalGenerator
                         .Where(static result => result.Article is not null)
                         .Select(static result => result.Article!),
                 ];
+                if (source.Right.Error is not null)
+                {
+                    productionContext.ReportDiagnostic(Diagnostic.Create(InvalidSettingsDescriptor, Location.None, source.Right.Path, source.Right.Error));
+                }
+
                 string generatedSource = SiteIndexSourceWriter.Write(sourceArticles, source.Right);
                 productionContext.AddSource("SiteIndex.g.cs", SourceText.From(generatedSource, Encoding.UTF8));
             });
     }
 }
 
-internal sealed class GeneratedSiteSettings(string path, string name, string description, string? baseUrl = null)
+internal sealed class GeneratedSiteSettings(string path, string name, string description, string? baseUrl = null, string? error = null)
 {
     public static GeneratedSiteSettings Empty { get; } = new(string.Empty, string.Empty, string.Empty);
 
@@ -86,6 +102,8 @@ internal sealed class GeneratedSiteSettings(string path, string name, string des
 
     public string? BaseUrl { get; } = baseUrl;
 
+    public string? Error { get; } = error;
+
     public static GeneratedSiteSettings Parse(AdditionalText file, AnalyzerConfigOptions options, System.Threading.CancellationToken cancellationToken)
     {
         SourceText? text = file.GetText(cancellationToken);
@@ -93,10 +111,18 @@ internal sealed class GeneratedSiteSettings(string path, string name, string des
 
         if (text is null)
         {
-            return new GeneratedSiteSettings(logicalPath, string.Empty, string.Empty);
+            return new GeneratedSiteSettings(logicalPath, string.Empty, string.Empty, error: "The settings file could not be read.");
         }
 
-        return MarkazorSiteSettingsJson.Parse(logicalPath, text.ToString());
+        try
+        {
+            MarkazorSiteSettings settings = MarkazorSiteSettingsJson.Parse(text.ToString());
+            return new GeneratedSiteSettings(logicalPath, settings.Site.Name, settings.Site.Description, settings.Site.PrimaryBaseUrl?.AbsoluteUri);
+        }
+        catch (JsonException exception)
+        {
+            return new GeneratedSiteSettings(logicalPath, string.Empty, string.Empty, error: exception.Message);
+        }
     }
 }
 
@@ -111,7 +137,6 @@ internal sealed class MarkdownArticleResult(string path, MarkdownArticle? articl
 
 internal sealed class MarkdownArticle
 {
-    private static readonly DateTimeOffset UnixEpoch = new(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     private MarkdownArticle(string slug, string title, string summary, DateTimeOffset publishedAtUtc, IReadOnlyList<string> tags, string? category, string relativePath, string contentPath, string route)
     {
@@ -156,49 +181,24 @@ internal sealed class MarkdownArticle
             return new MarkdownArticleResult(file.Path, null, hasPublishedDraftFlag: false);
         }
 
-        IReadOnlyDictionary<string, string> metadata = FrontMatter.Parse(text.ToString());
+        MarkdownFrontMatter metadata = MarkdownFrontMatter.Parse(text.ToString());
         string relativePath = MarkazorContentPath.NormalizeAdditionalFilePath(file.Path, options);
         if (!MarkazorContentPath.IsPublishedPath(relativePath))
         {
             return new MarkdownArticleResult(file.Path, null, hasPublishedDraftFlag: false);
         }
 
-        string slug = Get(metadata, "slug") ?? MarkazorContentPath.GetFileNameWithoutExtension(relativePath);
-        string title = Get(metadata, "title") ?? slug;
-        string summary = Get(metadata, "summary") ?? string.Empty;
-        string? category = Get(metadata, "category");
-        DateTimeOffset publishedAtUtc = ParsePublishedAt(Get(metadata, "publishedAt") ?? Get(metadata, "date"));
-        string[] tags = ParseTags(Get(metadata, "tags"));
-        bool hasPublishedDraftFlag = bool.TryParse(Get(metadata, "draft"), out bool isDraft) && isDraft;
+        string slug = metadata.Get("slug") ?? MarkazorContentPath.GetFileNameWithoutExtension(relativePath);
+        string title = metadata.Get("title") ?? slug;
+        string summary = metadata.Get("summary") ?? string.Empty;
+        string? category = metadata.Get("category");
+        DateTimeOffset publishedAtUtc = metadata.PublishedAtUtc;
+        string[] tags = metadata.GetTags();
+        bool hasPublishedDraftFlag = bool.TryParse(metadata.Get("draft"), out bool isDraft) && isDraft;
         string route = MarkazorContentPath.CreateRoute(slug);
         string contentPath = MarkazorContentPath.CreateContentPath(relativePath);
 
         return new MarkdownArticleResult(file.Path, new MarkdownArticle(slug, title, summary, publishedAtUtc, tags, category, relativePath, contentPath, route), hasPublishedDraftFlag);
-    }
-
-    private static string? Get(IReadOnlyDictionary<string, string> metadata, string key)
-    {
-        return metadata.TryGetValue(key.ToUpperInvariant(), out string? value) && value.Length > 0 ? value : null;
-    }
-
-    private static DateTimeOffset ParsePublishedAt(string? value)
-    {
-        return value is not null && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset publishedAt) ? publishedAt : UnixEpoch;
-    }
-
-    private static string[] ParseTags(string? value)
-    {
-        if (value is null || string.IsNullOrWhiteSpace(value))
-        {
-            return [];
-        }
-
-        string normalizedValue = value.Trim().Trim('[', ']');
-
-        return [.. normalizedValue
-            .Split([','], StringSplitOptions.RemoveEmptyEntries)
-            .Select(static tag => tag.Trim().Trim('"', '\''))
-            .Where(static tag => tag.Length > 0)];
     }
 
 }
@@ -394,266 +394,6 @@ internal static class MarkazorSiteSettingsFile
     private static string CombineSitePath(IEnumerable<string> segments)
     {
         return string.Join(SitePathSeparatorText, segments);
-    }
-}
-
-internal static class MarkazorSiteSettingsJson
-{
-    public static GeneratedSiteSettings Parse(string path, string content)
-    {
-        string? siteJson = TryReadObjectProperty(content, "site");
-        if (siteJson is null)
-        {
-            return new GeneratedSiteSettings(path, string.Empty, string.Empty);
-        }
-
-        string name = NormalizeText(TryReadStringProperty(siteJson, "name"));
-        string description = NormalizeText(TryReadStringProperty(siteJson, "description"));
-
-        string? baseUrl = null;
-        int index = 0;
-        if (TryReadNextProperty(siteJson, ref index, "baseUrls", out int start))
-        {
-            start = SkipWhitespace(siteJson, start);
-            if (start < siteJson.Length && siteJson[start] == '[')
-            {
-                start = SkipWhitespace(siteJson, start + 1);
-                string? candidate = ReadString(siteJson, ref start);
-                if (Uri.TryCreate(candidate, UriKind.Absolute, out Uri? uri) && (uri.Scheme == "https" || uri.Scheme == "http"))
-                {
-                    baseUrl = uri.AbsoluteUri;
-                }
-            }
-        }
-
-        return new GeneratedSiteSettings(path, name, description, baseUrl);
-    }
-
-    private static string NormalizeText(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? string.Empty : value!.Trim();
-    }
-
-    private static string? TryReadObjectProperty(string json, string propertyName)
-    {
-        int index = 0;
-        while (TryReadNextProperty(json, ref index, propertyName, out int valueStart))
-        {
-            int objectStart = SkipWhitespace(json, valueStart);
-            if (objectStart >= json.Length || json[objectStart] != '{')
-            {
-                continue;
-            }
-
-            int objectEnd = FindMatchingObjectEnd(json, objectStart);
-            if (objectEnd >= objectStart)
-            {
-                return json.Substring(objectStart, objectEnd - objectStart + 1);
-            }
-        }
-
-        return null;
-    }
-
-    private static string? TryReadStringProperty(string json, string propertyName)
-    {
-        int index = 0;
-        while (TryReadNextProperty(json, ref index, propertyName, out int valueStart))
-        {
-            int stringStart = SkipWhitespace(json, valueStart);
-            if (stringStart >= json.Length || json[stringStart] != '"')
-            {
-                continue;
-            }
-
-            int current = stringStart;
-            return ReadString(json, ref current);
-        }
-
-        return null;
-    }
-
-    private static bool TryReadNextProperty(string json, ref int index, string propertyName, out int valueStart)
-    {
-        int depth = 0;
-        valueStart = -1;
-
-        while (index < json.Length)
-        {
-            char character = json[index];
-            if (character == '"')
-            {
-                string? name = ReadString(json, ref index);
-                if (depth == 1 && string.Equals(name, propertyName, StringComparison.Ordinal))
-                {
-                    int colonIndex = SkipWhitespace(json, index);
-                    if (colonIndex < json.Length && json[colonIndex] == ':')
-                    {
-                        valueStart = colonIndex + 1;
-                        index = valueStart;
-                        return true;
-                    }
-                }
-
-                continue;
-            }
-
-            if (character == '{')
-            {
-                depth++;
-            }
-            else if (character == '}')
-            {
-                depth--;
-            }
-
-            index++;
-        }
-
-        return false;
-    }
-
-    private static int FindMatchingObjectEnd(string json, int objectStart)
-    {
-        int depth = 0;
-
-        for (int index = objectStart; index < json.Length; index++)
-        {
-            char character = json[index];
-            if (character == '"')
-            {
-                _ = ReadString(json, ref index);
-                continue;
-            }
-
-            if (character == '{')
-            {
-                depth++;
-            }
-            else if (character == '}')
-            {
-                depth--;
-                if (depth == 0)
-                {
-                    return index;
-                }
-            }
-        }
-
-        return -1;
-    }
-
-    private static string? ReadString(string json, ref int index)
-    {
-        if (index >= json.Length || json[index] != '"')
-        {
-            return null;
-        }
-
-        index++;
-        StringBuilder builder = new();
-
-        while (index < json.Length)
-        {
-            char character = json[index++];
-            if (character == '"')
-            {
-                return builder.ToString();
-            }
-
-            if (character != '\\' || index >= json.Length)
-            {
-                _ = builder.Append(character);
-                continue;
-            }
-
-            char escaped = json[index++];
-            switch (escaped)
-            {
-                case '"':
-                case '\\':
-                case '/':
-                    _ = builder.Append(escaped);
-                    break;
-                case 'b':
-                    _ = builder.Append('\b');
-                    break;
-                case 'f':
-                    _ = builder.Append('\f');
-                    break;
-                case 'n':
-                    _ = builder.Append('\n');
-                    break;
-                case 'r':
-                    _ = builder.Append('\r');
-                    break;
-                case 't':
-                    _ = builder.Append('\t');
-                    break;
-                case 'u':
-                    if (index + 4 <= json.Length
-                        && int.TryParse(json.Substring(index, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int codePoint))
-                    {
-                        _ = builder.Append((char)codePoint);
-                        index += 4;
-                    }
-
-                    break;
-            }
-        }
-
-        return null;
-    }
-
-    private static int SkipWhitespace(string value, int index)
-    {
-        while (index < value.Length && char.IsWhiteSpace(value[index]))
-        {
-            index++;
-        }
-
-        return index;
-    }
-}
-
-internal static class FrontMatter
-{
-    public static IReadOnlyDictionary<string, string> Parse(string content)
-    {
-        Dictionary<string, string> metadata = [];
-        using StringReader reader = new(content);
-
-        if (!string.Equals(reader.ReadLine(), "---", StringComparison.Ordinal))
-        {
-            return metadata;
-        }
-
-        string? line;
-
-        while ((line = reader.ReadLine()) is not null)
-        {
-            if (string.Equals(line, "---", StringComparison.Ordinal))
-            {
-                return metadata;
-            }
-
-            int separatorIndex = line.IndexOf(':');
-
-            if (separatorIndex <= 0)
-            {
-                continue;
-            }
-
-            string key = line.Substring(0, separatorIndex).Trim().ToUpperInvariant();
-            string value = line.Substring(separatorIndex + 1).Trim().Trim('"');
-
-            if (key.Length > 0)
-            {
-                metadata[key] = value;
-            }
-        }
-
-        return metadata;
     }
 }
 

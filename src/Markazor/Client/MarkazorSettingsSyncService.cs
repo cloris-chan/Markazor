@@ -2,7 +2,6 @@ using System.Text.Json;
 using Markazor.Core.GitHub;
 using Markazor.Core.Security;
 using Markazor.Core.Setup;
-using Markazor.Serialization;
 
 namespace Markazor.Client;
 
@@ -34,9 +33,7 @@ public sealed class MarkazorSettingsSyncService(
             return Failed("GitHub authorization is required.", MarkazorGitHubClientResultKind.Unauthorized);
         }
 
-        string content = JsonSerializer.Serialize(
-            settings,
-            MarkazorJsonSerializerContext.Default.MarkazorSiteSettings) + Environment.NewLine;
+        string content = MarkazorSiteSettingsJson.Serialize(settings);
 
         if (siteIcon is not null)
         {
@@ -53,7 +50,7 @@ public sealed class MarkazorSettingsSyncService(
 
         if (current.Succeeded && current.Value is not null)
         {
-            if (SettingsMatch(current.Value.ContentText, settings, content))
+            if (SettingsMatch(current.Value.ContentText, content))
             {
                 return new MarkazorSettingsSyncResult(true, null, "Settings already match the repository.");
             }
@@ -286,7 +283,6 @@ public sealed class MarkazorSettingsSyncService(
 
     private static bool SettingsMatch(
         string currentContent,
-        MarkazorSiteSettings settings,
         string serializedSettings)
     {
         if (string.Equals(currentContent, serializedSettings, StringComparison.Ordinal))
@@ -294,86 +290,14 @@ public sealed class MarkazorSettingsSyncService(
             return true;
         }
 
-        MarkazorSiteSettings? currentSettings = TryReadSettings(currentContent);
-
-        return currentSettings is not null
-            && SettingsEqual(currentSettings, settings);
-    }
-
-    private static MarkazorSiteSettings? TryReadSettings(string content)
-    {
         try
         {
-            return JsonSerializer.Deserialize(
-                content,
-                MarkazorJsonSerializerContext.Default.MarkazorSiteSettings);
+            return string.Equals(MarkazorSiteSettingsJson.Serialize(MarkazorSiteSettingsJson.Parse(currentContent)), serializedSettings, StringComparison.Ordinal);
         }
         catch (JsonException)
         {
-            return null;
+            return false;
         }
-    }
-
-    private static bool SettingsEqual(
-        MarkazorSiteSettings left,
-        MarkazorSiteSettings right)
-    {
-        MarkazorSitePublicSettings leftSite = left.Site ?? new MarkazorSitePublicSettings();
-        MarkazorSitePublicSettings rightSite = right.Site ?? new MarkazorSitePublicSettings();
-        MarkazorGitHubSettings leftGitHub = left.GitHub ?? new MarkazorGitHubSettings();
-        MarkazorGitHubSettings rightGitHub = right.GitHub ?? new MarkazorGitHubSettings();
-        MarkazorRepositorySettings leftRepository = left.Repository ?? new MarkazorRepositorySettings();
-        MarkazorRepositorySettings rightRepository = right.Repository ?? new MarkazorRepositorySettings();
-        MarkazorThemeSettings leftTheme = left.Theme ?? new MarkazorThemeSettings();
-        MarkazorThemeSettings rightTheme = right.Theme ?? new MarkazorThemeSettings();
-
-        return SiteEqual(leftSite, rightSite)
-            && string.Equals(
-                leftGitHub.ClientId?.Trim(),
-                rightGitHub.ClientId?.Trim(),
-                StringComparison.Ordinal)
-            && string.Equals(
-                leftRepository.Owner?.Trim(),
-                rightRepository.Owner?.Trim(),
-                StringComparison.Ordinal)
-            && string.Equals(
-                leftRepository.Name?.Trim(),
-                rightRepository.Name?.Trim(),
-                StringComparison.Ordinal)
-            && string.Equals(
-                leftRepository.DefaultBranch?.Trim(),
-                rightRepository.DefaultBranch?.Trim(),
-                StringComparison.Ordinal)
-            && string.Equals(
-                leftTheme.Name?.Trim(),
-                rightTheme.Name?.Trim(),
-                StringComparison.Ordinal);
-    }
-
-    private static bool SiteEqual(
-        MarkazorSitePublicSettings left,
-        MarkazorSitePublicSettings right)
-    {
-        return string.Equals(
-                MarkazorSitePublicSettings.NormalizeName(left.Name),
-                MarkazorSitePublicSettings.NormalizeName(right.Name),
-                StringComparison.Ordinal)
-            && string.Equals(
-                MarkazorSitePublicSettings.NormalizeDescription(left.Description),
-                MarkazorSitePublicSettings.NormalizeDescription(right.Description),
-                StringComparison.Ordinal)
-            && NormalizeBaseUrls(left.BaseUrls)
-                .SequenceEqual(NormalizeBaseUrls(right.BaseUrls), StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static IReadOnlyList<string> NormalizeBaseUrls(IReadOnlyList<Uri>? baseUrls)
-    {
-        return baseUrls is null || baseUrls.Count == 0
-            ? []
-            : [.. baseUrls
-                .Where(static url => url.IsAbsoluteUri)
-                .Select(static url => url.ToString().TrimEnd('/'))
-                .Where(static url => !string.IsNullOrWhiteSpace(url))];
     }
 
     private static MarkazorSettingsSyncResult Failed<T>(MarkazorGitHubClientResult<T> result)

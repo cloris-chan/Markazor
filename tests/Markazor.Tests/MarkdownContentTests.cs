@@ -42,8 +42,10 @@ public sealed class MarkdownContentTests
         Assert.DoesNotContain("onclick", html, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void MarkAsPublishedReplacesDraftFlag()
+    [Theory]
+    [InlineData("draft: true")]
+    [InlineData("draft: true\ndraft: true")]
+    public void MarkAsPublishedReplacesDraftFlag(string flags)
     {
         const string Markdown = """
             ---
@@ -54,7 +56,7 @@ public sealed class MarkdownContentTests
             Body
             """;
 
-        string published = MarkdownContent.MarkAsPublished(Markdown);
+        string published = MarkdownContent.MarkAsPublished(Markdown.Replace("draft: true", flags, StringComparison.Ordinal));
 
         Assert.Contains("draft: false", published, StringComparison.Ordinal);
         Assert.DoesNotContain("draft: true", published, StringComparison.Ordinal);
@@ -114,10 +116,10 @@ public sealed class MarkdownContentTests
         MarkdownDocumentMetadata metadata = new(
             "hello",
             "Hello \"World\"",
-            "Summary",
+            @"Summary in C:\docs\",
             new DateTimeOffset(2026, 6, 6, 12, 30, 0, TimeSpan.Zero),
             IsDraft: true,
-            ["dotnet", "blazor"],
+            ["dotnet", "blazor", "reader, writer", "don't", "quoted \"tag\""],
             "Ideas",
             ["custom: keep"]);
 
@@ -127,10 +129,14 @@ public sealed class MarkdownContentTests
         Assert.Contains("title: \"Hello \\\"World\\\"\"", markdown, StringComparison.Ordinal);
         Assert.Contains("publishedAt: 2026-06-06T12:30:00Z", markdown, StringComparison.Ordinal);
         Assert.Contains("draft: true", markdown, StringComparison.Ordinal);
-        Assert.Contains("tags: [\"dotnet\", \"blazor\"]", markdown, StringComparison.Ordinal);
         Assert.Contains("category: \"Ideas\"", markdown, StringComparison.Ordinal);
         Assert.Contains("custom: keep", markdown, StringComparison.Ordinal);
         Assert.EndsWith("# Body", markdown, StringComparison.Ordinal);
+        MarkdownDocument document = MarkdownContent.SplitDocument("drafts/hello.md", markdown);
+        Assert.Equal(metadata.Title, document.Metadata.Title);
+        Assert.Equal(metadata.Summary, document.Metadata.Summary);
+        Assert.Equal(metadata.Tags, document.Metadata.Tags);
+        Assert.Equal(metadata.AdditionalFrontMatterLines, document.Metadata.AdditionalFrontMatterLines);
     }
 
     [Fact]

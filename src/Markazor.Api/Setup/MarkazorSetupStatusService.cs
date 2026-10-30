@@ -12,10 +12,11 @@ public sealed class MarkazorSetupStatusService(
     public MarkazorSetupStatus GetStatus()
     {
         (MarkazorSiteSettings siteSettings, bool settingsFileExists) = GetSiteSettings();
-        MarkazorSitePublicSettings sitePublicSettings = Normalize(siteSettings.Site);
-        MarkazorGitHubSettings gitHubSettings = siteSettings.GitHub ?? new MarkazorGitHubSettings();
-        MarkazorRepositorySettings repositorySettings = siteSettings.Repository ?? new MarkazorRepositorySettings();
-        MarkazorThemeSettings themeSettings = siteSettings.Theme ?? new MarkazorThemeSettings();
+        MarkazorSiteSettingsJson.Validate(siteSettings);
+        MarkazorSitePublicSettings sitePublicSettings = siteSettings.Site;
+        MarkazorGitHubSettings gitHubSettings = siteSettings.GitHub;
+        MarkazorRepositorySettings repositorySettings = siteSettings.Repository;
+        MarkazorThemeSettings themeSettings = siteSettings.Theme;
         string clientId = gitHubSettings.ClientId;
         string repositoryOwner = repositorySettings.Owner;
         string repositoryName = repositorySettings.Name;
@@ -43,21 +44,6 @@ public sealed class MarkazorSetupStatusService(
         return (
             MarkazorSiteSettingsLoader.Load(options.SiteSettingsFilePath),
             MarkazorSiteSettingsLoader.Exists(options.SiteSettingsFilePath));
-    }
-
-    private static MarkazorSitePublicSettings Normalize(MarkazorSitePublicSettings? settings)
-    {
-        if (settings is null)
-        {
-            return new MarkazorSitePublicSettings();
-        }
-
-        return new MarkazorSitePublicSettings
-        {
-            Name = MarkazorSitePublicSettings.NormalizeName(settings.Name),
-            Description = MarkazorSitePublicSettings.NormalizeDescription(settings.Description),
-            BaseUrls = settings.BaseUrls ?? [],
-        };
     }
 
     private IEnumerable<string> GetMissingSettings(string clientId, string repositoryOwner, string repositoryName)

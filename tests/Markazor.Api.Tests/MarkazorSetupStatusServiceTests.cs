@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Markazor.Api.Functions;
 using Markazor.Api.Setup;
 using Markazor.Core.Setup;
@@ -66,25 +67,15 @@ public sealed class MarkazorSetupStatusServiceTests
     }
 
     [Fact]
-    public void TreatsNullSiteSettingsSectionsAsDefaults()
+    public void RejectsNullSiteSettingsSections()
     {
         Dictionary<string, string?> environment = new(StringComparer.OrdinalIgnoreCase)
         {
             ["GITHUB_APP_CLIENT_SECRET"] = "secret",
         };
 
-        MarkazorSetupStatus status = CreateService(
-            environment,
-            new MarkazorSiteSettings
-            {
-                GitHub = null!,
-                Repository = null!,
-            }).GetStatus();
-
-        Assert.False(status.Ready);
-        Assert.Equal(["github.clientId", "repository.owner", "repository.name"], status.MissingSettings);
-        Assert.True(status.SettingsFileExists);
-        Assert.Equal("main", status.Repository.DefaultBranch);
+        MarkazorSetupStatusService service = CreateService(environment, new MarkazorSiteSettings { GitHub = null!, Repository = null! });
+        Assert.Throws<JsonException>(() => service.GetStatus());
     }
 
     [Fact]
@@ -147,19 +138,21 @@ public sealed class MarkazorSetupStatusServiceTests
         }
     }
 
-    [Fact]
-    public void ReturnsDefaultsWhenSiteSettingsJsonIsInvalid()
+    [Theory]
+    [InlineData("{")]
+    [InlineData("null")]
+    [InlineData("{\"site\":null}")]
+    [InlineData("{\"site\":{\"name\":null}}")]
+    [InlineData("{\"site\":{\"name\":\"one\",\"name\":\"two\"}}")]
+    [InlineData("{\"unknown\":true}")]
+    [InlineData("{\"site\":{\"baseUrls\":[\"/relative\"]}}")]
+    [InlineData("{\"site\":{\"baseUrls\":[null]}}")]
+    public void RejectsInvalidSiteSettings(string json)
     {
         string settingsPath = Path.Combine(CreateTemporaryDirectory(), MarkazorSiteSettingsLoader.DefaultFileName);
         Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
-        File.WriteAllText(settingsPath, "{");
-
-        MarkazorSiteSettings settings = MarkazorSiteSettingsLoader.Load(settingsPath);
-
-        Assert.Empty(settings.Site.BaseUrls);
-        Assert.Equal(string.Empty, settings.GitHub.ClientId);
-        Assert.Equal(string.Empty, settings.Repository.Owner);
-        Assert.Equal(string.Empty, settings.Repository.Name);
+        File.WriteAllText(settingsPath, json);
+        Assert.Throws<JsonException>(() => MarkazorSiteSettingsLoader.Load(settingsPath));
     }
 
     [Fact]

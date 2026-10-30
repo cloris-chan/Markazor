@@ -23,6 +23,16 @@ public sealed class StaticSiteGeneratorTests : IDisposable
     }
 
     [Fact]
+    public async Task GeneratesManifestFromTheSharedSettingsContract()
+    {
+        File.Delete(Path.Combine(Output, "manifest.webmanifest"));
+        await StaticSiteGenerator.GenerateAsync(root, Output, TestContext.Current.CancellationToken);
+        JsonNode manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(Output, "manifest.webmanifest")))!;
+        Assert.Equal("My journal", manifest["name"]!.GetValue<string>());
+        Assert.Equal("A & B", manifest["description"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task GeneratesRealArticleHtmlMetadataAndStaticTaxonomyRoutes()
     {
         File.WriteAllText(Path.Combine(root, "posts", "hello.md"), "---\nslug: hello\ntitle: Hello & welcome\nsummary: A <thought> & a story\npublishedAt: 2026-09-21\ntags: [dotnet, C#]\ncategory: Reading\n---\n\n# Hello & welcome\n\n## A section\n\nBody with **meaning** and a note.[^a]\n\n[^a]: A source.");

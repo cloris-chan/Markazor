@@ -38,7 +38,8 @@
     <None Include="buildTransitive\Markazor.targets" Pack="true" PackagePath="buildTransitive\Markazor.targets" />
     <None Include="buildTransitive\defaults\**\*" Pack="true" PackagePath="buildTransitive\defaults\%(RecursiveDir)%(FileName)%(Extension)" />
     <None Update="package.json;package-lock.json;assets\**\*" Pack="false" />
-    <None Include="..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\Markazor.SourceGen.dll"
+    <None Include="..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\*.dll"
+          Exclude="..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\Microsoft.CodeAnalysis*.dll;..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\System.Collections.Immutable.dll;..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\System.Reflection.Metadata.dll;..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\System.Text.Encoding.CodePages.dll"
           Pack="true"
           PackagePath="buildTransitive"
           Visible="false" />

@@ -9,7 +9,6 @@ public static class MarkdownContent
 
     private static readonly char SitePathSeparator = Path.AltDirectorySeparatorChar;
     private static readonly string SitePathSeparatorText = SitePathSeparator.ToString();
-    private static readonly DateTimeOffset UnixEpoch = new(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
     private static readonly HashSet<string> KnownFrontMatterKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "category",
@@ -27,10 +26,10 @@ public static class MarkdownContent
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
         ArgumentNullException.ThrowIfNull(markdown);
 
-        FrontMatterDocument split = SplitFrontMatter(markdown);
-        ArticleMeta article = ParseArticleMeta(relativePath, markdown);
+        MarkdownFrontMatter split = MarkdownFrontMatter.Parse(markdown);
+        ArticleMeta article = ParseArticleMeta(relativePath, split);
 
-        MarkdownDocumentMetadata documentMetadata = new(article.Slug, article.Title, article.Summary, article.PublishedAtUtc, article.IsDraft, article.Tags, article.Category, GetAdditionalFrontMatterLines(split.FrontMatterLines));
+        MarkdownDocumentMetadata documentMetadata = new(article.Slug, article.Title, article.Summary, article.PublishedAtUtc, article.IsDraft, article.Tags, article.Category, GetAdditionalFrontMatterLines(split.Lines));
 
         return new MarkdownDocument(documentMetadata, split.HasFrontMatter ? split.Body : markdown);
     }
@@ -75,7 +74,7 @@ public static class MarkdownContent
     {
         ArgumentNullException.ThrowIfNull(markdown);
 
-        FrontMatterDocument split = SplitFrontMatter(markdown);
+        MarkdownFrontMatter split = MarkdownFrontMatter.Parse(markdown);
 
         return split.HasFrontMatter ? split.Body.Trim() : markdown.Trim();
     }
@@ -84,39 +83,32 @@ public static class MarkdownContent
     {
         ArgumentNullException.ThrowIfNull(markdown);
 
-        string body = StripFrontMatter(markdown);
-        return MarkdownDocumentRenderer.Render(body, articleTitle ?? Get(ParseFrontMatter(markdown), "title"));
+        MarkdownFrontMatter document = MarkdownFrontMatter.Parse(markdown);
+        return MarkdownDocumentRenderer.Render(document.Body.Trim(), articleTitle ?? document.Get("title"));
     }
 
     public static string MarkAsPublished(string markdown)
     {
         ArgumentNullException.ThrowIfNull(markdown);
 
-        string normalized = markdown.Replace("\r\n", "\n", StringComparison.Ordinal);
-        string[] lines = normalized.Split('\n');
-
-        if (lines.Length < 2 || !string.Equals(lines[0], "---", StringComparison.Ordinal))
+        MarkdownFrontMatter document = MarkdownFrontMatter.Parse(markdown);
+        if (!document.HasFrontMatter)
         {
             return markdown;
         }
 
-        for (int index = 1; index < lines.Length; index++)
+        List<string> lines = ["---"];
+        foreach (string line in document.Lines)
         {
-            if (string.Equals(lines[index], "---", StringComparison.Ordinal))
+            int separator = line.IndexOf(':', StringComparison.Ordinal);
+            if (separator <= 0 || !string.Equals(line[..separator].Trim(), "draft", StringComparison.OrdinalIgnoreCase))
             {
-                return string.Join('\n', InsertDraftFlag(lines, index));
-            }
-
-            int separatorIndex = lines[index].IndexOf(':', StringComparison.Ordinal);
-            if (separatorIndex > 0 && string.Equals(lines[index][..separatorIndex].Trim(), "draft", StringComparison.OrdinalIgnoreCase))
-            {
-                lines[index] = "draft: false";
-
-                return string.Join('\n', lines);
+                lines.Add(line);
             }
         }
 
-        return markdown;
+        lines.AddRange(["draft: false", "---", string.Empty, document.Body]);
+        return string.Join('\n', lines);
     }
 
     public static ArticleMeta ParseArticleMeta(string relativePath, string markdown)
@@ -124,15 +116,19 @@ public static class MarkdownContent
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
         ArgumentNullException.ThrowIfNull(markdown);
 
+        return ParseArticleMeta(relativePath, MarkdownFrontMatter.Parse(markdown));
+    }
+
+    private static ArticleMeta ParseArticleMeta(string relativePath, MarkdownFrontMatter metadata)
+    {
         string normalizedPath = NormalizeSitePath(relativePath);
-        Dictionary<string, string> metadata = ParseFrontMatter(markdown);
-        string slug = Get(metadata, "slug") ?? Path.GetFileNameWithoutExtension(normalizedPath);
-        string title = Get(metadata, "title") ?? slug;
-        string summary = Get(metadata, "summary") ?? string.Empty;
-        string? category = Get(metadata, "category");
-        DateTimeOffset publishedAtUtc = ParsePublishedAt(Get(metadata, "publishedAt") ?? Get(metadata, "date"));
-        string[] tags = ParseTags(Get(metadata, "tags"));
-        bool isDraft = bool.TryParse(Get(metadata, "draft"), out bool draft) ? draft : IsUnderRootSegment(normalizedPath, DraftsSegment);
+        string slug = metadata.Get("slug") ?? Path.GetFileNameWithoutExtension(normalizedPath);
+        string title = metadata.Get("title") ?? slug;
+        string summary = metadata.Get("summary") ?? string.Empty;
+        string? category = metadata.Get("category");
+        DateTimeOffset publishedAtUtc = metadata.PublishedAtUtc;
+        string[] tags = metadata.GetTags();
+        bool isDraft = bool.TryParse(metadata.Get("draft"), out bool draft) ? draft : IsUnderRootSegment(normalizedPath, DraftsSegment);
 
         return new ArticleMeta(slug, title, summary, publishedAtUtc, tags, category, normalizedPath, CreateRoute(slug), isDraft);
     }
@@ -169,70 +165,6 @@ public static class MarkdownContent
         return true;
     }
 
-    private static string[] InsertDraftFlag(string[] lines, int closingFrontMatterIndex)
-    {
-        string[] result = new string[lines.Length + 1];
-        Array.Copy(lines, result, closingFrontMatterIndex);
-        result[closingFrontMatterIndex] = "draft: false";
-        Array.Copy(lines, closingFrontMatterIndex, result, closingFrontMatterIndex + 1, lines.Length - closingFrontMatterIndex);
-
-        return result;
-    }
-
-    private static Dictionary<string, string> ParseFrontMatter(string markdown)
-    {
-        return ParseFrontMatterLines(SplitFrontMatter(markdown).FrontMatterLines);
-    }
-
-    private static Dictionary<string, string> ParseFrontMatterLines(IReadOnlyList<string> lines)
-    {
-        Dictionary<string, string> metadata = new(StringComparer.OrdinalIgnoreCase);
-
-        foreach (string line in lines)
-        {
-            int separatorIndex = line.IndexOf(':', StringComparison.Ordinal);
-            if (separatorIndex <= 0)
-            {
-                continue;
-            }
-
-            string key = line[..separatorIndex].Trim();
-            string value = UnquoteFrontMatterScalar(line[(separatorIndex + 1)..].Trim());
-            if (key.Length > 0)
-            {
-                metadata[key] = value;
-            }
-        }
-
-        return metadata;
-    }
-
-    private static FrontMatterDocument SplitFrontMatter(string markdown)
-    {
-        string normalized = NormalizeMarkdownLineEndings(markdown);
-        string[] lines = normalized.Split('\n');
-
-        if (lines.Length < 2 || !string.Equals(lines[0], "---", StringComparison.Ordinal))
-        {
-            return new FrontMatterDocument([], markdown, HasFrontMatter: false);
-        }
-
-        for (int index = 1; index < lines.Length; index++)
-        {
-            if (!string.Equals(lines[index], "---", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            string[] frontMatterLines = lines[1..index];
-            string body = string.Join('\n', lines[(index + 1)..]).TrimStart('\n');
-
-            return new FrontMatterDocument(frontMatterLines, body, HasFrontMatter: true);
-        }
-
-        return new FrontMatterDocument([], markdown, HasFrontMatter: false);
-    }
-
     private static IReadOnlyList<string> GetAdditionalFrontMatterLines(IReadOnlyList<string> lines)
     {
         return
@@ -250,23 +182,6 @@ public static class MarkdownContent
         }
 
         return KnownFrontMatterKeys.Contains(line[..separatorIndex].Trim());
-    }
-
-    private static string NormalizeMarkdownLineEndings(string value)
-    {
-        return value
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n');
-    }
-
-    private static string UnquoteFrontMatterScalar(string value)
-    {
-        string trimmed = value.Trim();
-        return trimmed.Length >= 2
-            && trimmed[0] == '"'
-            && trimmed[^1] == '"'
-                ? trimmed[1..^1].Replace("\\\"", "\"", StringComparison.Ordinal)
-                : trimmed.Trim('"');
     }
 
     private static string FormatFrontMatterScalar(string value)
@@ -300,34 +215,6 @@ public static class MarkdownContent
         return tags.Count == 0 ? "[]" : "[" + string.Join(", ", tags.Select(FormatQuotedFrontMatterScalar)) + "]";
     }
 
-    private static string? Get(Dictionary<string, string> metadata, string key)
-    {
-        return metadata.TryGetValue(key, out string? value) && !string.IsNullOrWhiteSpace(value) ? value : null;
-    }
-
-    private static DateTimeOffset ParsePublishedAt(string? value)
-    {
-        return value is not null && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset publishedAt)
-            ? publishedAt
-            : UnixEpoch;
-    }
-
-    private static string[] ParseTags(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return [];
-        }
-
-        return
-        [
-            .. value.Trim().Trim('[', ']')
-                .Split([','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(static tag => tag.Trim('"', '\''))
-                .Where(static tag => tag.Length > 0),
-        ];
-    }
-
     private static bool IsUnderRootSegment(string normalizedPath, string rootSegment)
     {
         string root = string.Concat(rootSegment, SitePathSeparatorText);
@@ -354,6 +241,4 @@ public static class MarkdownContent
     {
         return string.Join(SitePathSeparatorText, segments);
     }
-
-    private sealed record FrontMatterDocument(IReadOnlyList<string> FrontMatterLines, string Body, bool HasFrontMatter);
 }
