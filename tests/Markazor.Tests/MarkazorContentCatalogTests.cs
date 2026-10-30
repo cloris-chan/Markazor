@@ -193,7 +193,7 @@ public sealed class MarkazorContentCatalogTests
 
         public Task<MarkazorGitHubClientResult<T>> ExecuteGitHubAsync<T>(
             Func<MarkazorGitHubRepositoryClient, string, CancellationToken, Task<MarkazorGitHubClientResult<T>>> operation,
-            CancellationToken cancellationToken = default)
+            MarkazorRepositorySettings? repository = null, CancellationToken cancellationToken = default)
         {
             MarkazorGitHubRepositoryClient client = new(
                 httpClient,

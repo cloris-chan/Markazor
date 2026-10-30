@@ -37,8 +37,7 @@ public sealed class MarkazorSetupDiagnosticsService(
         MarkazorGitHubClientResult<MarkazorGitHubRepository> repository = await session.ExecuteGitHubAsync(
             static (client, accessToken, tokenCancellation) => client.GetRepositoryAsync(
                 accessToken,
-                tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
+                tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!repository.Succeeded || repository.Value is null)
         {
             errors.Add(Describe(repository, "The configured repository could not be opened."));
@@ -60,8 +59,7 @@ public sealed class MarkazorSetupDiagnosticsService(
             (client, accessToken, tokenCancellation) => client.GetBranchRefAsync(
                 status.Repository.DefaultBranch,
                 accessToken,
-                tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
+                tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!branch.Succeeded || string.IsNullOrWhiteSpace(branch.Value?.Sha))
         {
             errors.Add(Describe(
@@ -78,8 +76,7 @@ public sealed class MarkazorSetupDiagnosticsService(
             (client, accessToken, tokenCancellation) => client.GetCommitAsync(
                 branch.Value.Sha,
                 accessToken,
-                tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
+                tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!commit.Succeeded || string.IsNullOrWhiteSpace(commit.Value?.TreeSha))
         {
             errors.Add(Describe(commit, "The configured branch commit could not be read."));
@@ -96,8 +93,7 @@ public sealed class MarkazorSetupDiagnosticsService(
                 commit.Value.TreeSha,
                 accessToken,
                 recursive: true,
-                cancellationToken: tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
+                cancellationToken: tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!tree.Succeeded || tree.Value is null)
         {
             errors.Add(Describe(tree, "The repository tree could not be read."));

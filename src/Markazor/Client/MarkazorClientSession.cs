@@ -105,11 +105,18 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
         return IsAuthenticated;
     }
 
-    public async Task<bool> RefreshAccessTokenAsync(CancellationToken cancellationToken = default)
+    public Task<bool> RefreshAccessTokenAsync(CancellationToken cancellationToken = default) => RefreshAccessTokenAsync(null, cancellationToken);
+
+    private async Task<bool> RefreshAccessTokenAsync(string? rejectedToken, CancellationToken cancellationToken)
     {
         await refreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (rejectedToken is not null && string.Equals(AccessToken, rejectedToken, StringComparison.Ordinal))
+            {
+                ClearAccessToken();
+            }
+
             if (HasCurrentAccessToken())
             {
                 return true;
@@ -158,7 +165,7 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
 
     public async Task<MarkazorGitHubClientResult<T>> ExecuteGitHubAsync<T>(
         Func<MarkazorGitHubRepositoryClient, string, CancellationToken, Task<MarkazorGitHubClientResult<T>>> operation,
-        CancellationToken cancellationToken = default)
+        MarkazorRepositorySettings? repository = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(operation);
 
@@ -172,7 +179,7 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
                 "GitHub authorization is required.");
         }
 
-        MarkazorGitHubRepositoryClient client = CreateRepositoryClient();
+        MarkazorGitHubRepositoryClient client = CreateRepositoryClient(repository);
         MarkazorGitHubClientResult<T> result = await operation(
             client,
             accessToken,
@@ -183,8 +190,7 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
             return result;
         }
 
-        ClearAccessToken();
-        accessToken = await GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+        accessToken = await RefreshAccessTokenAsync(accessToken, cancellationToken).ConfigureAwait(false) ? AccessToken : null;
 
         return string.IsNullOrWhiteSpace(accessToken)
             ? result
@@ -196,42 +202,16 @@ public sealed class MarkazorClientSession(HttpClient httpClient) : IMarkazorClie
         refreshLock.Dispose();
     }
 
-    internal MarkazorGitHubRepositoryClient CreateRepositoryClient()
+    private MarkazorGitHubRepositoryClient CreateRepositoryClient(MarkazorRepositorySettings? repository)
     {
-        MarkazorSetupStatus status = SetupStatus
-            ?? throw new InvalidOperationException("Setup status has not been loaded.");
-
+        MarkazorRepositoryStatus? configured = SetupStatus?.Repository;
         MarkazorApiOptions options = new()
         {
-            RepositoryOwner = status.Repository.Owner,
-            RepositoryName = status.Repository.Name,
-            DefaultBranch = status.Repository.DefaultBranch,
+            RepositoryOwner = repository?.Owner ?? configured?.Owner ?? throw new InvalidOperationException("Setup status has not been loaded."),
+            RepositoryName = repository?.Name ?? configured!.Name,
+            DefaultBranch = repository?.DefaultBranch ?? configured!.DefaultBranch,
         };
-
-        return new MarkazorGitHubRepositoryClient(
-            httpClient,
-            options);
-    }
-
-    internal MarkazorGitHubRepositoryClient CreateRepositoryClient(MarkazorSiteSettings settings)
-    {
-        ArgumentNullException.ThrowIfNull(settings);
-
-        MarkazorApiOptions options = new()
-        {
-            RepositoryOwner = settings.Repository.Owner,
-            RepositoryName = settings.Repository.Name,
-            DefaultBranch = settings.Repository.DefaultBranch,
-        };
-
-        return new MarkazorGitHubRepositoryClient(
-            httpClient,
-            options);
-    }
-
-    internal void ClearAccessTokenForRetry()
-    {
-        ClearAccessToken();
+        return new MarkazorGitHubRepositoryClient(httpClient, options);
     }
 
     private bool HasCurrentAccessToken()

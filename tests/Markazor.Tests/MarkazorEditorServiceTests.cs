@@ -199,6 +199,20 @@ public sealed class MarkazorEditorServiceTests
     }
 
     [Fact]
+    public async Task BatchPublishDoesNotRetryRejectedTreeCreation()
+    {
+        using EditorHandler handler = new();
+        EnqueuePublishAttempt(handler, "1", HttpStatusCode.OK, HttpStatusCode.UnprocessableEntity);
+        using FakeSession session = new(handler);
+        MarkazorBatchPublishResult result = await new MarkazorEditorService(session, new FakeCatalog())
+            .PublishDraftsAsync(["drafts/one.md"], TestContext.Current.CancellationToken);
+        Assert.False(result.Succeeded);
+        Assert.Equal(MarkazorGitHubClientResultKind.Error, result.Kind);
+        Assert.Equal(1, result.AttemptCount);
+        Assert.Equal(5, handler.Requests.Count);
+    }
+
+    [Fact]
     public async Task BatchPublishRetriesWholeOperationOnceAfterHeadConflict()
     {
         using EditorHandler handler = new();
@@ -655,7 +669,8 @@ public sealed class MarkazorEditorServiceTests
     private static void EnqueuePublishAttempt(
         EditorHandler handler,
         string suffix,
-        HttpStatusCode updateRefStatus)
+        HttpStatusCode updateRefStatus,
+        HttpStatusCode treeStatus = HttpStatusCode.Created)
     {
         handler.Enqueue(
             HttpStatusCode.OK,
@@ -676,7 +691,7 @@ public sealed class MarkazorEditorServiceTests
             """);
         handler.Enqueue(HttpStatusCode.OK, Blob($"blob-{suffix}", "One"));
         handler.Enqueue(
-            HttpStatusCode.Created,
+            treeStatus,
             $$"""
             {
               "sha":"new-tree-{{suffix}}",
@@ -776,7 +791,7 @@ public sealed class MarkazorEditorServiceTests
 
         public Task<MarkazorGitHubClientResult<T>> ExecuteGitHubAsync<T>(
             Func<MarkazorGitHubRepositoryClient, string, CancellationToken, Task<MarkazorGitHubClientResult<T>>> operation,
-            CancellationToken cancellationToken = default)
+            MarkazorRepositorySettings? repository = null, CancellationToken cancellationToken = default)
         {
             MarkazorGitHubRepositoryClient client = new(
                 httpClient,

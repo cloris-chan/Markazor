@@ -29,6 +29,43 @@ public sealed class MarkazorClientSessionTests
     }
 
     [Fact]
+    public async Task LateUnauthorizedResponseKeepsTheRefreshedToken()
+    {
+        using SessionHandler handler = new();
+        using HttpClient httpClient = new(handler) { BaseAddress = new Uri("https://markazor.test/") };
+        using MarkazorClientSession session = new(httpClient);
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        _ = await session.LoadSetupStatusAsync(ct);
+        _ = await session.GetAccessTokenAsync(ct);
+        TaskCompletionSource secondStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource firstRetried = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<MarkazorGitHubClientResult<string>> first = session.ExecuteGitHubAsync<string>(async (_, token, cancellation) =>
+        {
+            if (token == "token-1")
+            {
+                await secondStarted.Task.WaitAsync(cancellation).ConfigureAwait(false);
+                return new(MarkazorGitHubClientResultKind.Unauthorized, null, HttpStatusCode.Unauthorized, null);
+            }
+
+            firstRetried.SetResult();
+            return new(MarkazorGitHubClientResultKind.Success, token, HttpStatusCode.OK, null);
+        }, cancellationToken: ct);
+        Task<MarkazorGitHubClientResult<string>> second = session.ExecuteGitHubAsync<string>(async (_, token, cancellation) =>
+        {
+            if (token == "token-1")
+            {
+                secondStarted.SetResult();
+                await firstRetried.Task.WaitAsync(cancellation).ConfigureAwait(false);
+                return new(MarkazorGitHubClientResultKind.Unauthorized, null, HttpStatusCode.Unauthorized, null);
+            }
+
+            return new(MarkazorGitHubClientResultKind.Success, token, HttpStatusCode.OK, null);
+        }, cancellationToken: ct);
+        Assert.All(await Task.WhenAll(first, second), result => Assert.Equal("token-2", result.Value));
+        Assert.Equal(2, handler.RefreshCount);
+    }
+
+    [Fact]
     public async Task UnauthorizedGitHubRequestRefreshesAndRetriesOnce()
     {
         using SessionHandler handler = new()
@@ -44,8 +81,7 @@ public sealed class MarkazorClientSessionTests
         _ = await session.LoadSetupStatusAsync(testCancellationToken);
 
         MarkazorGitHubClientResult<MarkazorGitHubRepository> result = await session.ExecuteGitHubAsync(
-            static (client, token, cancellationToken) => client.GetRepositoryAsync(token, cancellationToken),
-            testCancellationToken);
+            static (client, token, cancellationToken) => client.GetRepositoryAsync(token, cancellationToken), cancellationToken: testCancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(2, handler.RefreshCount);
@@ -69,8 +105,7 @@ public sealed class MarkazorClientSessionTests
         _ = await session.LoadSetupStatusAsync(testCancellationToken);
 
         MarkazorGitHubClientResult<MarkazorGitHubRepository> result = await session.ExecuteGitHubAsync(
-            static (client, token, cancellationToken) => client.GetRepositoryAsync(token, cancellationToken),
-            testCancellationToken);
+            static (client, token, cancellationToken) => client.GetRepositoryAsync(token, cancellationToken), cancellationToken: testCancellationToken);
 
         Assert.Equal(MarkazorGitHubClientResultKind.Forbidden, result.Kind);
         Assert.Equal(1, handler.RefreshCount);

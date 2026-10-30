@@ -32,5 +32,5 @@ public interface IMarkazorClientSession
 
     Task<MarkazorGitHubClientResult<T>> ExecuteGitHubAsync<T>(
         Func<MarkazorGitHubRepositoryClient, string, CancellationToken, Task<MarkazorGitHubClientResult<T>>> operation,
-        CancellationToken cancellationToken = default);
+        MarkazorRepositorySettings? repository = null, CancellationToken cancellationToken = default);
 }

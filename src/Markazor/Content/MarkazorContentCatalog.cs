@@ -30,7 +30,7 @@ public sealed class MarkazorContentCatalog(IMarkazorClientSession session, Marka
             return entries;
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubRef> branch = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetBranchRefAsync(session.SetupStatus!.Repository.DefaultBranch, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
+        MarkazorGitHubClientResult<MarkazorGitHubRef> branch = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetBranchRefAsync(session.SetupStatus!.Repository.DefaultBranch, token, tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!branch.Succeeded || string.IsNullOrWhiteSpace(branch.Value?.Sha))
         {
@@ -39,7 +39,7 @@ public sealed class MarkazorContentCatalog(IMarkazorClientSession session, Marka
             return entries;
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> commit = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetCommitAsync(branch.Value.Sha, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
+        MarkazorGitHubClientResult<MarkazorGitHubCommit> commit = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetCommitAsync(branch.Value.Sha, token, tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!commit.Succeeded || string.IsNullOrWhiteSpace(commit.Value?.TreeSha))
         {
@@ -49,7 +49,7 @@ public sealed class MarkazorContentCatalog(IMarkazorClientSession session, Marka
         }
 
         MarkazorGitHubClientResult<MarkazorGitHubTree> tree = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.GetTreeAsync(commit.Value.TreeSha, token, recursive: true, tokenCancellation), cancellationToken).ConfigureAwait(false);
+            (client, token, tokenCancellation) => client.GetTreeAsync(commit.Value.TreeSha, token, recursive: true, tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!tree.Succeeded || tree.Value is null)
         {

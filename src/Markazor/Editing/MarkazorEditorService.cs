@@ -16,7 +16,7 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
             return UnauthorizedDocument();
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubContentFile> result = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.ReadFileAsync(path, token, cancellationToken: tokenCancellation), cancellationToken).ConfigureAwait(false);
+        MarkazorGitHubClientResult<MarkazorGitHubContentFile> result = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.ReadFileAsync(path, token, cancellationToken: tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!result.Succeeded || result.Value is null)
         {
@@ -48,8 +48,7 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
         MarkazorGitHubClientResult<MarkazorGitHubContentMutationResult> result = await session.ExecuteGitHubAsync(
             (client, token, tokenCancellation) => string.IsNullOrWhiteSpace(sha)
                 ? client.CreateFileAsync(path, markdown, $"Create {path}", token, cancellationToken: tokenCancellation)
-                : client.UpdateFileAsync(path, markdown, $"Update {path}", sha, token, cancellationToken: tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
+                : client.UpdateFileAsync(path, markdown, $"Update {path}", sha, token, cancellationToken: tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!result.Succeeded || result.Value is null)
         {
@@ -78,7 +77,7 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
             return new MarkazorEditorOperationResult(false, "GitHub authorization is required.");
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubContentMutationResult> result = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.DeleteFileAsync(path, $"Delete {path}", sha, token, cancellationToken: tokenCancellation), cancellationToken).ConfigureAwait(false);
+        MarkazorGitHubClientResult<MarkazorGitHubContentMutationResult> result = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.DeleteFileAsync(path, $"Delete {path}", sha, token, cancellationToken: tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (result.Succeeded)
         {
@@ -126,29 +125,14 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
         }
 
         IReadOnlyList<MarkazorEditorAsset> referencedAssets = GetReferencedAssets(markdown, assets);
-        MarkazorSetupStatus setupStatus = session.SetupStatus
-            ?? throw new InvalidOperationException("Setup status has not been loaded.");
-        MarkazorGitHubClientResult<MarkazorGitHubRef> branch = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.GetBranchRefAsync(setupStatus.Repository.DefaultBranch, token, tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!branch.Succeeded || string.IsNullOrWhiteSpace(branch.Value?.Sha))
-        {
-            return FailedDocument(branch);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> baseCommit = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.GetCommitAsync(branch.Value.Sha, token, tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!baseCommit.Succeeded || string.IsNullOrWhiteSpace(baseCommit.Value?.TreeSha))
+        MarkazorGitHubClientResult<MarkazorGitHubCommit> baseCommit = await session.ReadBranchAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!baseCommit.Succeeded || baseCommit.Value is null)
         {
             return FailedDocument(baseCommit);
         }
 
         MarkazorGitHubClientResult<MarkazorGitHubTree> baseTree = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.GetTreeAsync(baseCommit.Value.TreeSha, token, recursive: true, cancellationToken: tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
+            (client, token, tokenCancellation) => client.GetTreeAsync(baseCommit.Value.TreeSha, token, recursive: true, cancellationToken: tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!baseTree.Succeeded || baseTree.Value is null)
         {
@@ -220,72 +204,22 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
             changes.Add(MarkazorGitHubTreeFileChange.Remove(normalizedDraftPath));
         }
 
-        foreach (MarkazorEditorAsset asset in referencedAssets)
+        MarkazorEditorOperationResult assetResult = await AddAssetsAsync(referencedAssets, treeEntries, changes, cancellationToken).ConfigureAwait(false);
+        if (!assetResult.Succeeded)
         {
-            string normalizedAssetPath;
-            try
-            {
-                normalizedAssetPath = ContentPathPolicy.NormalizeGitHubPath(asset.RepositoryPath);
-            }
-            catch (ArgumentException ex)
-            {
-                return FailedDocument(ex.Message);
-            }
-
-            if (!IsAssetPathAllowed(normalizedAssetPath))
-            {
-                return FailedDocument($"Asset path '{normalizedAssetPath}' is not under the configured asset root.");
-            }
-
-            if (treeEntries.ContainsKey(normalizedAssetPath))
-            {
-                continue;
-            }
-
-            MarkazorGitHubClientResult<MarkazorGitHubBlob> blob = await session.ExecuteGitHubAsync(
-                (client, token, tokenCancellation) => client.CreateBlobAsync(asset.Content, token, tokenCancellation),
-                cancellationToken).ConfigureAwait(false);
-
-            if (!blob.Succeeded || string.IsNullOrWhiteSpace(blob.Value?.Sha))
-            {
-                return FailedDocument(blob);
-            }
-
-            changes.Add(MarkazorGitHubTreeFileChange.UpsertBlob(normalizedAssetPath, blob.Value.Sha));
+            return new(false, null, assetResult.Message, assetResult.Kind);
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubTree> tree = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.CreateTreeAsync(baseCommit.Value.TreeSha, changes, token, tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!tree.Succeeded || string.IsNullOrWhiteSpace(tree.Value?.Sha))
+        MarkazorGitHubClientResult<MarkazorGitHubCommitChanges> write = await session.CommitChangesAsync(baseCommit.Value, changes, $"Publish {publishedPath}", cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!write.Succeeded || write.Value is null)
         {
-            return FailedDocument(tree);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> commit = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.CreateCommitAsync($"Publish {publishedPath}", tree.Value.Sha, branch.Value.Sha, token, tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!commit.Succeeded || string.IsNullOrWhiteSpace(commit.Value?.Sha))
-        {
-            return FailedDocument(commit);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubRef> updatedRef = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.UpdateBranchRefAsync(setupStatus.Repository.DefaultBranch, commit.Value.Sha, token, cancellationToken: tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!updatedRef.Succeeded)
-        {
-            MarkazorEditorConflict? updateConflict = updatedRef.Kind == MarkazorGitHubClientResultKind.Conflict && removeDraft
+            MarkazorEditorConflict? updateConflict = write.Kind == MarkazorGitHubClientResultKind.Conflict && removeDraft
                 ? await LoadConflictAsync(normalizedDraftPath, markdown, cancellationToken).ConfigureAwait(false)
                 : null;
-
-            return new MarkazorEditorOperationResult<MarkazorEditorDocument>(false, null, Describe(updatedRef), updatedRef.Kind, updateConflict);
+            return new(false, null, Describe(write), write.Kind, updateConflict);
         }
 
-        string? publishedSha = tree.Value.Entries
+        string? publishedSha = write.Value.Tree.Entries
             .FirstOrDefault(entry => string.Equals(entry.Path, publishedPath, StringComparison.Ordinal)
                 && string.Equals(entry.Type, "blob", StringComparison.Ordinal))
             ?.Sha;
@@ -349,24 +283,13 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
             return FailedDocument(ex.Message);
         }
 
-        MarkazorSetupStatus setupStatus = session.SetupStatus
-            ?? throw new InvalidOperationException("Setup status has not been loaded.");
-        MarkazorGitHubClientResult<MarkazorGitHubRef> branch = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.GetBranchRefAsync(setupStatus.Repository.DefaultBranch, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!branch.Succeeded || string.IsNullOrWhiteSpace(branch.Value?.Sha))
-        {
-            return FailedDocument(branch);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> baseCommit = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetCommitAsync(branch.Value.Sha, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!baseCommit.Succeeded || string.IsNullOrWhiteSpace(baseCommit.Value?.TreeSha))
+        MarkazorGitHubClientResult<MarkazorGitHubCommit> baseCommit = await session.ReadBranchAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!baseCommit.Succeeded || baseCommit.Value is null)
         {
             return FailedDocument(baseCommit);
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubTree> baseTree = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetTreeAsync(baseCommit.Value.TreeSha, token, recursive: true, cancellationToken: tokenCancellation), cancellationToken).ConfigureAwait(false);
+        MarkazorGitHubClientResult<MarkazorGitHubTree> baseTree = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetTreeAsync(baseCommit.Value.TreeSha, token, recursive: true, cancellationToken: tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!baseTree.Succeeded || baseTree.Value is null)
         {
@@ -393,7 +316,7 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
             return new MarkazorEditorOperationResult<MarkazorEditorDocument>(false, null, "The file was not found on GitHub.", MarkazorGitHubClientResultKind.NotFound);
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubBlob> documentBlob = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.CreateBlobAsync(Encoding.UTF8.GetBytes(markdown), token, tokenCancellation), cancellationToken).ConfigureAwait(false);
+        MarkazorGitHubClientResult<MarkazorGitHubBlob> documentBlob = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.CreateBlobAsync(Encoding.UTF8.GetBytes(markdown), token, tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!documentBlob.Succeeded || string.IsNullOrWhiteSpace(documentBlob.Value?.Sha))
         {
@@ -401,62 +324,20 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
         }
 
         List<MarkazorGitHubTreeFileChange> changes = [MarkazorGitHubTreeFileChange.UpsertBlob(normalizedPath, documentBlob.Value.Sha),];
-        foreach (MarkazorEditorAsset asset in assets)
+        MarkazorEditorOperationResult assetResult = await AddAssetsAsync(assets, treeEntries, changes, cancellationToken).ConfigureAwait(false);
+        if (!assetResult.Succeeded)
         {
-            string normalizedAssetPath;
-            try
-            {
-                normalizedAssetPath = ContentPathPolicy.NormalizeGitHubPath(asset.RepositoryPath);
-            }
-            catch (ArgumentException ex)
-            {
-                return FailedDocument(ex.Message);
-            }
-
-            if (!IsAssetPathAllowed(normalizedAssetPath))
-            {
-                return FailedDocument($"Asset path '{normalizedAssetPath}' is not under the configured asset root.");
-            }
-
-            if (treeEntries.ContainsKey(normalizedAssetPath))
-            {
-                continue;
-            }
-
-            MarkazorGitHubClientResult<MarkazorGitHubBlob> blob = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.CreateBlobAsync(asset.Content, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-            if (!blob.Succeeded || string.IsNullOrWhiteSpace(blob.Value?.Sha))
-            {
-                return FailedDocument(blob);
-            }
-
-            changes.Add(MarkazorGitHubTreeFileChange.UpsertBlob(normalizedAssetPath, blob.Value.Sha));
+            return new(false, null, assetResult.Message, assetResult.Kind);
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubTree> tree = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.CreateTreeAsync(baseCommit.Value.TreeSha, changes, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!tree.Succeeded || string.IsNullOrWhiteSpace(tree.Value?.Sha))
+        string message = string.IsNullOrWhiteSpace(sha) ? $"Create {normalizedPath}" : $"Update {normalizedPath}";
+        MarkazorGitHubClientResult<MarkazorGitHubCommitChanges> write = await session.CommitChangesAsync(baseCommit.Value, changes, message, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!write.Succeeded || write.Value is null)
         {
-            return FailedDocument(tree);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> commit = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.CreateCommitAsync(string.IsNullOrWhiteSpace(sha) ? $"Create {normalizedPath}" : $"Update {normalizedPath}", tree.Value.Sha, branch.Value.Sha, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!commit.Succeeded || string.IsNullOrWhiteSpace(commit.Value?.Sha))
-        {
-            return FailedDocument(commit);
-        }
-
-        string commitSha = commit.Value.Sha;
-        MarkazorGitHubClientResult<MarkazorGitHubRef> updatedRef = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.UpdateBranchRefAsync(setupStatus.Repository.DefaultBranch, commitSha, token, cancellationToken: tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!updatedRef.Succeeded)
-        {
-            MarkazorEditorConflict? updateConflict = updatedRef.Kind == MarkazorGitHubClientResultKind.Conflict
+            MarkazorEditorConflict? updateConflict = write.Kind == MarkazorGitHubClientResultKind.Conflict
                 ? await LoadConflictAsync(normalizedPath, markdown, cancellationToken).ConfigureAwait(false)
                 : null;
-
-            return new MarkazorEditorOperationResult<MarkazorEditorDocument>(false, null, Describe(updatedRef), updatedRef.Kind, updateConflict);
+            return new(false, null, Describe(write), write.Kind, updateConflict);
         }
 
         MarkazorEditorDocument document = new(normalizedPath, markdown, documentBlob.Value.Sha);
@@ -469,8 +350,6 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
     {
         string draftRoot = MarkazorRepositoryPaths.DraftsRoot;
         string postRoot = MarkazorRepositoryPaths.PostsRoot;
-        MarkazorSetupStatus setupStatus = session.SetupStatus
-            ?? throw new InvalidOperationException("Setup status has not been loaded.");
         Dictionary<string, string> destinations = new(StringComparer.Ordinal);
 
         foreach (string draftPath in draftPaths)
@@ -481,21 +360,13 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
             }
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubRef> branch = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetBranchRefAsync(setupStatus.Repository.DefaultBranch, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!branch.Succeeded || string.IsNullOrWhiteSpace(branch.Value?.Sha))
-        {
-            return FailedBatch(branch, attempt);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> baseCommit = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetCommitAsync(branch.Value.Sha, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!baseCommit.Succeeded || string.IsNullOrWhiteSpace(baseCommit.Value?.TreeSha))
+        MarkazorGitHubClientResult<MarkazorGitHubCommit> baseCommit = await session.ReadBranchAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!baseCommit.Succeeded || baseCommit.Value is null)
         {
             return FailedBatch(baseCommit, attempt);
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubTree> baseTree = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetTreeAsync(baseCommit.Value.TreeSha, token, recursive: true, cancellationToken: tokenCancellation), cancellationToken).ConfigureAwait(false);
+        MarkazorGitHubClientResult<MarkazorGitHubTree> baseTree = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.GetTreeAsync(baseCommit.Value.TreeSha, token, recursive: true, cancellationToken: tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (!baseTree.Succeeded || baseTree.Value is null)
         {
@@ -519,7 +390,7 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
                 return FailedBatch($"Draft {draftPath} was not found on the branch.", attemptCount: attempt);
             }
 
-            MarkazorGitHubClientResult<MarkazorGitHubBlob> blob = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.ReadBlobAsync(draftEntry.Sha, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
+            MarkazorGitHubClientResult<MarkazorGitHubBlob> blob = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.ReadBlobAsync(draftEntry.Sha, token, tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (!blob.Succeeded || blob.Value is null)
             {
@@ -543,36 +414,14 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
             publishedDocuments.Add(new MarkazorEditorDocument(publishedPath, publishedMarkdown, null));
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubTree> tree = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.CreateTreeAsync(baseCommit.Value.TreeSha, changes, token, tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!tree.Succeeded || string.IsNullOrWhiteSpace(tree.Value?.Sha))
+        string message = draftPaths.Length == 1 ? $"Publish {destinations[draftPaths[0]]}" : $"Publish {draftPaths.Length} drafts";
+        MarkazorGitHubClientResult<MarkazorGitHubCommitChanges> write = await session.CommitChangesAsync(baseCommit.Value, changes, message, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!write.Succeeded || write.Value is null)
         {
-            return FailedBatch(tree, attempt);
+            return FailedBatch(write, attempt, retryable: write.Kind == MarkazorGitHubClientResultKind.Conflict);
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> commit = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.CreateCommitAsync(
-                draftPaths.Length == 1 ? $"Publish {destinations[draftPaths[0]]}" : $"Publish {draftPaths.Length} drafts",
-                tree.Value.Sha,
-                branch.Value.Sha,
-                token,
-                tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!commit.Succeeded || string.IsNullOrWhiteSpace(commit.Value?.Sha))
-        {
-            return FailedBatch(commit, attempt);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubRef> updatedRef = await session.ExecuteGitHubAsync(
-            (client, token, tokenCancellation) => client.UpdateBranchRefAsync(setupStatus.Repository.DefaultBranch, commit.Value.Sha, token, cancellationToken: tokenCancellation), cancellationToken).ConfigureAwait(false);
-
-        if (!updatedRef.Succeeded)
-        {
-            return FailedBatch(updatedRef, attempt, retryable: updatedRef.Kind == MarkazorGitHubClientResultKind.Conflict);
-        }
-
-        Dictionary<string, string> createdShas = tree.Value.Entries
+        Dictionary<string, string> createdShas = write.Value.Tree.Entries
             .Where(static entry => string.Equals(entry.Type, "blob", StringComparison.Ordinal))
             .ToDictionary(static entry => entry.Path, static entry => entry.Sha, StringComparer.Ordinal);
 
@@ -586,7 +435,42 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
             catalog.UpsertDocument(document.Path, document.Markdown, document.Sha);
         }
 
-        return new MarkazorBatchPublishResult(true, publishedDocuments, commit.Value.Sha, null, AttemptCount: attempt);
+        return new MarkazorBatchPublishResult(true, publishedDocuments, write.Value.CommitSha, null, AttemptCount: attempt);
+    }
+
+    private async Task<MarkazorEditorOperationResult> AddAssetsAsync(IReadOnlyList<MarkazorEditorAsset> assets, Dictionary<string, MarkazorGitHubTreeEntry> treeEntries, List<MarkazorGitHubTreeFileChange> changes, CancellationToken cancellationToken)
+    {
+        foreach (MarkazorEditorAsset asset in assets)
+        {
+            string path;
+            try
+            {
+                path = ContentPathPolicy.NormalizeGitHubPath(asset.RepositoryPath);
+            }
+            catch (ArgumentException exception)
+            {
+                return new(false, exception.Message);
+            }
+
+            if (!IsAssetPathAllowed(path))
+            {
+                return new(false, $"Asset path '{path}' is not under the configured asset root.");
+            }
+
+            if (!treeEntries.ContainsKey(path))
+            {
+                MarkazorGitHubClientResult<MarkazorGitHubBlob> blob = await session.ExecuteGitHubAsync(
+                    (client, token, ct) => client.CreateBlobAsync(asset.Content, token, ct), cancellationToken: cancellationToken).ConfigureAwait(false);
+                if (!blob.Succeeded || string.IsNullOrWhiteSpace(blob.Value?.Sha))
+                {
+                    return new(false, Describe(blob), blob.Kind);
+                }
+
+                changes.Add(MarkazorGitHubTreeFileChange.UpsertBlob(path, blob.Value.Sha));
+            }
+        }
+
+        return new(true, null);
     }
 
     private async Task<bool> EnsureReadyAsync(CancellationToken cancellationToken)
@@ -601,7 +485,7 @@ public sealed class MarkazorEditorService(IMarkazorClientSession session, IMarka
 
     private async Task<MarkazorEditorConflict?> LoadConflictAsync(string path, string localMarkdown, CancellationToken cancellationToken)
     {
-        MarkazorGitHubClientResult<MarkazorGitHubContentFile> remote = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.ReadFileAsync(path, token, cancellationToken: tokenCancellation), cancellationToken).ConfigureAwait(false);
+        MarkazorGitHubClientResult<MarkazorGitHubContentFile> remote = await session.ExecuteGitHubAsync((client, token, tokenCancellation) => client.ReadFileAsync(path, token, cancellationToken: tokenCancellation), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         return remote.Succeeded && remote.Value is not null
             ? new MarkazorEditorConflict(remote.Value.Path, localMarkdown, remote.Value.ContentText, remote.Value.Sha)

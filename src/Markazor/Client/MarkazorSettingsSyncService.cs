@@ -6,7 +6,7 @@ using Markazor.Core.Setup;
 namespace Markazor.Client;
 
 public sealed class MarkazorSettingsSyncService(
-    MarkazorClientSession session) : IMarkazorSettingsSyncService
+    IMarkazorClientSession session) : IMarkazorSettingsSyncService
 {
     private const string SettingsPath = MarkazorRepositoryPaths.SettingsPath;
 
@@ -101,23 +101,8 @@ public sealed class MarkazorSettingsSyncService(
             return Failed("Site icon must be a valid PNG file.");
         }
 
-        string branchName = settings.Repository.DefaultBranch;
-        MarkazorGitHubClientResult<MarkazorGitHubRef> branch = await ExecuteGitHubAsync(
-            settings,
-            (client, token, tokenCancellation) => client.GetBranchRefAsync(branchName, token, tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!branch.Succeeded || string.IsNullOrWhiteSpace(branch.Value?.Sha))
-        {
-            return Failed(branch);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> baseCommit = await ExecuteGitHubAsync(
-            settings,
-            (client, token, tokenCancellation) => client.GetCommitAsync(branch.Value.Sha, token, tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!baseCommit.Succeeded || string.IsNullOrWhiteSpace(baseCommit.Value?.TreeSha))
+        MarkazorGitHubClientResult<MarkazorGitHubCommit> baseCommit = await session.ReadBranchAsync(settings.Repository, cancellationToken).ConfigureAwait(false);
+        if (!baseCommit.Succeeded || baseCommit.Value is null)
         {
             return Failed(baseCommit);
         }
@@ -142,41 +127,13 @@ public sealed class MarkazorSettingsSyncService(
             return Failed(iconBlob);
         }
 
-        MarkazorGitHubClientResult<MarkazorGitHubTree> tree = await ExecuteGitHubAsync(
-            settings,
-            (client, token, tokenCancellation) => client.CreateTreeAsync(
-                baseCommit.Value.TreeSha,
-                [
-                    MarkazorGitHubTreeFileChange.UpsertBlob(SettingsPath, settingsBlob.Value.Sha),
-                    MarkazorGitHubTreeFileChange.UpsertBlob(MarkazorRepositoryPaths.SiteIconPath, iconBlob.Value.Sha),
-                ],
-                token,
-                tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!tree.Succeeded || string.IsNullOrWhiteSpace(tree.Value?.Sha))
-        {
-            return Failed(tree);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubCommit> commit = await ExecuteGitHubAsync(
-            settings,
-            (client, token, tokenCancellation) => client.CreateCommitAsync("Configure Markazor settings", tree.Value.Sha, branch.Value.Sha, token, tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!commit.Succeeded || string.IsNullOrWhiteSpace(commit.Value?.Sha))
-        {
-            return Failed(commit);
-        }
-
-        MarkazorGitHubClientResult<MarkazorGitHubRef> update = await ExecuteGitHubAsync(
-            settings,
-            (client, token, tokenCancellation) => client.UpdateBranchRefAsync(branchName, commit.Value.Sha, token, cancellationToken: tokenCancellation),
-            cancellationToken).ConfigureAwait(false);
-
-        return update.Succeeded
-            ? new MarkazorSettingsSyncResult(true, commit.Value.Sha, null)
-            : Failed(update);
+        MarkazorGitHubClientResult<MarkazorGitHubCommitChanges> write = await session.CommitChangesAsync(
+            baseCommit.Value,
+            [MarkazorGitHubTreeFileChange.UpsertBlob(SettingsPath, settingsBlob.Value.Sha), MarkazorGitHubTreeFileChange.UpsertBlob(MarkazorRepositoryPaths.SiteIconPath, iconBlob.Value.Sha)],
+            "Configure Markazor settings", settings.Repository, cancellationToken).ConfigureAwait(false);
+        return write.Succeeded && write.Value is not null
+            ? new MarkazorSettingsSyncResult(true, write.Value.CommitSha, null)
+            : Failed(write);
     }
 
     private Task<MarkazorSettingsSyncResult> CreateAsync(
@@ -229,50 +186,10 @@ public sealed class MarkazorSettingsSyncService(
             : Failed(result);
     }
 
-    private async Task<MarkazorGitHubClientResult<T>> ExecuteGitHubAsync<T>(
+    private Task<MarkazorGitHubClientResult<T>> ExecuteGitHubAsync<T>(
         MarkazorSiteSettings settings,
         Func<MarkazorGitHubRepositoryClient, string, CancellationToken, Task<MarkazorGitHubClientResult<T>>> operation,
-        CancellationToken cancellationToken)
-    {
-        string? accessToken = await session.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(accessToken))
-        {
-            return new MarkazorGitHubClientResult<T>(
-                MarkazorGitHubClientResultKind.Unauthorized,
-                default,
-                System.Net.HttpStatusCode.Unauthorized,
-                "GitHub authorization is required.");
-        }
-
-        MarkazorGitHubRepositoryClient client = session.CreateRepositoryClient(settings);
-        MarkazorGitHubClientResult<T> result = await operation(
-            client,
-            accessToken,
-            cancellationToken).ConfigureAwait(false);
-
-        return result.Kind == MarkazorGitHubClientResultKind.Unauthorized
-            ? await RetryAfterRefreshAsync(client, operation, cancellationToken).ConfigureAwait(false)
-            : result;
-    }
-
-    private async Task<MarkazorGitHubClientResult<T>> RetryAfterRefreshAsync<T>(
-        MarkazorGitHubRepositoryClient client,
-        Func<MarkazorGitHubRepositoryClient, string, CancellationToken, Task<MarkazorGitHubClientResult<T>>> operation,
-        CancellationToken cancellationToken)
-    {
-        session.ClearAccessTokenForRetry();
-        bool refreshed = await session.RefreshAccessTokenAsync(cancellationToken).ConfigureAwait(false);
-        if (!refreshed || string.IsNullOrWhiteSpace(session.AccessToken))
-        {
-            return new MarkazorGitHubClientResult<T>(
-                MarkazorGitHubClientResultKind.Unauthorized,
-                default,
-                System.Net.HttpStatusCode.Unauthorized,
-                "GitHub authorization is required.");
-        }
-
-        return await operation(client, session.AccessToken, cancellationToken).ConfigureAwait(false);
-    }
+        CancellationToken cancellationToken) => session.ExecuteGitHubAsync(operation, settings.Repository, cancellationToken);
 
     private static bool HasRepositoryConfiguration(MarkazorSiteSettings settings)
     {
