@@ -351,10 +351,7 @@ public sealed class SiteIndexGeneratorTests
 
     private static string RepositoryPath(params string[] segments)
     {
-        return Path.Combine(
-            Path.GetTempPath(),
-            "markazor-sourcegen-tests",
-            Path.Combine(segments));
+        return Path.Combine([Path.GetTempPath(), "markazor-sourcegen-tests", .. segments]);
     }
 
     private static string RepositoryContentPath(params string[] segments)

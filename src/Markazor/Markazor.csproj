@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <PackageId>Markazor</PackageId>
     <Description>Blazor components, editor UI, and build integration for Markazor sites.</Description>
     <MarkazorEditorBundleFileName>markazor-markdown-editor.js</MarkazorEditorBundleFileName>
@@ -200,10 +200,10 @@ if (!IsUpToDate())
              RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;TargetFramework"
              Condition="'$(NoBuild)' != 'true'" />
     <ItemGroup>
-      <None Include="..\Markazor.Build\bin\$(Configuration)\net9.0\*.dll;..\Markazor.Build\bin\$(Configuration)\net9.0\*.deps.json;..\Markazor.Build\bin\$(Configuration)\net9.0\*.runtimeconfig.json"
+      <None Include="..\Markazor.Build\bin\$(Configuration)\net10.0\*.dll;..\Markazor.Build\bin\$(Configuration)\net10.0\*.deps.json;..\Markazor.Build\bin\$(Configuration)\net10.0\*.runtimeconfig.json"
             Pack="true" PackagePath="buildTransitive/tools" Visible="false" />
     </ItemGroup>
-    <Error Condition="!Exists('..\Markazor.Build\bin\$(Configuration)\net9.0\Markazor.Build.dll')" Text="Build Markazor.Build before packing Markazor." />
+    <Error Condition="!Exists('..\Markazor.Build\bin\$(Configuration)\net10.0\Markazor.Build.dll')" Text="Build Markazor.Build before packing Markazor." />
   </Target>
 
   <Target Name="RestoreMarkazorEditorAssets"

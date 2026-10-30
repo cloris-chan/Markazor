@@ -441,22 +441,22 @@ if (-not [string]::IsNullOrWhiteSpace($webMarkazorReference.ExcludeAssets)) {
     throw 'Generated Web project must include Markazor analyzers.'
 }
 
-if ($webProjectXml.Project.PropertyGroup.TargetFramework -ne 'net9.0') {
-    throw "Generated Web project must explicitly target net9.0 for Azure Static Web Apps Oryx detection. Actual: $($webProjectXml.Project.PropertyGroup.TargetFramework)"
+if ($webProjectXml.Project.PropertyGroup.TargetFramework -ne 'net10.0') {
+    throw "Generated Web project must explicitly target net10.0 for Azure Static Web Apps Oryx detection. Actual: $($webProjectXml.Project.PropertyGroup.TargetFramework)"
 }
 
-if ($functionsProjectXml.Project.PropertyGroup.TargetFramework -ne 'net9.0') {
-    throw "Generated Functions project must explicitly target net9.0 for Azure Static Web Apps Oryx detection. Actual: $($functionsProjectXml.Project.PropertyGroup.TargetFramework)"
+if ($functionsProjectXml.Project.PropertyGroup.TargetFramework -ne 'net10.0') {
+    throw "Generated Functions project must explicitly target net10.0 for Azure Static Web Apps Oryx detection. Actual: $($functionsProjectXml.Project.PropertyGroup.TargetFramework)"
 }
 
 $webTargetFramework = (dotnet msbuild $webProjectPath -getProperty:TargetFramework).Trim()
 $functionsTargetFramework = (dotnet msbuild $functionsProjectPath -getProperty:TargetFramework).Trim()
-if ($webTargetFramework -ne 'net9.0') {
-    throw "Generated Web project must target net9.0. Actual: $webTargetFramework"
+if ($webTargetFramework -ne 'net10.0') {
+    throw "Generated Web project must target net10.0. Actual: $webTargetFramework"
 }
 
-if ($functionsTargetFramework -ne 'net9.0') {
-    throw "Generated Functions project must target net9.0. Actual: $functionsTargetFramework"
+if ($functionsTargetFramework -ne 'net10.0') {
+    throw "Generated Functions project must target net10.0. Actual: $functionsTargetFramework"
 }
 
 $generatedReadmePath = Join-Path $generatedPath 'README.md'
@@ -573,7 +573,7 @@ if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"route"
     throw 'Generated staticwebapp.config.json is missing the /studio no-store route.'
 }
 
-if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"apiRuntime": "dotnet-isolated:9.0"')) {
+if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"apiRuntime": "dotnet-isolated:10.0"')) {
     throw 'Generated staticwebapp.config.json is missing the Azure Functions runtime declaration.'
 }
 

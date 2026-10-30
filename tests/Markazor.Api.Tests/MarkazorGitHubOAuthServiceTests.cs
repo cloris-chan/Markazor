@@ -1,11 +1,24 @@
 using System.Net;
 using System.Text;
 using Markazor.Api.Auth;
+using Markazor.Api.Serialization;
 
 namespace Markazor.Api.Tests;
 
 public sealed class MarkazorGitHubOAuthServiceTests
 {
+    [Fact]
+    public void ExistingRefreshCookieRemainsReadable()
+    {
+        const string legacyCookie = "AAECAwQFBgcICQoL_GfmYieIBJynSwvEG5AKQH6-b2uCn42322pwUnxhOe-hXXCMwEsMMKEDXk6PF8XQeL3BHZ8gBL_L9D2_QWv7-l-IEMYiq_SV1BT6HCSWc9QXV5CMQwt570yz-g";
+        MarkazorCookieProtector protector = new("cookie-secret");
+        MarkazorRefreshTokenCookie? cookie = protector.Unprotect(
+            legacyCookie,
+            MarkazorApiJsonSerializerContext.Default.MarkazorRefreshTokenCookie);
+
+        Assert.Equal(new MarkazorRefreshTokenCookie("refresh-token", null, "client-id"), cookie);
+    }
+
     [Fact]
     public async Task CallbackExchangesAuthorizationCodeAndProtectsRefreshToken()
     {

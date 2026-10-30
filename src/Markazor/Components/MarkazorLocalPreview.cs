@@ -97,7 +97,7 @@ internal static class MarkazorLocalPreview
             return false;
         }
 
-        ReadOnlySpan<char> remaining = query.AsSpan();
+        ReadOnlySpan<char> remaining = query;
         if (remaining[0] == '?')
         {
             remaining = remaining[1..];
@@ -110,7 +110,7 @@ internal static class MarkazorLocalPreview
             int equals = pair.IndexOf('=');
             ReadOnlySpan<char> name = equals < 0 ? pair : pair[..equals];
             ReadOnlySpan<char> value = equals < 0 ? ReadOnlySpan<char>.Empty : pair[(equals + 1)..];
-            if (name.SequenceEqual(QueryParameterName.AsSpan()) && value.SequenceEqual("1".AsSpan()))
+            if (name.SequenceEqual(QueryParameterName) && value.SequenceEqual("1"))
             {
                 return true;
             }

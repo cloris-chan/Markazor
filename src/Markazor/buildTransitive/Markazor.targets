@@ -23,7 +23,7 @@
     <MarkazorServiceWorkerIntermediateRoot Condition="'$(MarkazorServiceWorkerIntermediateRoot)' == ''">$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', '$(Configuration)', '$(TargetFramework)', 'markazor', 'service-worker'))))</MarkazorServiceWorkerIntermediateRoot>
     <_MarkazorMSBuildTasksAssembly>$([System.IO.Path]::Combine('$(MSBuildToolsPath)', 'Microsoft.Build.Tasks.Core.dll'))</_MarkazorMSBuildTasksAssembly>
     <_MarkazorStaticBuilder>$(MSBuildThisFileDirectory)tools\Markazor.Build.dll</_MarkazorStaticBuilder>
-    <_MarkazorStaticBuilder Condition="!Exists('$(_MarkazorStaticBuilder)')">$(MSBuildThisFileDirectory)..\..\Markazor.Build\bin\$(Configuration)\net9.0\Markazor.Build.dll</_MarkazorStaticBuilder>
+    <_MarkazorStaticBuilder Condition="!Exists('$(_MarkazorStaticBuilder)')">$(MSBuildThisFileDirectory)..\..\Markazor.Build\bin\$(Configuration)\net10.0\Markazor.Build.dll</_MarkazorStaticBuilder>
   </PropertyGroup>
 
   <UsingTask TaskName="MarkazorGenerateWebManifest"

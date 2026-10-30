@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -22,8 +23,8 @@ public sealed class MarkazorGitHubOAuthService(HttpClient httpClient, MarkazorGi
 
         DateTimeOffset currentTime = now ?? DateTimeOffset.UtcNow;
         string effectiveClientId = ResolveClientId(clientId);
-        string state = Base64Url.RandomToken();
-        string codeVerifier = Base64Url.RandomToken();
+        string state = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
+        string codeVerifier = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
         string codeChallenge = CreateCodeChallenge(codeVerifier);
         DateTimeOffset expiresAtUtc = currentTime.Add(options.StateLifetime);
         MarkazorOAuthState oauthState = new(state, codeVerifier, expiresAtUtc, effectiveClientId, callbackUri);
@@ -209,6 +210,6 @@ public sealed class MarkazorGitHubOAuthService(HttpClient httpClient, MarkazorGi
     {
         byte[] hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
 
-        return Base64Url.Encode(hash);
+        return Base64Url.EncodeToString(hash);
     }
 }

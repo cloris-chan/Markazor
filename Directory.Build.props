@@ -33,7 +33,7 @@
     <PackageReadmeFile>package-readme.md</PackageReadmeFile>
   </PropertyGroup>
 
-  <PropertyGroup Condition="('$(TargetFramework)' == 'net9.0' or '$(TargetFramework)' == 'net10.0') and '$(MarkazorDisableAotCompatibility)' != 'true'">
+  <PropertyGroup Condition="'$(MarkazorDisableAotCompatibility)' != 'true'">
     <IsAotCompatible>true</IsAotCompatible>
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>

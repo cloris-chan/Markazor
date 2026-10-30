@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -11,6 +12,7 @@ namespace Markazor.Content;
 
 internal static class MarkdownDocumentRenderer
 {
+    private static readonly SearchValues<char> CodeLanguageCharacters = SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-#");
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAutoIdentifiers(AutoIdentifierOptions.GitHub).UseAdvancedExtensions().Build();
     private static readonly HtmlSanitizer Sanitizer = CreateSanitizer();
 
@@ -162,7 +164,7 @@ internal static class MarkdownDocumentRenderer
             foreach (string name in element.ClassList.ToArray())
             {
                 bool language = element.LocalName == "code" && name.StartsWith("language-", StringComparison.Ordinal) && name.Length is > 9 and <= 41
-                    && name.AsSpan(9).IndexOfAnyExcept("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-#".AsSpan()) < 0;
+                    && name.AsSpan(9).IndexOfAnyExcept(CodeLanguageCharacters) < 0;
                 if (!language && name is not ("footnotes" or "footnote-ref" or "footnote-back-ref" or "task-list-item" or "contains-task-list"))
                 {
                     element.ClassList.Remove(name);
