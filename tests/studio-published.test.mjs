@@ -46,13 +46,10 @@ test('published Studio initializes and edits through the trimmed Blazor interop'
   await page.waitForLoadState('networkidle');
   assert.ok(!requests.some(url => /markazor-markdown-editor[^/]*\.js/.test(url)), 'Public reading must not load Muya');
 
-  // The explicit local-preview flag uses fixtures; this test never writes GitHub content.
   await page.goto(`${origin}/studio/write?markazor-preview=1`);
   await page.waitForSelector('.is-muya-ready', { timeout: 20000 }).catch(error => {
     assert.fail(`Published editor failed to initialize: ${errors.join('\n')}\n${error.message}`);
   });
-  // Classic Windows scrollbars reserve space; overlay scrollbars in headless
-  // browsers otherwise hide collapsed Muya icon containers.
   await page.addStyleTag({ content: '.markazor-muya-popover ::-webkit-scrollbar { width: 16px; height: 16px; }' });
   assert.equal(await page.locator('.mu-container').count(), 1);
   assert.equal(await page.locator('.markazor-markdown-editor-fallback').isVisible(), false);
@@ -87,8 +84,14 @@ test('published Studio initializes and edits through the trimmed Blazor interop'
     canvas.width = canvas.height = 32;
     return canvas.toDataURL('image/png').split(',')[1];
   });
+  await page.evaluate(() => {
+    window.revokedImageUrls = [];
+    const revoke = URL.revokeObjectURL.bind(URL);
+    URL.revokeObjectURL = url => { window.revokedImageUrls.push(url); revoke(url); };
+  });
   await page.locator('input[type=file]').setInputFiles({ name: 'published.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await page.waitForFunction(() => document.querySelector('.mu-inline-image img')?.naturalWidth === 32);
+  const imagePreviewUrl = await page.locator('.mu-inline-image img').getAttribute('src');
   const markdown = await page.locator('.markazor-markdown-editor-fallback').inputValue();
   assert.ok(markdown.includes('Published 繁體中文.'));
   assert.ok(markdown.includes('/assets/'));
@@ -130,6 +133,7 @@ test('published Studio initializes and edits through the trimmed Blazor interop'
   await page.waitForFunction(() => document.querySelector('.markazor-document-title h2')?.textContent === 'Hello Workbench');
   assert.equal(await page.locator('#markazor-content-browser').isVisible(), false);
   assert.ok(!(await page.locator('.markazor-markdown-editor-fallback').inputValue()).includes('Published 繁體中文.'));
+  assert.ok(await page.evaluate(url => window.revokedImageUrls.includes(url), imagePreviewUrl), 'Switching documents must revoke the uploaded image preview');
   assert.deepEqual(errors, []);
   assert.deepEqual(failed, []);
 });

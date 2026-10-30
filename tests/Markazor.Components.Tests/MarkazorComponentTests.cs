@@ -886,8 +886,13 @@ public sealed class MarkazorComponentTests
             Assert.Empty(component.FindAll(".markazor-asset-tools"));
         });
 
+        GetMetadataInput(component, "Title").Input(" Hello ");
+        Assert.Contains("Saved", component.Find(".markazor-document-state").TextContent, StringComparison.Ordinal);
         GetMetadataInput(component, "Title").Input("Edited title");
-        component.Find(".markazor-editor-textarea").Input("Edited body");
+        Assert.Contains("Unsaved", component.Find(".markazor-document-state").TextContent, StringComparison.Ordinal);
+        GetMetadataInput(component, "Tags").Change("one, \"reader, writer\", \"quoted \\\"tag\\\"\"");
+        component.Find(".markazor-editor-textarea").Input("Edited body with four words");
+        Assert.Contains("5 words", component.Find(".markazor-document-state").TextContent, StringComparison.Ordinal);
         component.FindAll("button")
             .Single(button => string.Equals(button.TextContent.Trim(), "Save", StringComparison.Ordinal))
             .Click();
@@ -899,6 +904,8 @@ public sealed class MarkazorComponentTests
             Assert.Contains("draft: true", editor.LastSavedMarkdown, StringComparison.Ordinal);
             Assert.Contains("Edited body", editor.LastSavedMarkdown, StringComparison.Ordinal);
             Assert.StartsWith("---", editor.LastSavedMarkdown, StringComparison.Ordinal);
+            Assert.Equal(["one", "reader, writer", "quoted \"tag\""], MarkdownContent.ParseArticleMeta("drafts/hello.md", editor.LastSavedMarkdown!).Tags);
+            Assert.Contains("Saved", component.Find(".markazor-document-state").TextContent, StringComparison.Ordinal);
         });
     }
 

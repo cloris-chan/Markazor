@@ -39,9 +39,11 @@ internal sealed class MarkdownFrontMatter(IReadOnlyList<string> lines, string bo
         return line is null ? new([], markdown, false) : new(lines, reader.ReadToEnd().TrimStart('\r', '\n'), true);
     }
 
-    public string[] GetTags()
+    public string[] GetTags() => ParseTags(Get("tags"));
+
+    public static string[] ParseTags(string? value)
     {
-        string text = (Get("tags") ?? string.Empty).Trim().Trim('[', ']');
+        string text = (value ?? string.Empty).Trim().Trim('[', ']');
         List<string> tags = [];
         int start = 0;
         char quote = '\0';

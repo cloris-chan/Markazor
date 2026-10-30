@@ -16,6 +16,11 @@
 @inject Microsoft.JSInterop.IJSRuntime JavaScript
 @implements IAsyncDisposable
 
+@{
+    IReadOnlyList<MarkazorContentEntry> entries = EditorEntries;
+    int draftCount = entries.Count(static entry => entry.IsDraft);
+}
+
 <NavigationLock ConfirmExternalNavigation="@IsDirty"
                 OnBeforeInternalNavigation="ConfirmNavigationAsync" />
 
@@ -54,12 +59,12 @@
                 <h2>Content</h2>
             </div>
 
-            @if (EditorEntries.Count > 0)
+            @if (entries.Count > 0)
             {
                 <div class="markazor-sidebar-metrics" aria-label="Content summary">
-                    <span><strong>@EditorEntries.Count</strong> files</span>
-                    <span><strong>@DraftCount</strong> drafts</span>
-                    <span><strong>@PublishedCount</strong> public</span>
+                    <span><strong>@entries.Count</strong> files</span>
+                    <span><strong>@draftCount</strong> drafts</span>
+                    <span><strong>@(entries.Count - draftCount)</strong> public</span>
                 </div>
             }
 
@@ -79,7 +84,7 @@
             </details>
 
             <div class="markazor-article-list">
-                @foreach (MarkazorContentEntry entry in EditorEntries)
+                @foreach (MarkazorContentEntry entry in entries)
                 {
                     <div class="@GetArticleRowClass(entry)">
                         @if (entry.IsDraft)
@@ -101,7 +106,7 @@
                         </button>
                     </div>
                 }
-                @if (EditorEntries.Count == 0)
+                @if (entries.Count == 0)
                 {
                     <p class="markazor-muted">@EmptyContentText</p>
                 }
@@ -196,7 +201,7 @@
                 </details>
 
                     <section class="markazor-authoring-pane" aria-label="Article editor">
-                        <MarkazorMarkdownEditor Value="@bodyMarkdown"
+                        <MarkazorMarkdownEditor Value="@BodyMarkdown"
                                                 DocumentKey="@documentKey"
                                                 @ref="markdownEditor"
                                                 ValueChanged="OnMarkdownChanged"
@@ -249,11 +254,17 @@
     private IJSObjectReference? assetModule;
     private string documentPath = string.Empty;
     private string documentKey = Guid.NewGuid().ToString("N");
-    private string bodyMarkdown = string.Empty;
+    private string BodyMarkdown
+    {
+        get;
+        set { field = value; WordCount = CountWords(value); referencedPendingAssets = null; }
+    } = string.Empty;
     private string baseBodyMarkdown = string.Empty;
     private bool fileBrowserOpen;
-    private EditorMetadataState metadata = EditorMetadataState.CreateDefault();
-    private EditorMetadataState baseMetadata = EditorMetadataState.CreateDefault();
+    private EditorMetadataState metadata = new();
+    private string baseFrontMatter = string.Empty;
+    private IReadOnlyList<PendingEditorAsset>? referencedPendingAssets;
+    private IReadOnlyDictionary<string, string>? imageSources;
     private string? sha;
     private string? pendingDeleteSha;
     private string? message;
@@ -271,48 +282,26 @@
     private readonly HashSet<string> selectedDraftPaths = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PendingEditorAsset> pendingAssets = new(StringComparer.Ordinal);
 
-    private bool CanSave => !isLocalPreview
-        && !isBusy
-        && Session.IsAuthenticated
-        && diagnostics?.Ready == true
-        && !string.IsNullOrWhiteSpace(documentPath)
-        && metadata.HasRequiredValues
-        && !string.IsNullOrWhiteSpace(bodyMarkdown);
+    private bool CanWrite => !isLocalPreview && !isBusy && Session.IsAuthenticated && diagnostics?.Ready == true;
 
-    private bool CanDelete => !isLocalPreview
-        && !isBusy
-        && Session.IsAuthenticated
-        && diagnostics?.Ready == true
-        && !isNewDocument
-        && !string.IsNullOrWhiteSpace(documentPath)
-        && (!string.IsNullOrWhiteSpace(sha) || !string.IsNullOrWhiteSpace(pendingDeleteSha));
+    private bool CanSave => CanWrite && HasDocument && metadata.HasRequiredValues && !string.IsNullOrWhiteSpace(BodyMarkdown);
 
-    private bool CanPublish => !isLocalPreview
-        && !isBusy
-        && Session.IsAuthenticated
-        && diagnostics?.Ready == true
-        && !string.IsNullOrWhiteSpace(documentPath)
-        && metadata.HasRequiredValues
-        && !string.IsNullOrWhiteSpace(bodyMarkdown)
-        && IsDraftPath(documentPath);
+    private bool CanDelete => CanWrite && HasDocument && !isNewDocument && (!string.IsNullOrWhiteSpace(sha) || !string.IsNullOrWhiteSpace(pendingDeleteSha));
 
-    private bool CanPublishSelected => !isLocalPreview
-        && !isBusy
-        && Session.IsAuthenticated
-        && diagnostics?.Ready == true
-        && selectedDraftPaths.Count > 0
-        && !SelectedDraftIsDirty;
+    private bool CanPublish => CanSave && IsDraftPath(documentPath);
+
+    private bool CanPublishSelected => CanWrite && selectedDraftPaths.Count > 0 && !SelectedDraftIsDirty;
 
     private bool SelectedDraftIsDirty => IsDirty && selectedDraftPaths.Contains(documentPath);
 
-    private bool IsDirty => isNewDocument
-        || !string.Equals(bodyMarkdown, baseBodyMarkdown, StringComparison.Ordinal)
-        || !metadata.Equals(baseMetadata)
-        || ReferencedPendingAssetCount > 0;
+    private bool IsDirty => HasDocument && (isNewDocument
+        || !string.Equals(BodyMarkdown, baseBodyMarkdown, StringComparison.Ordinal)
+        || !string.Equals(metadata.FrontMatter, baseFrontMatter, StringComparison.Ordinal)
+        || ReferencedPendingAssetCount > 0);
 
-    private string CurrentMarkdown => MarkdownContent.ComposeDocument(metadata.ToDocumentMetadata(), bodyMarkdown);
+    private string CurrentMarkdown => metadata.FrontMatter + BodyMarkdown.TrimStart('\r', '\n');
 
-    private IReadOnlyDictionary<string, string> EditorImageSources => pendingAssets.Values
+    private IReadOnlyDictionary<string, string> EditorImageSources => imageSources ??= pendingAssets.Values
         .Where(static asset => !string.IsNullOrWhiteSpace(asset.PreviewUrl))
         .ToDictionary(static asset => asset.MarkdownPath, static asset => asset.PreviewUrl!, StringComparer.Ordinal);
 
@@ -326,7 +315,7 @@
 
     private bool HasDocument => !string.IsNullOrWhiteSpace(documentPath);
 
-    private int WordCount => CountWords(bodyMarkdown);
+    private int WordCount { get; set; }
 
     private int ReferencedPendingAssetCount => GetReferencedPendingAssets()
         .Count(static asset => asset.RequiresUpload);
@@ -337,10 +326,6 @@
         isLocalPreview
             ? PreviewEntries
             : Catalog.Entries.Where(static entry => entry.ExistsOnGitHub).ToArray();
-
-    private int DraftCount => EditorEntries.Count(static entry => entry.IsDraft);
-
-    private int PublishedCount => EditorEntries.Count(static entry => !entry.IsDraft);
 
     private string ContentSourceText => isLocalPreview
         ? "Local preview"
@@ -702,10 +687,6 @@
         if (clearPendingAssets)
         {
             await ClearAllPendingAssetsAsync().ConfigureAwait(false);
-        }
-
-        if (clearPendingAssets)
-        {
             documentKey = Guid.NewGuid().ToString("N");
         }
         documentPath = document.Path;
@@ -716,10 +697,10 @@
 
         if (string.IsNullOrWhiteSpace(document.Path))
         {
-            bodyMarkdown = string.Empty;
+            BodyMarkdown = string.Empty;
             baseBodyMarkdown = string.Empty;
-            metadata = EditorMetadataState.CreateDefault();
-            baseMetadata = metadata.Clone();
+            metadata = new EditorMetadataState();
+            baseFrontMatter = metadata.FrontMatter;
             documentSlugFollowsTitle = true;
             documentPathFollowsSlug = true;
             documentSlugTimestamp = null;
@@ -729,8 +710,8 @@
 
         MarkdownDocument split = MarkdownContent.SplitDocument(document.Path, document.Markdown);
         metadata = EditorMetadataState.FromDocument(split);
-        baseMetadata = metadata.Clone();
-        bodyMarkdown = split.Body;
+        baseFrontMatter = metadata.FrontMatter;
+        BodyMarkdown = split.Body;
         baseBodyMarkdown = split.Body;
         documentSlugTimestamp = isNew ? TryGetGeneratedSlugTimestamp(metadata.Slug) : null;
         documentSlugFollowsTitle = isNew && IsSameSlug(metadata.Slug, CreateDocumentDefaultSlug(metadata.Title));
@@ -739,7 +720,7 @@
 
     private void OnMarkdownChanged(string value)
     {
-        bodyMarkdown = value;
+        BodyMarkdown = value;
     }
 
     private void OnNewDraftTitleInput(ChangeEventArgs args)
@@ -862,7 +843,7 @@
             return;
         }
 
-        string hash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+        string hash = Convert.ToHexStringLower(SHA256.HashData(content));
         string fileName = hash + extension;
         string repositoryPath = CreateAssetRepositoryPath(fileName);
         string markdownPath = CreateAssetMarkdownPath(repositoryPath);
@@ -895,6 +876,8 @@
             content,
             previewUrl,
             RequiresUpload: true);
+        referencedPendingAssets = null;
+        imageSources = null;
 
         string altText = string.IsNullOrWhiteSpace(Path.GetFileNameWithoutExtension(file.Name))
             ? "image"
@@ -912,7 +895,7 @@
             return;
         }
 
-        bodyMarkdown += markdown;
+        BodyMarkdown += markdown;
     }
 
     private async Task FlushEditorAsync()
@@ -925,10 +908,10 @@
 
     private IReadOnlyList<PendingEditorAsset> GetReferencedPendingAssets()
     {
-        return
+        return referencedPendingAssets ??=
         [
             .. pendingAssets.Values
-                .Where(asset => bodyMarkdown.Contains(asset.MarkdownPath, StringComparison.Ordinal))
+                .Where(asset => BodyMarkdown.Contains(asset.MarkdownPath, StringComparison.Ordinal))
                 .OrderBy(static asset => asset.MarkdownPath, StringComparer.Ordinal),
         ];
     }
@@ -949,20 +932,12 @@
 
     private void MarkReferencedPendingAssetsUploaded()
     {
-        string[] keys =
-        [
-            .. pendingAssets
-                .Where(pair => bodyMarkdown.Contains(pair.Value.MarkdownPath, StringComparison.Ordinal))
-                .Select(static pair => pair.Key),
-        ];
-
-        foreach (string key in keys)
+        foreach (PendingEditorAsset asset in GetReferencedPendingAssets())
         {
-            if (pendingAssets.TryGetValue(key, out PendingEditorAsset? asset))
-            {
-                pendingAssets[key] = asset with { RequiresUpload = false };
-            }
+            pendingAssets[asset.MarkdownPath] = asset with { RequiresUpload = false };
         }
+
+        referencedPendingAssets = null;
     }
 
     private async Task ClearAllPendingAssetsAsync()
@@ -975,16 +950,20 @@
 
     private async Task RevokePendingAssetAsync(string key)
     {
-        if (!pendingAssets.Remove(key, out PendingEditorAsset? asset)
-            || string.IsNullOrWhiteSpace(asset.PreviewUrl))
+        if (!pendingAssets.Remove(key, out PendingEditorAsset? asset))
         {
             return;
         }
 
-        IJSObjectReference? module = await EnsureAssetModuleAsync().ConfigureAwait(false);
-        if (module is not null)
+        referencedPendingAssets = null;
+        imageSources = null;
+        if (!string.IsNullOrWhiteSpace(asset.PreviewUrl))
         {
-            await module.InvokeVoidAsync("revokeObjectUrl", key).ConfigureAwait(false);
+            IJSObjectReference? module = await EnsureAssetModuleAsync().ConfigureAwait(false);
+            if (module is not null)
+            {
+                await module.InvokeVoidAsync("revokeObjectUrl", asset.WebPath).ConfigureAwait(false);
+            }
         }
     }
 
@@ -1372,32 +1351,31 @@
         }
     }
 
-    private sealed class EditorMetadataState : IEquatable<EditorMetadataState>
+    private sealed class EditorMetadataState
     {
-        public string Slug { get; set; } = string.Empty;
+        private string? frontMatter;
 
-        public string Title { get; set; } = string.Empty;
+        public string FrontMatter => frontMatter ??= MarkdownContent.ComposeDocument(ToDocumentMetadata(), string.Empty);
 
-        public string Summary { get; set; } = string.Empty;
+        public string Slug { get; set { field = value; frontMatter = null; } } = string.Empty;
 
-        public DateTime PublishedAt { get; set; } = DateTimeOffset.UnixEpoch.UtcDateTime;
+        public string Title { get; set { field = value; frontMatter = null; } } = string.Empty;
 
-        public bool IsDraft { get; set; }
+        public string Summary { get; set { field = value; frontMatter = null; } } = string.Empty;
 
-        public string Tags { get; set; } = string.Empty;
+        public DateTime PublishedAt { get; set { field = value; frontMatter = null; } } = DateTimeOffset.UnixEpoch.UtcDateTime;
 
-        public string Category { get; set; } = string.Empty;
+        public bool IsDraft { get; set { field = value; frontMatter = null; } }
+
+        public string Tags { get; set { field = value; frontMatter = null; } } = string.Empty;
+
+        public string Category { get; set { field = value; frontMatter = null; } } = string.Empty;
 
         public IReadOnlyList<string> AdditionalFrontMatterLines { get; private init; } = [];
 
         public bool HasRequiredValues =>
             !string.IsNullOrWhiteSpace(Slug)
             && !string.IsNullOrWhiteSpace(Title);
-
-        public static EditorMetadataState CreateDefault()
-        {
-            return new EditorMetadataState();
-        }
 
         public static EditorMetadataState FromDocument(MarkdownDocument document)
         {
@@ -1412,107 +1390,30 @@
                 Summary = source.Summary,
                 PublishedAt = source.PublishedAtUtc.UtcDateTime,
                 IsDraft = source.IsDraft,
-                Tags = string.Join(", ", source.Tags),
+                Tags = string.Join(", ", source.Tags.Select(static tag => tag.IndexOfAny([',', '"', '\'']) < 0 ? tag : MarkdownContent.FormatQuotedFrontMatterScalar(tag))),
                 Category = source.Category ?? string.Empty,
-                AdditionalFrontMatterLines = [.. source.AdditionalFrontMatterLines],
-            };
-        }
-
-        public EditorMetadataState Clone()
-        {
-            return new EditorMetadataState
-            {
-                Slug = Slug,
-                Title = Title,
-                Summary = Summary,
-                PublishedAt = PublishedAt,
-                IsDraft = IsDraft,
-                Tags = Tags,
-                Category = Category,
-                AdditionalFrontMatterLines = [.. AdditionalFrontMatterLines],
+                AdditionalFrontMatterLines = source.AdditionalFrontMatterLines,
             };
         }
 
         public MarkdownDocumentMetadata ToDocumentMetadata()
         {
             return new MarkdownDocumentMetadata(
-                NormalizeRequiredText(Slug),
-                NormalizeRequiredText(Title),
+                Slug.Trim(),
+                Title.Trim(),
                 NormalizeOptionalText(Summary) ?? string.Empty,
                 ToPublishedAtUtc(),
                 IsDraft,
-                ParseTags(Tags),
+                MarkdownFrontMatter.ParseTags(Tags),
                 NormalizeOptionalText(Category),
                 AdditionalFrontMatterLines);
         }
 
-        public bool Equals(EditorMetadataState? other)
-        {
-            return other is not null
-                && string.Equals(NormalizeRequiredText(Slug), NormalizeRequiredText(other.Slug), StringComparison.Ordinal)
-                && string.Equals(NormalizeRequiredText(Title), NormalizeRequiredText(other.Title), StringComparison.Ordinal)
-                && string.Equals(NormalizeOptionalText(Summary), NormalizeOptionalText(other.Summary), StringComparison.Ordinal)
-                && ToPublishedAtUtc().Equals(other.ToPublishedAtUtc())
-                && IsDraft == other.IsDraft
-                && ParseTags(Tags).SequenceEqual(ParseTags(other.Tags), StringComparer.Ordinal)
-                && string.Equals(NormalizeOptionalText(Category), NormalizeOptionalText(other.Category), StringComparison.Ordinal)
-                && AdditionalFrontMatterLines.SequenceEqual(other.AdditionalFrontMatterLines, StringComparer.Ordinal);
-        }
-
-        public override bool Equals(object? obj)
-        {
-            return obj is EditorMetadataState other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            HashCode hash = new();
-            hash.Add(NormalizeRequiredText(Slug), StringComparer.Ordinal);
-            hash.Add(NormalizeRequiredText(Title), StringComparer.Ordinal);
-            hash.Add(NormalizeOptionalText(Summary), StringComparer.Ordinal);
-            hash.Add(ToPublishedAtUtc());
-            hash.Add(IsDraft);
-            foreach (string tag in ParseTags(Tags))
-            {
-                hash.Add(tag, StringComparer.Ordinal);
-            }
-
-            hash.Add(NormalizeOptionalText(Category), StringComparer.Ordinal);
-            foreach (string line in AdditionalFrontMatterLines)
-            {
-                hash.Add(line, StringComparer.Ordinal);
-            }
-
-            return hash.ToHashCode();
-        }
-
-        private DateTimeOffset ToPublishedAtUtc()
-        {
-            DateTime utcValue = DateTime.SpecifyKind(PublishedAt, DateTimeKind.Utc);
-
-            return new DateTimeOffset(utcValue);
-        }
-
-        private static string NormalizeRequiredText(string value)
-        {
-            return value.Trim();
-        }
+        private DateTimeOffset ToPublishedAtUtc() => new(DateTime.SpecifyKind(PublishedAt, DateTimeKind.Utc));
 
         private static string? NormalizeOptionalText(string? value)
         {
-            string? normalized = value?.Trim();
-
-            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
-        }
-
-        private static string[] ParseTags(string value)
-        {
-            return
-            [
-                .. value.Split([','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .Select(static tag => tag.Trim('"', '\''))
-                    .Where(static tag => tag.Length > 0),
-            ];
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
     }
 

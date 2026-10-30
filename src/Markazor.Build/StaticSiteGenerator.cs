@@ -105,11 +105,21 @@ internal static class StaticSiteGenerator
             EnsureGeneratedPathAvailable(path);
             await File.WriteAllTextAsync(path, shell, cancellationToken).ConfigureAwait(false);
         }
+        BuildNavigationManager navigation = new();
+        ServiceCollection services = new();
+        services.AddLogging();
+        services.AddSingleton<IMarkazorReaderService>(reader);
+        services.AddSingleton<NavigationManager>(navigation);
+        services.AddSingleton<IJSRuntime>(new BuildJavaScriptRuntime());
+        services.AddSingleton<IMarkazorPwaUpdateService, MarkazorPwaUpdateService>();
+        ServiceProvider provider = services.BuildServiceProvider();
+        await using var providerLifetime = provider.ConfigureAwait(false);
         Dictionary<string, string> routes = new(StringComparer.Ordinal);
         foreach (StaticPage page in pages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string markup = await RenderPageAsync(reader, page).ConfigureAwait(false);
+            navigation.SetRoute(page.Route);
+            string markup = await RenderPageAsync(provider, page).ConfigureAwait(false);
             string html = CreateDocument(shell, markup, page, options.Site);
             string routePath = page.Route == "/" ? "/index.html" : page.Route + "/index.html";
             string path = Path.Combine(output, Uri.UnescapeDataString(routePath).TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
@@ -197,16 +207,8 @@ internal static class StaticSiteGenerator
         }
     }
 
-    private static async Task<string> RenderPageAsync(MarkazorReaderService reader, StaticPage page)
+    private static async Task<string> RenderPageAsync(ServiceProvider provider, StaticPage page)
     {
-        ServiceCollection services = new();
-        services.AddLogging();
-        services.AddSingleton<IMarkazorReaderService>(reader);
-        services.AddSingleton<NavigationManager>(new BuildNavigationManager(page.Route));
-        services.AddSingleton<IJSRuntime>(new BuildJavaScriptRuntime());
-        services.AddSingleton<IMarkazorPwaUpdateService, MarkazorPwaUpdateService>();
-        ServiceProvider provider = services.BuildServiceProvider();
-        await using var providerLifetime = provider.ConfigureAwait(false);
         HtmlRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
         await using var rendererLifetime = renderer.ConfigureAwait(false);
         return await renderer.Dispatcher.InvokeAsync(async () =>
@@ -385,7 +387,9 @@ internal static class StaticSiteGenerator
 
     private sealed class BuildNavigationManager : NavigationManager
     {
-        public BuildNavigationManager(string route) => Initialize("https://markazor-build.invalid/", "https://markazor-build.invalid" + route);
+        public BuildNavigationManager() => Initialize("https://markazor-build.invalid/", "https://markazor-build.invalid/");
+
+        public void SetRoute(string route) => Uri = ToAbsoluteUri(route).AbsoluteUri;
     }
 
     private sealed class BuildJavaScriptRuntime : IJSRuntime

@@ -50,23 +50,29 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
         return FindArticle(publishedArticles, slug);
     }
 
-    public IReadOnlyList<MarkazorTaxonomyItem> GetCategories()
+    public IReadOnlyList<MarkazorTaxonomyItem> GetCategories() => Categories;
+
+    private IReadOnlyList<MarkazorTaxonomyItem> Categories
     {
-        return AggregateTaxonomy(
+        get => field ??= AggregateTaxonomy(
             publishedArticles
                 .Select(static article => article.Category)
                 .Where(static category => !string.IsNullOrWhiteSpace(category))
                 .Select(static category => category!));
     }
 
-    public IReadOnlyList<MarkazorTaxonomyItem> GetTags()
+    public IReadOnlyList<MarkazorTaxonomyItem> GetTags() => Tags;
+
+    private IReadOnlyList<MarkazorTaxonomyItem> Tags
     {
-        return AggregateTaxonomy(publishedArticles.SelectMany(static article => article.Tags));
+        get => field ??= AggregateTaxonomy(publishedArticles.SelectMany(static article => article.Tags));
     }
 
-    public IReadOnlyList<MarkazorArchiveGroup> GetArchive()
+    public IReadOnlyList<MarkazorArchiveGroup> GetArchive() => Archive;
+
+    private IReadOnlyList<MarkazorArchiveGroup> Archive
     {
-        return
+        get => field ??=
         [
             .. publishedArticles
                 .GroupBy(static article => new
@@ -114,7 +120,7 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
     private MarkazorArticlePage CreatePage(IEnumerable<ArticleMeta> source, int requestedPage)
     {
         int pageSize = Math.Max(1, Site.PageSize);
-        IReadOnlyList<ArticleMeta> articles = [.. source];
+        IReadOnlyList<ArticleMeta> articles = source as IReadOnlyList<ArticleMeta> ?? [.. source];
         int totalPages = Math.Max(1, (int)Math.Ceiling(articles.Count / (double)pageSize));
         int pageNumber = Math.Clamp(requestedPage, 1, totalPages);
 

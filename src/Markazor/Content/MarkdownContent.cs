@@ -191,7 +191,7 @@ public static class MarkdownContent
             : value.Trim();
     }
 
-    private static string FormatQuotedFrontMatterScalar(string? value)
+    internal static string FormatQuotedFrontMatterScalar(string? value)
     {
         string normalized = (value ?? string.Empty)
             .Replace("\r", " ", StringComparison.Ordinal)
