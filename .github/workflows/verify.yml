@@ -43,7 +43,7 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = ./build/Get-MarkazorVersion.ps1
+          $version = dotnet msbuild src/Markazor.Core/Markazor.Core.csproj -getProperty:PackageVersion -nologo
           "value=$version" >> $env:GITHUB_OUTPUT
 
       - name: Restore

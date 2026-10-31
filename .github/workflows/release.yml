@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version. Defaults to the tag version or Directory.Build.props VersionPrefix.
+        description: Package version. Defaults to the selected tag version; required when running from a branch.
         required: false
         type: string
 
@@ -51,10 +51,10 @@ jobs:
           "value=$version" >> $env:GITHUB_OUTPUT
 
       - name: Restore
-        run: dotnet restore Markazor.slnx
+        run: dotnet restore Markazor.slnx -p:Version='${{ steps.version.outputs.value }}'
 
       - name: Build
-        run: dotnet build Markazor.slnx --configuration Release --no-restore
+        run: dotnet build Markazor.slnx --configuration Release --no-restore -p:Version='${{ steps.version.outputs.value }}'
 
       - name: Test
         run: dotnet test Markazor.slnx --configuration Release --no-build
