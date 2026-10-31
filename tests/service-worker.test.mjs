@@ -11,7 +11,7 @@ function createWorker() {
     ['/index.html', { body: 'Home', redirected: true, encoded: true }],
     ['/posts/article/index.html', { body: 'Article', redirected: true, encoded: true }],
     ['/tags/c%23/index.html', { body: 'C# collection', redirected: true, encoded: true }],
-    ['/_markazor/content/posts/C%23%20hello%25.md', { body: '# Reserved filename', redirected: false }],
+    ['/_markazor/content/posts/C%23%20hello%25.md.json', { body: '{"html":"<p>Reserved filename</p>","headings":[]}', redirected: false }],
     ['/_markazor/app.html', { body: 'Studio shell', redirected: true, encoded: true }],
     ['/404.html', { body: 'Page not found', redirected: false }],
     ['/site.css', { body: 'body {}', redirected: false }],
@@ -20,7 +20,7 @@ function createWorker() {
     '/index.html',
     '/posts/article/index.html',
     '/tags/c#/index.html',
-    '/_markazor/content/posts/C# hello%.md',
+    '/_markazor/content/posts/C# hello%.md.json',
     '/_markazor/app.html',
     '/404.html',
     '/site.css',
@@ -143,7 +143,7 @@ test('installation excludes drafts and activation only removes older owned cache
   await context.onInstall({});
   assert.ok(state.installed.some(url => url.endsWith('/posts/article/index.html')));
   assert.ok(state.installed.some(url => url.endsWith('/tags/c%23/index.html')));
-  assert.ok(state.installed.some(url => url.endsWith('/_markazor/content/posts/C%23%20hello%25.md')));
+  assert.ok(state.installed.some(url => url.endsWith('/_markazor/content/posts/C%23%20hello%25.md.json')));
   assert.ok(state.installed.every(url => !url.includes('#')));
   assert.ok(state.installed.every(url => !url.includes('/drafts/')));
   assert.ok(state.installed.every(url => !url.includes('/editor/') && !url.includes('markazor-markdown-editor.')));

@@ -18,7 +18,7 @@ internal static class Program
             Console.WriteLine($"Markazor: generated {count} static reader pages.");
             return 0;
         }
-        catch (Exception exception) when (exception is IOException or ArgumentException or JsonException or InvalidOperationException)
+        catch (Exception exception) when (exception is IOException or ArgumentException or JsonException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             await Console.Error.WriteLineAsync("Markazor static generation failed: " + exception.Message).ConfigureAwait(false);
             return 1;

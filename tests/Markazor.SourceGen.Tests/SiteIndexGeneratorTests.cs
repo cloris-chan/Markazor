@@ -162,7 +162,7 @@ public sealed class SiteIndexGeneratorTests
         Assert.Null(article.Category);
         Assert.Empty(article.Tags);
         Assert.Equal(RepositoryContentPath("posts", "plain-file.md"), article.RelativePath);
-        Assert.Equal("/_markazor/content/posts/plain-file.md", article.ContentPath);
+        Assert.Equal("/_markazor/content/posts/plain-file.md.json", article.ContentPath);
         Assert.Equal(RoutePath("posts", "plain-file"), article.Route);
         Assert.Equal(new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero), article.PublishedAtUtc);
         Assert.False(article.IsDraft);
@@ -181,7 +181,7 @@ public sealed class SiteIndexGeneratorTests
         ArticleMeta article = Assert.Single(LoadArticles(execution.OutputCompilation));
 
         Assert.Equal(RepositoryContentPath("posts", "C# writing%.md"), article.RelativePath);
-        Assert.Equal("/_markazor/content/posts/C%23%20writing%25.md", article.ContentPath);
+        Assert.Equal("/_markazor/content/posts/C%23%20writing%25.md.json", article.ContentPath);
         Assert.Empty(execution.Diagnostics);
     }
 
@@ -353,9 +353,7 @@ public sealed class SiteIndexGeneratorTests
 
     private static IReadOnlyList<MetadataReference> CreateReferences()
     {
-        string? trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-
-        if (trustedPlatformAssemblies is null)
+        if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is not string trustedPlatformAssemblies)
         {
             throw new InvalidOperationException("The test runtime did not expose trusted platform assemblies.");
         }
@@ -403,9 +401,8 @@ public sealed class SiteIndexGeneratorTests
         }
     }
 
-    private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
+    private sealed class TestAnalyzerConfigOptionsProvider(IReadOnlyList<SiteIndexGeneratorTests.TestAdditionalTextMetadata> metadata) : AnalyzerConfigOptionsProvider
     {
-        private readonly IReadOnlyList<TestAdditionalTextMetadata> metadata;
         private readonly TestAnalyzerConfigOptions emptyOptions = new(new Dictionary<string, string>(StringComparer.Ordinal));
 
         public TestAnalyzerConfigOptionsProvider(
@@ -413,11 +410,6 @@ public sealed class SiteIndexGeneratorTests
             IReadOnlyDictionary<string, string> metadata)
             : this([new TestAdditionalTextMetadata(targetAdditionalText, metadata)])
         {
-        }
-
-        public TestAnalyzerConfigOptionsProvider(IReadOnlyList<TestAdditionalTextMetadata> metadata)
-        {
-            this.metadata = metadata;
         }
 
         public override AnalyzerConfigOptions GlobalOptions => emptyOptions;

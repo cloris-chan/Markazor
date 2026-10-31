@@ -74,17 +74,7 @@ public static class MarkdownContent
     {
         ArgumentNullException.ThrowIfNull(markdown);
 
-        MarkdownFrontMatter split = MarkdownFrontMatter.Parse(markdown);
-
-        return split.HasFrontMatter ? split.Body.Trim() : markdown.Trim();
-    }
-
-    public static MarkdownRenderResult Render(string markdown, string? articleTitle = null)
-    {
-        ArgumentNullException.ThrowIfNull(markdown);
-
-        MarkdownFrontMatter document = MarkdownFrontMatter.Parse(markdown);
-        return MarkdownDocumentRenderer.Render(document.Body.Trim(), articleTitle ?? document.Get("title"));
+        return MarkdownFrontMatter.Parse(markdown).Body;
     }
 
     public static string MarkAsPublished(string markdown)

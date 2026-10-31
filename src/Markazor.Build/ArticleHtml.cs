@@ -2,54 +2,31 @@ using System.Buffers;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
 using Ganss.Xss;
-using Markdig;
-using Markdig.Extensions.AutoIdentifiers;
+using Markazor.Content;
 
-namespace Markazor.Content;
+namespace Markazor.Build;
 
-internal static class MarkdownDocumentRenderer
+internal static class ArticleHtml
 {
     private static readonly SearchValues<char> CodeLanguageCharacters = SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-#");
-    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAutoIdentifiers(AutoIdentifierOptions.GitHub).UseAdvancedExtensions().Build();
     private static readonly HtmlSanitizer Sanitizer = CreateSanitizer();
 
-    public static MarkdownRenderResult Render(string body, string? title)
+    public static MarkdownRenderResult Prepare(string html)
     {
-        using IHtmlDocument document = Sanitizer.SanitizeDom(Markdown.ToHtml(body, Pipeline));
+        using IHtmlDocument document = Sanitizer.SanitizeDom(html);
         IHtmlElement root = document.Body!;
-        if (root.FirstElementChild is { LocalName: "h1" } first && title is not null && string.Equals(first.TextContent.Trim(), title.Trim(), StringComparison.OrdinalIgnoreCase))
-        {
-            IElement anchor = document.CreateElement("span");
-            anchor.Id = first.Id;
-            first.Replace(anchor);
-        }
-
-        foreach (IElement heading in root.QuerySelectorAll("h1"))
-        {
-            IElement replacement = document.CreateElement("h2");
-            foreach (IAttr attribute in heading.Attributes)
-            {
-                replacement.SetAttribute(attribute.Name, attribute.Value);
-            }
-
-            while (heading.FirstChild is { } child)
-            {
-                replacement.AppendChild(child);
-            }
-
-            heading.Replace(replacement);
-        }
-
         NormalizeClasses(root);
         Dictionary<string, string> anchors = new(StringComparer.Ordinal);
         HashSet<string> identifiers = new(StringComparer.Ordinal);
-        foreach (IElement element in root.QuerySelectorAll("[id], h2, h3, h4, h5, h6"))
+        foreach (IElement element in root.QuerySelectorAll("[id], h1, h2, h3, h4, h5, h6"))
         {
             string? oldId = element.GetAttribute("id");
-            string stem = "mk-" + Slug(string.IsNullOrWhiteSpace(oldId) ? element.TextContent : oldId);
+            string slug = Slug(string.IsNullOrWhiteSpace(oldId) ? element.TextContent : oldId);
+            string stem = "mk-" + slug;
             string id = stem;
             for (int suffix = 2; !identifiers.Add(id); suffix++)
             {
@@ -57,10 +34,7 @@ internal static class MarkdownDocumentRenderer
             }
 
             element.Id = id;
-            if (!string.IsNullOrWhiteSpace(oldId))
-            {
-                anchors.TryAdd(oldId, id);
-            }
+            anchors.TryAdd(string.IsNullOrWhiteSpace(oldId) ? slug : oldId, id);
         }
 
         foreach (IElement link in root.QuerySelectorAll("a[href]"))
@@ -78,7 +52,7 @@ internal static class MarkdownDocumentRenderer
         }
 
         ImmutableArray<MarkdownHeading>.Builder headings = ImmutableArray.CreateBuilder<MarkdownHeading>();
-        foreach (IElement heading in root.QuerySelectorAll("h2, h3, h4, h5, h6"))
+        foreach (IElement heading in root.QuerySelectorAll("h1, h2, h3, h4, h5, h6"))
         {
             string text = heading.TextContent.Trim();
             int level = heading.LocalName[1] - '0';
@@ -86,13 +60,6 @@ internal static class MarkdownDocumentRenderer
             {
                 headings.Add(new MarkdownHeading(heading.Id!, text, level));
             }
-
-            IElement permalink = document.CreateElement("a");
-            permalink.ClassName = "markazor-heading-link";
-            permalink.SetAttribute("href", "#" + Uri.EscapeDataString(heading.Id!));
-            permalink.SetAttribute("aria-label", "Permalink: " + text);
-            permalink.TextContent = "#";
-            heading.AppendChild(permalink);
         }
 
         foreach (IElement checkbox in root.QuerySelectorAll("input"))
@@ -100,6 +67,11 @@ internal static class MarkdownDocumentRenderer
             checkbox.SetAttribute("type", "checkbox");
             checkbox.SetAttribute("disabled", "disabled");
             checkbox.SetAttribute("aria-label", checkbox.ParentElement?.TextContent.Trim() ?? "Task");
+            checkbox.Closest("li")?.ClassList.Add("task-list-item");
+            if (checkbox.ParentElement is { LocalName: "p", ParentElement.LocalName: "li" } paragraph)
+            {
+                paragraph.Before(checkbox);
+            }
         }
 
         int imageIndex = 0;
@@ -109,16 +81,6 @@ internal static class MarkdownDocumentRenderer
             image.SetAttribute("loading", imageIndex++ == 0 || image.GetAttribute("loading") == "eager" ? "eager" : "lazy");
             NormalizeDimension(image, "width");
             NormalizeDimension(image, "height");
-            if (image.ParentElement is { LocalName: "p" } paragraph && paragraph.Children.Length == 1 && string.IsNullOrWhiteSpace(paragraph.TextContent)
-                && image.GetAttribute("title") is { Length: > 0 } caption)
-            {
-                IElement figure = document.CreateElement("figure");
-                paragraph.Replace(figure);
-                figure.AppendChild(image);
-                IElement figcaption = document.CreateElement("figcaption");
-                figcaption.TextContent = caption;
-                figure.AppendChild(figcaption);
-            }
         }
 
         foreach (IElement table in root.QuerySelectorAll("table"))
@@ -147,12 +109,14 @@ internal static class MarkdownDocumentRenderer
     private static HtmlSanitizer CreateSanitizer()
     {
         HtmlSanitizer sanitizer = new();
+        using Stream stream = typeof(ArticleHtml).Assembly.GetManifestResourceStream("Markazor.MarkdownProfile.json")!;
+        using JsonDocument profile = JsonDocument.Parse(stream);
+        JsonElement html = profile.RootElement.GetProperty("html");
         sanitizer.AllowedTags.Clear();
-        sanitizer.AllowedTags.UnionWith(["p", "h1", "h2", "h3", "h4", "h5", "h6", "a", "ul", "ol", "li", "blockquote", "pre", "code", "strong", "em", "b", "i", "s", "del", "u", "sup", "sub", "br", "hr", "img", "figure", "figcaption", "table", "caption", "thead", "tbody", "tfoot", "tr", "th", "td", "dl", "dt", "dd", "details", "summary", "kbd", "abbr", "div", "span", "input", "ruby", "rt", "rp"]);
+        sanitizer.AllowedTags.UnionWith(html.GetProperty("ALLOWED_TAGS").EnumerateArray().Select(static item => item.GetString()!));
         sanitizer.AllowedAttributes.Clear();
-        sanitizer.AllowedAttributes.UnionWith(["id", "class", "href", "src", "alt", "title", "width", "height", "loading", "lang", "dir", "start", "colspan", "rowspan", "scope", "style", "type", "checked", "disabled", "open", "target", "rel"]);
+        sanitizer.AllowedAttributes.UnionWith(html.GetProperty("ALLOWED_ATTR").EnumerateArray().Select(static item => item.GetString()!));
         sanitizer.AllowedCssProperties.Clear();
-        sanitizer.AllowedCssProperties.Add("text-align");
         sanitizer.AllowedSchemes.Add("mailto");
         return sanitizer;
     }
@@ -161,11 +125,15 @@ internal static class MarkdownDocumentRenderer
     {
         foreach (IElement element in root.QuerySelectorAll("[class]"))
         {
+            bool token = element.LocalName == "span" && element.ClassList.Contains("token") && element.Closest("pre > code") is not null;
             foreach (string name in element.ClassList.ToArray())
             {
                 bool language = element.LocalName == "code" && name.StartsWith("language-", StringComparison.Ordinal) && name.Length is > 9 and <= 41
                     && name.AsSpan(9).IndexOfAnyExcept(CodeLanguageCharacters) < 0;
-                if (!language && name is not ("footnotes" or "footnote-ref" or "footnote-back-ref" or "task-list-item" or "contains-task-list"))
+                bool syntax = token && name is ("token" or "comment" or "keyword" or "tag" or "atrule" or "string" or "char" or "regex" or "number" or "boolean"
+                    or "constant" or "function" or "class-name" or "attr-name" or "punctuation" or "operator" or "important" or "bold" or "italic"
+                    or "prolog" or "doctype" or "cdata" or "attr-value" or "selector" or "builtin" or "property" or "symbol" or "entity" or "url" or "inserted" or "deleted" or "variable");
+                if (!language && !syntax && name is not ("footnotes" or "footnote-ref" or "footnote-backref" or "task-list-item"))
                 {
                     element.ClassList.Remove(name);
                 }

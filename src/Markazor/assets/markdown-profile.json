@@ -1,0 +1,15 @@
+{
+  "markdown": {
+    "frontMatter": false,
+    "math": false,
+    "footnote": true,
+    "superSubScript": true,
+    "isGitlabCompatibilityEnabled": true
+  },
+  "html": {
+    "ALLOWED_TAGS": ["p", "h1", "h2", "h3", "h4", "h5", "h6", "a", "ul", "ol", "li", "blockquote", "pre", "code", "strong", "em", "b", "i", "s", "del", "u", "mark", "sup", "sub", "br", "hr", "img", "figure", "figcaption", "table", "caption", "thead", "tbody", "tfoot", "tr", "th", "td", "dl", "dt", "dd", "details", "summary", "kbd", "abbr", "div", "span", "section", "input", "ruby", "rt", "rp"],
+    "ALLOWED_ATTR": ["id", "class", "href", "src", "alt", "title", "width", "height", "loading", "lang", "dir", "start", "colspan", "rowspan", "scope", "align", "type", "checked", "disabled", "open", "target", "rel"],
+    "ALLOW_DATA_ATTR": false,
+    "ALLOW_ARIA_ATTR": false
+  }
+}

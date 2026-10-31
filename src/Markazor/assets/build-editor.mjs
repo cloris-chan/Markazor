@@ -5,14 +5,26 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 const project = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Muya 0.2.0 has no option for disabling diagram parsing. Keep diagram fences
-// as code, matching Markdig, and omit engines that can make remote requests.
-// These checked transformations deliberately fail if the pinned package changes.
 const markazorMarkdown = {
   name: 'markazor-markdown-subset',
   setup(builder) {
     builder.onLoad({ filter: /@muyajs[\\/]core[\\/]lib[\\/]es[\\/]index\.js$/ }, async args => {
       let contents = await readFile(args.path, 'utf8');
+      const profile = JSON.parse(await readFile(resolve(project, 'assets/markdown-profile.json'), 'utf8'));
+      const sanitizers = /(\w+) = \{\n\tFORBID_ATTR: \["style", "contenteditable"\],[\s\S]*?\n\}, (\w+) = \{\n\tFORBID_ATTR: \["contenteditable"\],[\s\S]*?\n\},/;
+      if (!sanitizers.test(contents)) throw new Error('Review Muya HTML sanitization before updating the dependency.');
+      contents = contents.replace(sanitizers, (_, editor, exported) => `${editor} = ${JSON.stringify(profile.html)}, ${exported} = ${JSON.stringify(profile.html)},`);
+      const prism = contents.match(/window\.Prism = (\w+)\.default, import\(/)?.[1];
+      const loadLanguages = contents.match(/var (\w+) = \w+\(\w+\.default\);\nfunction \w+\(e\) \{\n\treturn !e \|\| typeof e != "string" \? \[\] : new/)?.[1];
+      if (!prism || !loadLanguages) throw new Error('Review Muya syntax highlighting before updating the dependency.');
+      contents = contents.replace(`window.Prism = ${prism}.default`, `globalThis.Prism = ${prism}.default, globalThis.Prism.manual = true`);
+      contents += `\nexport { ${loadLanguages} as loadCodeLanguages };`;
+      const lists = contents.match(/\/\/#region src\/utils\/marked\/compatibleTaskList\.ts[\s\S]*?function (\w+)\(e = \[\]\)/)?.[1];
+      const highlighting = /\/\/#region src\/utils\/marked\/getHighlightHtml\.ts\n[\s\S]*?\/\/#endregion/;
+      const highlightSource = contents.match(highlighting)?.[0];
+      const parser = highlightSource?.match(/(\w+) = new \w+\(/)?.[1];
+      if (!lists || !parser || highlightSource.split(`${parser}.use({ walkTokens:`).length !== 2) throw new Error('Review Muya list rendering before updating the dependency.');
+      contents = contents.replace(highlighting, highlightSource.replace(`${parser}.use({ walkTokens:`, `${parser}.use({ hooks: { processAllTokens(tokens) { const result = ${lists}(tokens); result.links = tokens.links; return result; } } }); ${parser}.use({ walkTokens:`));
       const expression = '/mermaid|vega-lite|plantuml/';
       if (contents.split(expression).length !== 2) throw new Error('Review Muya diagram parsing before updating the editor dependency.');
       contents = contents.replace(expression, '/(?!)/');
@@ -98,6 +110,21 @@ export async function buildEditorAssets(outdir = resolve(project, '../../artifac
   });
   const files = Object.keys(result.metafile.outputs).map(path => resolve(project, path));
   await writeFile(resolve(outdir, 'markazor-editor-assets.txt'), files.join('\n') + '\n');
+  await build({
+    absWorkingDir: project,
+    entryPoints: ['assets/render-markdown.mjs'],
+    outfile: resolve(outdir, 'render-markdown.cjs'),
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    target: 'es2022',
+    minify: true,
+    define: { window: 'undefined' },
+    loader: { '.png': 'empty', '.svg': 'empty', '.css': 'empty' },
+    legalComments: 'external',
+    logLevel: 'warning',
+    plugins: [markazorMarkdown]
+  });
   return result;
 }
 

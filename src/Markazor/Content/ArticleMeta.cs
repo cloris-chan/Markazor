@@ -11,7 +11,7 @@ public sealed record ArticleMeta(string Slug, string Title, string Summary, Date
 
         if (normalizedPath.StartsWith("posts/", StringComparison.Ordinal))
         {
-            return "/_markazor/content/" + escapedPath;
+            return "/_markazor/content/" + escapedPath + ".json";
         }
 
         return "/" + escapedPath;

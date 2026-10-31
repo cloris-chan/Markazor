@@ -58,7 +58,7 @@ public sealed class MarkazorComponentTests
         options.Site.Name = "A personal journal";
         options.Site.Description = "Writing from my own corner.";
         options.Site.PageSize = 1;
-        context.Services.AddSingleton<IMarkazorReaderService>(new MarkazorReaderService(httpClient, new FakeMarkdownRenderer(), options));
+        context.Services.AddSingleton<IMarkazorReaderService>(new MarkazorReaderService(httpClient, options));
 
         IRenderedComponent<ReaderHome> component = context.Render<ReaderHome>(parameters => parameters.Add(static item => item.Page, 2));
 
@@ -76,7 +76,7 @@ public sealed class MarkazorComponentTests
         using BunitContext context = new();
         using HttpClient httpClient = new();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
-        context.Services.AddSingleton<IMarkazorReaderService>(new MarkazorReaderService(httpClient, new FakeMarkdownRenderer(), new Markazor.Configuration.MarkazorOptions()));
+        context.Services.AddSingleton<IMarkazorReaderService>(new MarkazorReaderService(httpClient, new Markazor.Configuration.MarkazorOptions()));
         context.Services.AddSingleton<IMarkazorPwaUpdateService>(new FakePwaUpdateService());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/posts");
 
@@ -105,7 +105,6 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
         context.Services.AddSingleton<IMarkazorContentCatalog>(new FakeCatalog());
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(new FakeEditor());
         context.Services.AddSingleton<IMarkazorPwaUpdateService>(new FakePwaUpdateService());
         Microsoft.AspNetCore.Components.NavigationManager navigation =
@@ -804,7 +803,6 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
         context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
@@ -834,7 +832,6 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
         context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
@@ -871,7 +868,6 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
         context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
@@ -922,7 +918,6 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
         context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
@@ -958,7 +953,6 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
         context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
@@ -1011,7 +1005,6 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
         context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
@@ -1058,7 +1051,6 @@ public sealed class MarkazorComponentTests
             new FakeDiagnosticsService(CreateDiagnostics(ready: true, canPush: true)));
         context.Services.AddSingleton<IMarkazorSettingsSyncService>(new FakeSettingsSyncService());
         context.Services.AddSingleton<IMarkazorContentCatalog>(catalog);
-        context.Services.AddSingleton<IMarkazorMarkdownRenderer>(new FakeMarkdownRenderer());
         context.Services.AddSingleton<IMarkazorEditorService>(editor);
 
         IRenderedComponent<StudioWriterPanel> component = context.Render<StudioWriterPanel>();
@@ -1477,14 +1469,6 @@ public sealed class MarkazorComponentTests
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
-        }
-    }
-
-    private sealed class FakeMarkdownRenderer : IMarkazorMarkdownRenderer
-    {
-        public MarkdownRenderResult Render(string markdown, string? articleTitle = null)
-        {
-            return new MarkdownRenderResult("<p>Preview</p>", []);
         }
     }
 

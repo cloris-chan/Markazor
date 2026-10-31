@@ -5,6 +5,7 @@ import {
 import '@muyajs/core/lib/core.css';
 import './markazor-muya.css';
 import { rewriteImageUrls, restoreDisplayUrls } from './markdown-images.js';
+import profile from './markdown-profile.json';
 import { bindEditorTools, focusEditor, openInsertMenu, showBlockHandle } from './muya-tools.js';
 
 const editors = new Map();
@@ -37,7 +38,6 @@ async function notify(instance) {
 
 function updateSources(instance, sources) {
   instance.imageSources = new Map(Object.entries(sources ?? {}));
-  // Undo history can still reference earlier display URLs.
   for (const [path, url] of instance.imageSources) instance.originalUrls.set(url, path);
 }
 
@@ -77,8 +77,8 @@ export function initialize(id, root, host, dotNetReference, value, disabled, sou
   const previousChildren = new Set(document.body.children);
   const muya = instance.muya = new Muya(mount, {
     markdown: rewriteImageUrls(instance.value, instance.imageSources),
-    frontMatter: false, math: false, footnote: true, superSubScript: true,
-    hideQuickInsertHint: false, fontSize: 18, lineHeight: 1.75
+    ...profile.markdown,
+    hideQuickInsertHint: false
   });
   muya.init();
   instance.tools = bindEditorTools(muya, root, previousChildren, () => instance.disabled || instance.disposed);
@@ -100,7 +100,6 @@ export function initialize(id, root, host, dotNetReference, value, disabled, sou
   on('pointerup', async event => {
     if (event.pointerType !== 'touch' || instance.disabled) return;
     const documentKey = instance.documentKey;
-    // Muya updates the clicked selection on the frame after pointerup.
     await settled();
     await settled();
     if (!instance.disposed && !instance.disabled && instance.documentKey === documentKey) showBlockHandle(muya, activeBlock(instance));
@@ -227,8 +226,6 @@ export async function setImageSources(id, sources = {}) {
 export async function getValue(id) {
   const instance = editors.get(id);
   if (!instance) return null;
-  // Muya applies text operations on the next animation frame. A synchronous
-  // getMarkdown() here can save only a prefix of the last typed word.
   await settled();
   return instance.disposed ? null : read(instance);
 }
@@ -248,7 +245,6 @@ export function setDisabled(id, disabled) {
 export async function showInsertMenu(id, reference) {
   const instance = editors.get(id);
   if (!instance || instance.disabled) return;
-  // Let the opening click finish before Muya's document click listener runs.
   const documentKey = instance.documentKey;
   await settled();
   if (!instance.disposed && !instance.disabled && instance.documentKey === documentKey && reference.isConnected) {

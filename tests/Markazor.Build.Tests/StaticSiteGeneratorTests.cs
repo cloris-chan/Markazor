@@ -45,7 +45,7 @@ public sealed class StaticSiteGeneratorTests : IDisposable
         Assert.Contains("/categories/reading", routes.Keys);
         string html = File.ReadAllText(Path.Combine(Output, routes["/posts/hello"].TrimStart('/')));
         using var document = new HtmlParser().ParseDocument(html);
-        Assert.Single(document.QuerySelectorAll("h1"));
+        Assert.Equal(2, document.QuerySelectorAll("h1").Length);
         Assert.Equal("Hello & welcome", document.QuerySelector("h1")!.TextContent);
         Assert.Equal("meaning", document.QuerySelector(".markazor-prose strong")!.TextContent);
         Assert.Equal("en", document.DocumentElement.GetAttribute("lang"));
@@ -64,7 +64,11 @@ public sealed class StaticSiteGeneratorTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(Output, "setup")));
         Assert.Single(document.QuerySelectorAll("script[src$='markazor-reader.js']"));
         Assert.Empty(document.QuerySelectorAll("a[href^='#']"));
-        Assert.NotNull(document.QuerySelector("a[href='/posts/hello#mk-fn%3A1']"));
+        Assert.NotNull(document.QuerySelector("a[href='/posts/hello#mk-fn-1']"));
+        JsonNode compiled = JsonNode.Parse(File.ReadAllText(Path.Combine(Output, "_markazor", "content", "posts", "hello.md.json")))!;
+        using var body = new HtmlParser().ParseDocument(compiled["html"]!.GetValue<string>());
+        Assert.Equal(document.QuerySelector(".markazor-prose")!.TextContent, body.Body!.TextContent);
+        Assert.False(File.Exists(Path.Combine(Output, "_markazor", "content", "posts", "hello.md")));
         Assert.NotNull(document.QuerySelector("a[href='/posts/hello#main-content']"));
         JsonNode configuration = JsonNode.Parse(File.ReadAllText(Path.Combine(Output, "staticwebapp.config.json")))!;
         Assert.Equal("/_markazor/app.html", configuration["navigationFallback"]!["rewrite"]!.GetValue<string>());

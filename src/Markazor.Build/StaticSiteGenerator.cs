@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -55,7 +56,7 @@ internal static class StaticSiteGenerator
         }
 
         List<ArticleMeta> articles = [];
-        Dictionary<string, string> markdownFiles = new(StringComparer.Ordinal);
+        Dictionary<string, string> contentFiles = new(StringComparer.Ordinal);
         HashSet<string> articleRoutes = new(StringComparer.OrdinalIgnoreCase);
         string directory = Path.Combine(source, "posts");
         if (Directory.Exists(directory))
@@ -88,14 +89,25 @@ internal static class StaticSiteGenerator
                 }
 
                 articles.Add(article);
-                markdownFiles.Add(article.ContentPath, markdown);
+                contentFiles.Add(article.ContentPath, MarkdownContent.StripFrontMatter(markdown));
             }
         }
 
         options.Articles = articles.AsReadOnly();
-        using LocalMarkdownHandler handler = new(markdownFiles);
+        string[] rendered = await RenderMarkdownAsync(contentFiles.Values, cancellationToken).ConfigureAwait(false);
+        int index = 0;
+        foreach (string contentPath in contentFiles.Keys)
+        {
+            string json = JsonSerializer.Serialize(ArticleHtml.Prepare(rendered[index++]), JsonOptions);
+            contentFiles[contentPath] = json;
+            string path = Path.Combine(output, Uri.UnescapeDataString(contentPath).TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            EnsureGeneratedPathAvailable(path);
+            await File.WriteAllTextAsync(path, json, cancellationToken).ConfigureAwait(false);
+        }
+
+        using LocalContentHandler handler = new(contentFiles);
         using HttpClient client = new(handler) { BaseAddress = new Uri("https://markazor-build.invalid/") };
-        MarkazorReaderService reader = new(client, new MarkazorMarkdownRenderer(), options);
+        MarkazorReaderService reader = new(client, options);
         List<StaticPage> pages = CreatePages(reader, articles);
         Directory.CreateDirectory(Path.Combine(output, "_markazor"));
         await File.WriteAllTextAsync(Path.Combine(output, "_markazor", "app.html"), shell, cancellationToken).ConfigureAwait(false);
@@ -137,6 +149,53 @@ internal static class StaticSiteGenerator
         UpdateDeploymentConfiguration(output);
         WriteSitemap(output, pages, options.Site.BaseUrl);
         return pages.Count;
+    }
+
+    private static async Task<string[]> RenderMarkdownAsync(Dictionary<string, string>.ValueCollection documents, CancellationToken cancellationToken)
+    {
+        if (documents.Count == 0)
+        {
+            return [];
+        }
+
+        ProcessStartInfo start = new("node")
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardInputEncoding = new UTF8Encoding(false),
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "render-markdown.cjs"));
+        using Process process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the Muya renderer. Install Node.js to build a Markazor site.");
+        try
+        {
+            Task<string> output = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> error = process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.StandardInput.WriteAsync(JsonSerializer.Serialize(documents).AsMemory(), cancellationToken).ConfigureAwait(false);
+            process.StandardInput.Close();
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            string diagnostics = await error.ConfigureAwait(false);
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidDataException("Muya rendering failed: " + diagnostics);
+            }
+
+            string[] result = JsonSerializer.Deserialize<string[]>(await output.ConfigureAwait(false)) ?? throw new InvalidDataException("Muya returned no article content.");
+            return result.Length == documents.Count ? result : throw new InvalidDataException("Muya returned an unexpected number of articles.");
+        }
+        catch
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+
+            throw;
+        }
     }
 
     private static Uri? ValidateBaseUrl(Uri? uri)
@@ -372,14 +431,14 @@ internal static class StaticSiteGenerator
 
     private sealed record StaticPage(MarkazorReaderPageKind Kind, string? Value, int Number, string Route, string Title, string Description, ArticleMeta? Article = null);
 
-    private sealed class LocalMarkdownHandler(Dictionary<string, string> files) : HttpMessageHandler
+    private sealed class LocalContentHandler(Dictionary<string, string> files) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string path = request.RequestUri!.AbsolutePath;
-            HttpResponseMessage response = files.TryGetValue(path, out string? markdown)
-                ? new(HttpStatusCode.OK) { Content = new StringContent(markdown, Encoding.UTF8, "text/markdown") }
+            HttpResponseMessage response = files.TryGetValue(path, out string? json)
+                ? new(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") }
                 : new(HttpStatusCode.NotFound);
             return Task.FromResult(response);
         }

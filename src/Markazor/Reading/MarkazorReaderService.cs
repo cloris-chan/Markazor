@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Markazor.Configuration;
 using Markazor.Content;
 
@@ -6,17 +7,14 @@ namespace Markazor.Reading;
 public sealed class MarkazorReaderService : IMarkazorReaderService
 {
     private readonly HttpClient httpClient;
-    private readonly IMarkazorMarkdownRenderer markdownRenderer;
     private readonly IReadOnlyList<ArticleMeta> publishedArticles;
 
-    public MarkazorReaderService(HttpClient httpClient, IMarkazorMarkdownRenderer markdownRenderer, MarkazorOptions options)
+    public MarkazorReaderService(HttpClient httpClient, MarkazorOptions options)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentNullException.ThrowIfNull(markdownRenderer);
         ArgumentNullException.ThrowIfNull(options);
 
         this.httpClient = httpClient;
-        this.markdownRenderer = markdownRenderer;
         Site = options.Site;
         publishedArticles = [.. options.Articles.Where(static article => !article.IsDraft).OrderByDescending(static article => article.PublishedAtUtc).ThenBy(static article => article.RelativePath, StringComparer.Ordinal),];
     }
@@ -112,9 +110,8 @@ public sealed class MarkazorReaderService : IMarkazorReaderService
         ArgumentNullException.ThrowIfNull(article);
 
         ArticleMeta? publishedArticle = publishedArticles.FirstOrDefault(candidate => string.Equals(candidate.RelativePath, article.RelativePath, StringComparison.Ordinal)) ?? throw new InvalidOperationException("Only published articles can be loaded by the reader service.");
-        string markdown = await httpClient.GetStringAsync(new Uri(publishedArticle.ContentPath, UriKind.Relative), cancellationToken).ConfigureAwait(false);
-
-        return markdownRenderer.Render(markdown, article.Title);
+        return await httpClient.GetFromJsonAsync(new Uri(publishedArticle.ContentPath, UriKind.Relative), ArticleJsonContext.Default.MarkdownRenderResult, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidDataException("The published article content is missing.");
     }
 
     private MarkazorArticlePage CreatePage(IEnumerable<ArticleMeta> source, int requestedPage)

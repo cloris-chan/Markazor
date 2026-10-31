@@ -14,7 +14,7 @@ public sealed class MarkazorReaderServiceTests
         using HttpClient httpClient = CreateHttpClient();
         MarkazorOptions options = CreateOptions();
         options.Site.PageSize = 2;
-        MarkazorReaderService reader = new(httpClient, new MarkazorMarkdownRenderer(), options);
+        MarkazorReaderService reader = new(httpClient, options);
 
         MarkazorArticlePage first = reader.GetArticles(0);
         MarkazorArticlePage last = reader.GetArticles(99);
@@ -36,7 +36,6 @@ public sealed class MarkazorReaderServiceTests
         using HttpClient httpClient = CreateHttpClient();
         MarkazorReaderService reader = new(
             httpClient,
-            new MarkazorMarkdownRenderer(),
             CreateOptions());
 
         Assert.Equal(
@@ -63,7 +62,6 @@ public sealed class MarkazorReaderServiceTests
         using HttpClient httpClient = CreateHttpClient();
         MarkazorReaderService reader = new(
             httpClient,
-            new MarkazorMarkdownRenderer(),
             CreateOptions());
 
         IReadOnlyList<MarkazorArchiveGroup> archive = reader.GetArchive();
@@ -87,27 +85,19 @@ public sealed class MarkazorReaderServiceTests
     }
 
     [Fact]
-    public async Task LoadsAndSanitizesPublishedMarkdown()
+    public async Task LoadsTheCompiledArticleWithoutChangingItsMarkup()
     {
-        using HttpClient httpClient = CreateHttpClient(
-            """
-            ---
-            title: Newest
-            ---
-            # Hello
-            <script>alert('no')</script>
-            """);
+        const string Html = "<h2 id=\"mk-hello\">Hello</h2>";
+        using HttpClient httpClient = CreateHttpClient("""{"html":"<h2 id=\"mk-hello\">Hello</h2>","headings":[{"id":"mk-hello","text":"Hello","level":2}]}""");
         MarkazorReaderService reader = new(
             httpClient,
-            new MarkazorMarkdownRenderer(),
             CreateOptions());
         ArticleMeta article = Assert.IsType<ArticleMeta>(reader.FindArticle("newest"));
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        string html = (await reader.LoadContentAsync(article, cancellationToken)).Html;
-
-        Assert.Contains("<h2 id=\"mk-hello\">Hello", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
+        MarkdownRenderResult result = await reader.LoadContentAsync(article, cancellationToken);
+        Assert.Equal(Html, result.Html);
+        Assert.Equal(new MarkdownHeading("mk-hello", "Hello", 2), Assert.Single(result.Headings));
     }
 
     private static MarkazorOptions CreateOptions()
@@ -158,7 +148,7 @@ public sealed class MarkazorReaderServiceTests
             string.Join(Path.AltDirectorySeparatorChar, routeRoot, slug));
     }
 
-    private static MarkdownClient CreateHttpClient(string markdown = "# Empty")
+    private static MarkdownClient CreateHttpClient(string markdown = """{"html":"","headings":[]}""")
     {
         return new MarkdownClient(markdown);
     }
@@ -182,7 +172,7 @@ public sealed class MarkazorReaderServiceTests
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(markdown, Encoding.UTF8, "text/markdown"),
+                Content = new StringContent(markdown, Encoding.UTF8, "application/json"),
             });
         }
     }

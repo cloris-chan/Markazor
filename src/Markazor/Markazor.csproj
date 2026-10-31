@@ -27,8 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="HtmlSanitizer" />
-    <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
     <ProjectReference Include="..\Markazor.Core\Markazor.Core.csproj" />
     <ProjectReference Include="..\Markazor.Themes\Markazor.Themes.csproj" />
@@ -38,6 +36,7 @@
     <None Include="buildTransitive\Markazor.targets" Pack="true" PackagePath="buildTransitive\Markazor.targets" />
     <None Include="buildTransitive\defaults\**\*" Pack="true" PackagePath="buildTransitive\defaults\%(RecursiveDir)%(FileName)%(Extension)" />
     <None Update="package.json;package-lock.json;assets\**\*" Pack="false" />
+    <Content Update="package.json;package-lock.json;assets\**\*" Pack="false" />
     <None Include="..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\*.dll"
           Exclude="..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\Microsoft.CodeAnalysis*.dll;..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\System.Collections.Immutable.dll;..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\System.Reflection.Metadata.dll;..\Markazor.SourceGen\bin\$(Configuration)\netstandard2.0\System.Text.Encoding.CodePages.dll"
           Pack="true"
@@ -201,7 +200,7 @@ if (!IsUpToDate())
              RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;TargetFramework"
              Condition="'$(NoBuild)' != 'true'" />
     <ItemGroup>
-      <None Include="..\Markazor.Build\bin\$(Configuration)\net10.0\*.dll;..\Markazor.Build\bin\$(Configuration)\net10.0\*.deps.json;..\Markazor.Build\bin\$(Configuration)\net10.0\*.runtimeconfig.json"
+      <None Include="..\Markazor.Build\bin\$(Configuration)\net10.0\*.dll;..\Markazor.Build\bin\$(Configuration)\net10.0\*.deps.json;..\Markazor.Build\bin\$(Configuration)\net10.0\*.runtimeconfig.json;..\Markazor.Build\bin\$(Configuration)\net10.0\render-markdown.cjs*"
             Pack="true" PackagePath="buildTransitive/tools" Visible="false" />
     </ItemGroup>
     <Error Condition="!Exists('..\Markazor.Build\bin\$(Configuration)\net10.0\Markazor.Build.dll')" Text="Build Markazor.Build before packing Markazor." />
@@ -222,7 +221,7 @@ if (!IsUpToDate())
           BeforeTargets="ResolveStaticWebAssetsInputs"
           DependsOnTargets="RestoreMarkazorEditorAssets"
           Inputs="@(_MarkazorEditorBundleInput)"
-          Outputs="$(MarkazorEditorBundleOutput);$(MarkazorEditorBundleContentRoot)markazor-markdown-editor.css;$(MarkazorEditorBundleContentRoot)markazor-reader.js;$(MarkazorEditorBundleContentRoot)markazor-editor-assets.txt"
+          Outputs="$(MarkazorEditorBundleOutput);$(MarkazorEditorBundleContentRoot)markazor-markdown-editor.css;$(MarkazorEditorBundleContentRoot)markazor-reader.js;$(MarkazorEditorBundleContentRoot)markazor-editor-assets.txt;$(MarkazorEditorBundleContentRoot)render-markdown.cjs"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(TargetFramework)' != ''">
     <MakeDir Directories="$(MarkazorEditorBundleContentRoot)" />
     <Exec Command="node assets/build-editor.mjs &quot;$(MarkazorEditorBundleContentRoot).&quot;" WorkingDirectory="$(MSBuildProjectDirectory)" />

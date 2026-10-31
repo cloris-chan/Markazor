@@ -20,26 +20,13 @@ public sealed class MarkdownContentTests
         Assert.Equal("# Hello", body);
     }
 
-    [Fact]
-    public void RenderProducesMarkdownAndRemovesUnsafeHtml()
+    [Theory]
+    [InlineData("")]
+    [InlineData("---\ntitle: Example\n---\n\n")]
+    public void RemovingFrontMatterPreservesMarkdownIndentationAndLineEndings(string prefix)
     {
-        const string Markdown = """
-            ---
-            title: Hello
-            ---
-
-            Hello **world**
-
-            <script>alert('xss')</script>
-            <a href="javascript:alert('xss')" onclick="alert('xss')">bad</a>
-            """;
-
-        string html = MarkdownContent.Render(Markdown).Html;
-
-        Assert.Contains("<strong>world</strong>", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("javascript:", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("onclick", html, StringComparison.OrdinalIgnoreCase);
+        const string Body = "    Console.WriteLine(\"中文😀\");\r\n\r\n";
+        Assert.Equal(Body, MarkdownContent.StripFrontMatter(prefix + Body));
     }
 
     [Theory]
@@ -172,7 +159,7 @@ public sealed class MarkdownContentTests
             ContentPath("posts", "C# writing%.md"),
             "# Reserved filename");
 
-        Assert.Equal("/_markazor/content/posts/C%23%20writing%25.md", article.ContentPath);
+        Assert.Equal("/_markazor/content/posts/C%23%20writing%25.md.json", article.ContentPath);
     }
 
     [Fact]

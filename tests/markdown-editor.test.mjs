@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, resolve, sep } from 'node:path';
 import { createRequire } from 'node:module';
@@ -18,9 +20,20 @@ const mime = { '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png'
 const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jr1sAAAAASUVORK5CYII=', 'base64');
 let server;
 let origin;
+let published;
+const publishingFixture = '## Traditional 中文 heading that stays identical when it wraps across narrow screens\n\nA paragraph with **bold**, *emphasis*, ~~removed~~, H~2~O, x^2^ and :smile:.\n\n### Details\n\n> A quoted paragraph.\n\n- Parent\n  - Child\n\n- [x] Done\n- [ ] Pending\n\n| Left | Right |\n| :--- | ---: |\n| One | Two |\n\n![Book](/assets/parity.svg "Caption")\n\n```csharp\nvar name = "world";\n```\n\n```css\n:root { --accent: #fff; color: var(--accent) !important; }\n```\n\n```json\n{"ready": true, "count": 42}\n```\n\n```html\n<div title="hello">Text</div>\n```\n\nA footnote.[^source]\n\n[^source]: A source with **detail**.\n\n<div><em>Raw HTML</em></div>';
 
 before(async () => {
   const result = await buildEditorAssets(output);
+  const site = resolve(output, 'site');
+  const web = resolve(site, 'wwwroot');
+  await mkdir(resolve(site, 'posts'), { recursive: true });
+  await mkdir(web, { recursive: true });
+  await writeFile(resolve(site, 'posts/parity.md'), '---\ntitle: Parity\n---\n\n' + publishingFixture);
+  await writeFile(resolve(web, 'index.html'), '<!doctype html><html><head></head><body><div id="app"></div></body></html>');
+  await writeFile(resolve(web, 'staticwebapp.config.json'), '{}');
+  await promisify(execFile)('dotnet', [resolve(repository, 'src/Markazor.Build/bin/Release/net10.0/Markazor.Build.dll'), site, web]);
+  published = JSON.parse(await readFile(resolve(web, '_markazor/content/posts/parity.md.json'), 'utf8'));
   let initialBytes = 0;
   const seen = new Set();
   const inspect = async path => {
@@ -36,11 +49,15 @@ before(async () => {
   server = createServer(async (request, response) => {
     const path = new URL(request.url, 'http://localhost').pathname;
     try {
-      if (path === '/') {
+      if (path === '/' || path === '/published') {
         response.setHeader('Content-Type', 'text/html');
-        response.end('<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="/_content/Markazor/markazor-markdown-editor.css"></head><body><div id="root"><button data-insert-block onmousedown="event.preventDefault()" onclick="window.adapter.showInsertMenu(\'editor\', this)">Insert block</button><div id="host"></div></div><script type="module">import * as adapter from "/_content/Markazor/markazor-markdown-editor.js"; window.adapter = adapter;</script></body></html>');
+        const article = path === '/published' ? `<article id="published" class="markazor-prose">${published.html}</article>` : '';
+        response.end('<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="/base.css"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/_content/Markazor/markazor-markdown-editor.css"></head><body>' + article + '<div id="root"><button data-insert-block onmousedown="event.preventDefault()" onclick="window.adapter.showInsertMenu(\'editor\', this)">Insert block</button><div id="host" class="markazor-muya-host"></div></div><script type="module">import * as adapter from "/_content/Markazor/markazor-markdown-editor.js"; window.adapter = adapter;</script></body></html>');
         return;
       }
+      const styles = { '/base.css': 'src/Markazor/wwwroot/markazor.css', '/markazor-prose.css': 'src/Markazor/wwwroot/markazor-prose.css', '/theme.css': 'src/Markazor.Themes/Themes/default/theme.css' };
+      if (styles[path]) { response.setHeader('Content-Type', 'text/css'); response.end(await readFile(resolve(repository, styles[path]))); return; }
+      if (path === '/assets/parity.svg') { response.setHeader('Content-Type', 'image/svg+xml'); response.end('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="180"><rect width="480" height="180" fill="#eae7de"/></svg>'); return; }
       if (path.startsWith('/assets/')) { response.setHeader('Content-Type', 'image/png'); response.end(pixel); return; }
       const file = resolve(output, '.' + path.replace(/^\/_content\/Markazor/, ''));
       if (!file.startsWith(output + sep)) throw new Error('Invalid asset path');
@@ -72,6 +89,77 @@ test('image display mapping preserves code samples, links, references, and attri
 });
 
 for (const engine of browsers) {
+  test(`${engine}: editor and static article share content, typography, and highlighting`, { timeout: 30000 }, async t => {
+    const browser = await engines[engine].launch();
+    t.after(() => browser.close());
+    const page = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
+    await page.goto(origin + '/published');
+    await page.waitForFunction(() => window.adapter);
+    await page.evaluate(async markdown => {
+      window.adapter.initialize('editor', document.querySelector('#root'), document.querySelector('#host'), { async invokeMethodAsync() {} }, markdown, false);
+      const article = document.querySelector('#published');
+      document.querySelector('.mu-container').style.cssText = 'width:672px;max-width:none;padding:0;';
+      article.style.width = '672px';
+      document.querySelector('#host').inert = true;
+      await new Promise(requestAnimationFrame);
+    }, publishingFixture);
+    await page.waitForFunction(() => document.querySelector('.mu-code .token.keyword') && document.querySelector('.mu-code .token.property') && document.querySelector('.mu-code .token.attr-value') && document.querySelector('.mu-code .token.important'));
+    const comparison = await page.evaluate(html => {
+      const editor = document.querySelector('.mu-container');
+      const article = document.querySelector('#published');
+      const generated = document.createElement('template');
+      generated.innerHTML = html;
+      const text = node => {
+        const copy = node.cloneNode(true);
+        for (const hint of copy.querySelectorAll('.mu-remove,.footnote-backref')) hint.remove();
+        return copy.textContent.trim();
+      };
+      const style = (node, name) => {
+        const css = getComputedStyle(node);
+        const keys = ['fontFamily', 'fontSize', 'lineHeight', 'fontWeight', 'color', 'backgroundColor', 'textAlign'];
+        if (name !== 'root') keys.push('padding', 'margin');
+        return Object.fromEntries(keys.map(key => [key, css[key]]));
+      };
+      return {
+        headings: [editor, article].map(root => [...root.querySelectorAll('h2,h3')].map(text)),
+        tables: [editor, article].map(root => [...root.querySelectorAll('th,td')].map(node => node.textContent)),
+        images: [editor, article].map(root => root.querySelector('img')?.src),
+        code: [editor.querySelector('.mu-code'), article.querySelector('pre code')].map(node => node.textContent.trim()),
+        formatting: [editor, article].map(root => [...root.querySelector('p').querySelectorAll('strong,em,del,sub,sup')].map(node => [node.tagName, node.textContent])),
+        footnote: [editor.querySelector('.mu-footnote p'), article.querySelector('.footnotes li p')].map(text),
+        styles: [
+          ['root', editor, article],
+          ['heading', editor.querySelector('h2'), article.querySelector('h2')],
+          ['header', editor.querySelector('td'), article.querySelector('th')],
+          ['cell', editor.querySelectorAll('td')[2], article.querySelector('td')],
+          ['checkbox', editor.querySelector('.mu-task-list-checkbox'), article.querySelector('input')],
+          ['code', editor.querySelector('.mu-code-block'), article.querySelector('pre')],
+          ['token', editor.querySelector('.token.keyword'), article.querySelector('.token.keyword')]
+        ].map(([name, first, second]) => ({ name, first: style(first, name), second: style(second, name) })),
+        tokens: [editor.querySelectorAll('.mu-code-block .token'), article.querySelectorAll('pre code .token')].map(nodes => [...nodes].map(node => [node.textContent, getComputedStyle(node).color])),
+        generatedCode: [article, generated.content].map(root => [...root.querySelectorAll('pre code')].map(node => node.innerHTML))
+      };
+    }, published.html);
+    await page.screenshot({ path: resolve(output, `${engine}-publishing.png`), fullPage: true });
+    for (const name of ['headings', 'tables', 'images', 'code', 'formatting', 'footnote', 'tokens', 'generatedCode']) assert.deepEqual(comparison[name][0], comparison[name][1], `${engine}: ${name}`);
+    for (const { name, first, second } of comparison.styles) assert.deepEqual(first, second, `${engine}: ${name}`);
+    for (const width of [672, 320]) {
+      await page.setViewportSize({ width: width + 32, height: 1000 });
+      const heights = await page.evaluate(width => {
+        const editor = document.querySelector('.mu-container');
+        const article = document.querySelector('#published');
+        editor.style.width = article.style.width = `${width}px`;
+        return ['h2', 'p', 'blockquote', 'pre', 'table', 'ul'].map(selector => [editor, article].map(root => root.querySelector(selector).getBoundingClientRect().height));
+      }, width);
+      const images = await page.evaluate(() => ['.mu-container', '#published'].map(selector => {
+        const root = document.querySelector(selector);
+        const image = root.querySelector('img').getBoundingClientRect();
+        return [image.width, image.height, image.x - root.getBoundingClientRect().x];
+      }));
+      for (let index = 0; index < 3; index++) assert.ok(Math.abs(images[0][index] - images[1][index]) <= 1, `${engine}: image layout at ${width}px`);
+      for (const [first, second] of heights) assert.ok(Math.abs(first - second) <= 1, `${engine}: body layout at ${width}px: ${first} != ${second}`);
+    }
+  });
   test(`${engine}: Markdown editing, formatting, images, composition, and lifecycle`, { timeout: 90000 }, async t => {
     const browser = await engines[engine].launch();
     t.after(() => browser.close());
@@ -253,8 +341,6 @@ for (const engine of browsers) {
       const filesBefore = transfer.files.length;
       const event = new ClipboardEvent('paste', { bubbles: true, clipboardData: transfer });
       const eventFiles = event.clipboardData?.files.length ?? 0;
-      // Firefox restricts files on a constructed clipboard event. Supply the
-      // FileList contract explicitly when emulating a paste in that engine.
       if (eventFiles !== 1) Object.defineProperty(event, 'clipboardData', { value: { files: [file] } });
       document.querySelector('#host').dispatchEvent(event);
       return { filesBefore, eventFiles };

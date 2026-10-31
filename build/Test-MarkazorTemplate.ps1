@@ -904,9 +904,9 @@ foreach ($expectedFunctionRoute in @('auth/github/start', 'auth/github/callback'
     }
 }
 
-$publicPost = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') (Join-Path 'content' $postMarkdownPath)
+$publicPost = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') (Join-Path 'content' ($postMarkdownPath + '.json'))
 if (-not (Test-Path -LiteralPath $publicPost)) {
-    throw "Published output is missing public post markdown: $publicPost"
+    throw "Published output is missing compiled post content: $publicPost"
 }
 
 $publishedReservedTagPage = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'tags') 'c#') 'index.html'
@@ -914,9 +914,9 @@ if (-not (Test-Path -LiteralPath $publishedReservedTagPage)) {
     throw "Published output is missing the static taxonomy page for a reserved-character tag: $publishedReservedTagPage"
 }
 
-$secondPublicPost = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'posts' 'first-update.md')
+$secondPublicPost = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'posts' 'first-update.md.json')
 if (-not (Test-Path -LiteralPath $secondPublicPost)) {
-    throw "Published output is missing public article markdown: $secondPublicPost"
+    throw "Published output is missing compiled article content: $secondPublicPost"
 }
 
 $publicAsset = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'assets') 'smoke-asset.txt'
@@ -1042,11 +1042,11 @@ if (Test-StringContains -Text $serviceWorkerAssetsText -Value 'staticwebapp.conf
     throw 'service-worker-assets.js must not contain staticwebapp.config.json because Azure Static Web Apps handles it as deployment configuration.'
 }
 
-if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/first-update.md' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
+if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/first-update.md.json' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
     throw 'service-worker-assets.js must contain public article content paths.'
 }
 
-if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/C# hello%.md' -Comparison ([System.StringComparison]::Ordinal))) {
+if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/C# hello%.md.json' -Comparison ([System.StringComparison]::Ordinal))) {
     throw 'service-worker-assets.js must retain the SDK manifest path for reserved-character post filenames.'
 }
 

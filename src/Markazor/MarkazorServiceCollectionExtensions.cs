@@ -32,7 +32,6 @@ public static class MarkazorServiceCollectionExtensions
         _ = services.AddScoped<MarkazorContentCatalog>();
         _ = services.AddScoped<IMarkazorContentCatalog>(
             static provider => provider.GetRequiredService<MarkazorContentCatalog>());
-        _ = services.AddSingleton<IMarkazorMarkdownRenderer, MarkazorMarkdownRenderer>();
         _ = services.AddScoped<MarkazorReaderService>();
         _ = services.AddScoped<IMarkazorReaderService>(
             static provider => provider.GetRequiredService<MarkazorReaderService>());

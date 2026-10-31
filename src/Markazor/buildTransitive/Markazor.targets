@@ -159,23 +159,6 @@ if (match.Success)
           SkipUnchangedFiles="true"
           Condition="'@(_MarkazorStagedPublicAsset)' != ''" />
 
-    <ItemGroup Condition="'$(MarkazorPublishContent)' == 'true' and Exists('$(_MarkazorContentRoot)\posts')">
-      <_MarkazorPostContent Include="$(_MarkazorContentRoot)\posts\**\*" />
-      <_MarkazorPostContentWithPath Include="@(_MarkazorPostContent)"
-                                    Condition="'@(_MarkazorPostContent)' != ''">
-        <RelativePath>$([MSBuild]::MakeRelative('$(_MarkazorContentRoot)', '%(_MarkazorPostContent.Identity)'))</RelativePath>
-      </_MarkazorPostContentWithPath>
-      <_MarkazorStagedPostContent Include="@(_MarkazorPostContentWithPath->'$(MarkazorGeneratedWebRoot)_markazor\content\%(RelativePath)')"
-                                  Condition="'@(_MarkazorPostContentWithPath)' != ''">
-        <SourcePath>%(_MarkazorPostContentWithPath.Identity)</SourcePath>
-      </_MarkazorStagedPostContent>
-    </ItemGroup>
-
-    <Copy SourceFiles="@(_MarkazorStagedPostContent->'%(SourcePath)')"
-          DestinationFiles="@(_MarkazorStagedPostContent)"
-          SkipUnchangedFiles="true"
-          Condition="'@(_MarkazorStagedPostContent)' != ''" />
-
     <ItemGroup Condition="'$(MarkazorPublishAssets)' == 'true' and Exists('$(_MarkazorAssetRoot)')">
       <_MarkazorAsset Include="$(_MarkazorAssetRoot)\**\*" />
       <_MarkazorAssetWithPath Include="@(_MarkazorAsset)"

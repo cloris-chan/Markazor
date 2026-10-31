@@ -250,7 +250,7 @@ internal static class MarkazorContentPath
             segments[index] = Uri.EscapeDataString(segments[index]);
         }
 
-        return string.Concat(SitePathSeparatorText, "_markazor", SitePathSeparatorText, "content", SitePathSeparatorText, string.Join(SitePathSeparatorText, segments));
+        return string.Concat(SitePathSeparatorText, "_markazor", SitePathSeparatorText, "content", SitePathSeparatorText, string.Join(SitePathSeparatorText, segments), ".json");
     }
 
     private static string GetUriPathOrDefault(string path)

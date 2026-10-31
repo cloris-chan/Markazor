@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Markazor.Content;
 
@@ -8,3 +10,7 @@ public sealed record MarkdownRenderResult(string Html, ImmutableArray<MarkdownHe
 {
     public static MarkdownRenderResult Empty { get; } = new(string.Empty, []);
 }
+
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(MarkdownRenderResult))]
+internal sealed partial class ArticleJsonContext : JsonSerializerContext;

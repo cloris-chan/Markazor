@@ -8,6 +8,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Markazor.Build.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="HtmlSanitizer" />
+    <EmbeddedResource Include="..\Markazor\assets\markdown-profile.json" LogicalName="Markazor.MarkdownProfile.json" />
     <ProjectReference Include="..\Markazor\Markazor.csproj" />
+    <None Include="..\Markazor\obj\$(Configuration)\net10.0\markazor-editor\render-markdown.cjs;..\Markazor\obj\$(Configuration)\net10.0\markazor-editor\render-markdown.cjs.LEGAL.txt" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

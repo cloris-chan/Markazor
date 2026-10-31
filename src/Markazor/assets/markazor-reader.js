@@ -1,33 +1,8 @@
-import hljs from "highlight.js/lib/core";
-import csharp from "highlight.js/lib/languages/csharp";
-import javascript from "highlight.js/lib/languages/javascript";
-import typescript from "highlight.js/lib/languages/typescript";
-import json from "highlight.js/lib/languages/json";
-import xml from "highlight.js/lib/languages/xml";
-import css from "highlight.js/lib/languages/css";
-import bash from "highlight.js/lib/languages/bash";
-import sql from "highlight.js/lib/languages/sql";
-import python from "highlight.js/lib/languages/python";
-import yaml from "highlight.js/lib/languages/yaml";
-import markdown from "highlight.js/lib/languages/markdown";
 import { waitForUpdate, activateUpdate } from "../wwwroot/markazor-pwa.js";
 
-for (const [name, grammar] of Object.entries({ csharp, javascript, typescript, json, xml, css, bash, sql, python, yaml, markdown })) {
-  hljs.registerLanguage(name, grammar);
-}
-
 const codeBlocks = new WeakSet();
-const tables = new WeakSet();
 const observedHeadings = new WeakSet();
 const menuLabels = new WeakMap();
-const resizeObserver = new ResizeObserver(entries => {
-  for (const { target } of entries) {
-    const hint = target.nextElementSibling;
-    if (hint?.classList.contains("markazor-table-hint")) {
-      hint.hidden = target.scrollWidth <= target.clientWidth + 1;
-    }
-  }
-});
 const sectionObserver = new IntersectionObserver(entries => {
   const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
   if (!visible.length) return;
@@ -42,18 +17,7 @@ function enhance(root = document) {
   for (const code of root.querySelectorAll(".markazor-prose pre > code")) {
     if (codeBlocks.has(code)) continue;
     codeBlocks.add(code);
-    const language = [...code.classList].find(name => name.startsWith("language-"))?.slice(9) || "text";
-    if (code.textContent.length <= 100_000 && hljs.getLanguage(language)) {
-      code.innerHTML = hljs.highlight(code.textContent, { language, ignoreIllegals: true }).value;
-    }
     const pre = code.parentElement;
-    if (pre.parentElement.classList.contains("markazor-code")) continue;
-    const wrapper = document.createElement("div");
-    wrapper.className = "markazor-code";
-    const toolbar = document.createElement("div");
-    toolbar.className = "markazor-code-toolbar";
-    const label = document.createElement("span");
-    label.textContent = language;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "markazor-code-copy";
@@ -61,19 +25,7 @@ function enhance(root = document) {
     button.textContent = "Copy";
     button.setAttribute("aria-label", "Copy code");
     button.setAttribute("aria-live", "polite");
-    pre.replaceWith(wrapper);
-    toolbar.append(label, button);
-    wrapper.append(toolbar, pre);
-  }
-  for (const table of root.querySelectorAll(".markazor-table-scroll")) {
-    if (tables.has(table)) continue;
-    tables.add(table);
-    const hint = document.createElement("p");
-    hint.className = "markazor-table-hint";
-    hint.textContent = "Scroll sideways for all columns, or use the arrow keys.";
-    hint.hidden = table.scrollWidth <= table.clientWidth + 1;
-    table.after(hint);
-    resizeObserver.observe(table);
+    pre.append(button);
   }
   for (const heading of root.querySelectorAll(".markazor-prose h2[id], .markazor-prose h3[id]")) {
     if (observedHeadings.has(heading)) continue;
@@ -87,7 +39,7 @@ document.addEventListener("click", async event => {
   const button = event.target.closest?.("button[data-mk-copy]");
   if (button) {
     try {
-      await navigator.clipboard.writeText(button.closest(".markazor-code").querySelector("code").textContent);
+      await navigator.clipboard.writeText(button.parentElement.querySelector("code").textContent);
       button.textContent = "Copied";
     } catch {
       button.textContent = "Select text to copy";
@@ -135,9 +87,8 @@ const mutationObserver = new MutationObserver(records => {
   for (const record of records) {
     for (const removed of record.removedNodes) {
       if (removed.nodeType !== Node.ELEMENT_NODE) continue;
-      for (const element of [removed, ...removed.querySelectorAll(".markazor-table-scroll, h2[id], h3[id]")]) {
+      for (const element of [removed, ...removed.querySelectorAll("h2[id], h3[id]")]) {
         if (!element.isConnected) {
-          resizeObserver.unobserve(element);
           sectionObserver.unobserve(element);
         }
       }
