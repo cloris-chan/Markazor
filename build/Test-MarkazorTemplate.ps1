@@ -306,10 +306,7 @@ if (Test-Path -LiteralPath $siteConsumerSourceWebRoot) {
     throw 'Markazor site build recreated the direct consumer source wwwroot.'
 }
 
-dotnet publish $siteConsumerProjectPath `
-    --configuration Release `
-    --no-restore `
-    --output $siteConsumerPublishPath
+dotnet publish $siteConsumerProjectPath --configuration Release --no-restore --output $siteConsumerPublishPath
 
 $siteConsumerPublishedWebRoot = Join-Path $siteConsumerPublishPath 'wwwroot'
 foreach ($siteConsumerExpectedFile in @(
@@ -605,14 +602,8 @@ if (-not (Test-StringContains -Text ($reservedPublicBuild.Output -join [Environm
 
 Remove-Item -LiteralPath (Split-Path -Parent $reservedPublicAsset) -Recurse -Force
 
-dotnet publish $webProjectPath `
-    --configuration Release `
-    --no-restore `
-    --output $emptyWebPublishPath
-dotnet publish $functionsProjectPath `
-    --configuration Release `
-    --no-restore `
-    --output $emptyFunctionsPublishPath
+dotnet publish $webProjectPath --configuration Release --no-restore --output $emptyWebPublishPath
+dotnet publish $functionsProjectPath --configuration Release --no-restore --output $emptyFunctionsPublishPath
 
 $emptyPublishedSiteSettings = Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') 'markazor.settings.json'
 if (Test-Path -LiteralPath $emptyPublishedSiteSettings) {
@@ -860,14 +851,8 @@ if (-not [string]::IsNullOrWhiteSpace((Get-Content -Raw -LiteralPath $generatedT
 Set-Content -LiteralPath $siteSettingsPath -Value $validSiteSettings -Encoding utf8 -NoNewline
 dotnet build $webProjectPath --configuration Release --no-restore
 
-dotnet publish $webProjectPath `
-    --configuration Release `
-    --no-restore `
-    --output $webPublishPath
-dotnet publish $functionsProjectPath `
-    --configuration Release `
-    --no-restore `
-    --output $functionsPublishPath
+dotnet publish $webProjectPath --configuration Release --no-restore --output $webPublishPath
+dotnet publish $functionsProjectPath --configuration Release --no-restore --output $functionsPublishPath
 
 $functionsMetadataPath = Join-Path $functionsPublishPath 'functions.metadata'
 if (-not (Test-Path -LiteralPath $functionsMetadataPath)) {
@@ -1060,6 +1045,18 @@ if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value 'assets/smok
 
 if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_content/Markazor/markazor-markdown-editor.js' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
     throw 'service-worker-assets.js must contain the Markazor markdown editor bundle.'
+}
+
+if ($IsLinux) {
+    docker run --rm --volume "${repoRoot}:${repoRoot}" --workdir $repoRoot `
+        --env ENABLE_DYNAMIC_INSTALL=true --env ORYX_APP_TYPE=static-sites `
+        --env "MARKAZOR_SITE=$generatedPath" --env "MARKAZOR_WEB=$webProjectDirectory" `
+        --entrypoint bash mcr.microsoft.com/appsvc/staticappsclient:stable -ec @'
+mv "$MARKAZOR_SITE/posts" "$MARKAZOR_SITE/posts-oryx"
+oryx build "$MARKAZOR_WEB" --output "$MARKAZOR_SITE/../oryx-empty" --platform dotnet
+mv "$MARKAZOR_SITE/posts-oryx" "$MARKAZOR_SITE/posts"
+oryx build "$MARKAZOR_WEB" --output "$MARKAZOR_SITE/../oryx-posts" --platform dotnet
+'@
 }
 
 dotnet new uninstall Markazor.Templates

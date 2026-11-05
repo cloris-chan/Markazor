@@ -224,7 +224,8 @@ if (match.Success)
            Text="The Markazor static builder is missing. Source checkouts must build Markazor.Build before the site; installed Markazor packages include it." />
     <Error Condition="'$(MarkazorPublishContent)' != 'true'"
            Text="Static reader pages require MarkazorPublishContent=true." />
-    <Exec Command="dotnet &quot;$(_MarkazorStaticBuilder)&quot; &quot;$(_MarkazorContentRoot).&quot; &quot;$(MarkazorGeneratedWebRoot).&quot;" />
+    <Exec Command="dotnet &quot;$(_MarkazorStaticBuilder)&quot; &quot;$(_MarkazorContentRoot).&quot; &quot;$(MarkazorGeneratedWebRoot).&quot;"
+          EnvironmentVariables="PATH=$([MSBuild]::Escape('$(EmscriptenNodeBinPath.Replace('\', '/'))$([System.IO.Path]::PathSeparator)$(PATH)'))" />
   </Target>
 
   <Target Name="ResolveMarkazorGeneratedStaticWebAssets"
