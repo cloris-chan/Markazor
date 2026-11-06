@@ -11,9 +11,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if ($PSVersionTable.PSVersion.Major -ge 7) {
-    $PSNativeCommandUseErrorActionPreference = $true
-}
+$PSNativeCommandUseErrorActionPreference = $true
 
 $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')
 $packageSourcePath = Resolve-Path -LiteralPath $PackageSource
@@ -90,11 +88,7 @@ function Test-StringContains {
         [System.StringComparison] $Comparison = [System.StringComparison]::Ordinal
     )
 
-    if ($null -eq $Text) {
-        return $false
-    }
-
-    return $Text.IndexOf($Value, $Comparison) -ge 0
+    return $null -ne $Text -and $Text.Contains($Value, $Comparison)
 }
 
 function Convert-ToSlashPath {
@@ -112,43 +106,16 @@ function Assert-NoMixedLineEndings {
         [string] $RootPath
     )
 
-    $excludedDirectoryNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $excludedDirectoryNames.Add('bin') | Out-Null
-    $excludedDirectoryNames.Add('obj') | Out-Null
-
     $mixedFiles = @(
         Get-ChildItem -LiteralPath $RootPath -Recurse -File |
-            Where-Object {
-                $directory = $_.Directory
-                while ($null -ne $directory) {
-                    if ($excludedDirectoryNames.Contains($directory.Name)) {
-                        return $false
-                    }
-
-                    $directory = $directory.Parent
-                }
-
-                return $true
-            } |
+            Where-Object FullName -NotMatch '[\\/](bin|obj)[\\/]' |
             ForEach-Object {
                 $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
                 if ($bytes.Length -gt 0 -and [Array]::IndexOf($bytes, [byte] 0) -lt 0) {
-                    $lfCount = 0
-                    $crlfCount = 0
-                    $bareCrCount = 0
-                    for ($index = 0; $index -lt $bytes.Length; $index++) {
-                        if ($bytes[$index] -eq 10) {
-                            $lfCount++
-                            if ($index -gt 0 -and $bytes[$index - 1] -eq 13) {
-                                $crlfCount++
-                            }
-                        }
-                        elseif ($bytes[$index] -eq 13 -and ($index + 1 -ge $bytes.Length -or $bytes[$index + 1] -ne 10)) {
-                            $bareCrCount++
-                        }
-                    }
-
-                    $bareLfCount = $lfCount - $crlfCount
+                    $text = [System.Text.Encoding]::Latin1.GetString($bytes)
+                    $crlfCount = [regex]::Matches($text, '\r\n').Count
+                    $bareLfCount = [regex]::Matches($text, '(?<!\r)\n').Count
+                    $bareCrCount = [regex]::Matches($text, '\r(?!\n)').Count
                     if ((($crlfCount -gt 0) -and ($bareLfCount -gt 0)) -or $bareCrCount -gt 0) {
                         [pscustomobject] @{
                             Path = $_.FullName
@@ -174,24 +141,10 @@ function Invoke-DotNetBuildCapturingFailure {
         [string] $ProjectPath
     )
 
-    $previousNativeCommandPreference = $null
-    if ($PSVersionTable.PSVersion.Major -ge 7) {
-        $previousNativeCommandPreference = $PSNativeCommandUseErrorActionPreference
-        $PSNativeCommandUseErrorActionPreference = $false
-    }
-
-    try {
-        $output = @(& dotnet build $ProjectPath --configuration Release --no-restore 2>&1)
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        if ($PSVersionTable.PSVersion.Major -ge 7) {
-            $PSNativeCommandUseErrorActionPreference = $previousNativeCommandPreference
-        }
-    }
-
+    $PSNativeCommandUseErrorActionPreference = $false
+    $output = @(& dotnet build $ProjectPath --configuration Release --no-restore 2>&1)
     return [pscustomobject] @{
-        ExitCode = $exitCode
+        ExitCode = $LASTEXITCODE
         Output = $output
     }
 }
@@ -774,6 +727,10 @@ category: Writing
 Short updates and longer articles share the same public content history.
 '@
 
+for ($index = 0; $index -lt 10; $index++) {
+    Write-SmokeFile -RelativePath "posts/pagination-$index.md" -Content "# Pagination $index"
+}
+
 Write-SmokeFile -RelativePath $draftMarkdownPath -Content @'
 ---
 slug: work-in-progress
@@ -1045,6 +1002,37 @@ if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value 'assets/smok
 
 if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_content/Markazor/markazor-markdown-editor.js' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
     throw 'service-worker-assets.js must contain the Markazor markdown editor bundle.'
+}
+
+$run = dotnet msbuild $webProjectPath -property:Configuration=Release '-getProperty:RunCommand,RunArguments' | ConvertFrom-Json
+$server = [System.Diagnostics.Process]::Start([System.Diagnostics.ProcessStartInfo] @{
+    FileName = $run.Properties.RunCommand
+    Arguments = $run.Properties.RunArguments + ' --urls http://127.0.0.1:0'
+    WorkingDirectory = $webProjectDirectory
+    RedirectStandardOutput = $true
+    UseShellExecute = $false
+    CreateNoWindow = $true
+})
+try {
+    while (($line = $server.StandardOutput.ReadLineAsync().WaitAsync([TimeSpan]::FromSeconds(30)).GetAwaiter().GetResult()) -notmatch 'Now listening on: (http://127\.0\.0\.1:\d+)') {
+        if ($null -eq $line) { throw 'The local development server exited before starting.' }
+    }
+    $origin = $Matches[1]
+    $routes = (Invoke-WebRequest "$origin/_markazor/routes.json" -TimeoutSec 10).Content | ConvertFrom-Json -AsHashtable
+    if (-not $routes.Contains('/posts/page/2')) { throw 'Local route coverage must include pagination.' }
+    foreach ($path in @('/studio', '/studio/write', '/studio/settings', '/studio/setup', '/studio/setup/github-callback')) {
+        $routes[$path] = '/_markazor/app.html'
+    }
+    foreach ($route in $routes.GetEnumerator()) {
+        $expected = (Invoke-WebRequest "$origin$($route.Value)" -TimeoutSec 10).Content
+        foreach ($path in @($route.Key, ($route.Key.TrimEnd('/') + '/'))) {
+            if ((Invoke-WebRequest "$origin$path" -TimeoutSec 10).Content -cne $expected) { throw "Local route did not serve its generated page: $path" }
+        }
+    }
+}
+finally {
+    if (-not $server.HasExited) { $server.Kill($true) }
+    $server.Dispose()
 }
 
 if ($IsLinux) {

@@ -264,6 +264,11 @@ if (match.Success)
     <ItemGroup>
       <StaticWebAsset Include="@(_MarkazorGeneratedStaticWebAsset)" />
       <StaticWebAssetEndpoint Include="@(_MarkazorGeneratedStaticWebAssetEndpoint)" />
+      <_MarkazorDirectoryEndpoint Include="@(_MarkazorGeneratedStaticWebAssetEndpoint)"
+                                 Condition="$([System.String]::Copy('%(_MarkazorGeneratedStaticWebAssetEndpoint.Identity)').EndsWith('/index.html'))">
+        <Route>$([System.Text.RegularExpressions.Regex]::Replace('%(Identity)', '/index\.html$', ''))</Route>
+      </_MarkazorDirectoryEndpoint>
+      <StaticWebAssetEndpoint Include="@(_MarkazorDirectoryEndpoint->'%(Route)')" />
       <StaticWebAssetDiscoveryPattern Include="$(PackageId)\markazor-site">
         <Source>$(PackageId)</Source>
         <BasePath>$(StaticWebAssetBasePath)</BasePath>
