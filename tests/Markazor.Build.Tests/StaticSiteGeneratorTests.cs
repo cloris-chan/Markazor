@@ -16,8 +16,8 @@ public sealed class StaticSiteGeneratorTests : IDisposable
         Directory.CreateDirectory(Path.Combine(root, "posts"));
         Directory.CreateDirectory(Path.Combine(root, "drafts"));
         Directory.CreateDirectory(Output);
-        File.WriteAllText(Path.Combine(Output, "index.html"), "<!doctype html><html lang='en'><head><title>Old shell</title><base href='/'></head><body><div id='app'></div><script src='_framework/blazor.webassembly.js'></script></body></html>");
-        File.WriteAllText(Path.Combine(Output, "staticwebapp.config.json"), "{\"globalHeaders\":{\"X-Frame-Options\":\"DENY\"},\"navigationFallback\":{\"rewrite\":\"/index.html\",\"exclude\":[\"/api/*\"]}}");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "SiteDefaults", "index.html"), Path.Combine(Output, "index.html"));
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "SiteDefaults", "staticwebapp.config.json"), Path.Combine(Output, "staticwebapp.config.json"));
         File.WriteAllText(Path.Combine(Output, "manifest.webmanifest"), "{\"lang\":\"en\"}");
         File.WriteAllText(Path.Combine(root, "public", "markazor.settings.json"), "{\"site\":{\"name\":\"My journal\",\"description\":\"A & B\",\"baseUrls\":[\"https://example.test\"]}}");
     }
@@ -29,7 +29,39 @@ public sealed class StaticSiteGeneratorTests : IDisposable
         await StaticSiteGenerator.GenerateAsync(root, Output, TestContext.Current.CancellationToken);
         JsonNode manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(Output, "manifest.webmanifest")))!;
         Assert.Equal("My journal", manifest["name"]!.GetValue<string>());
+        Assert.Equal("My journal", manifest["short_name"]!.GetValue<string>());
         Assert.Equal("A & B", manifest["description"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EmptySitesKeepPublicPagesStaticAndStudioInteractive(bool customShell)
+    {
+        string shellPath = Path.Combine(Output, "index.html");
+        if (customShell)
+        {
+            File.WriteAllText(shellPath, "<!doctype html><html lang='en'><head><base href='/'></head><body data-custom='preserved'><div id='app'>Loading</div><script src='_framework/blazor.webassembly.js'></script></body></html>");
+        }
+
+        File.Delete(Path.Combine(root, "public", "markazor.settings.json"));
+        await StaticSiteGenerator.GenerateAsync(root, Output, TestContext.Current.CancellationToken);
+        using var home = new HtmlParser().ParseDocument(File.ReadAllText(shellPath));
+        Assert.Empty(home.QuerySelectorAll("script[src*='blazor']"));
+        Assert.Single(home.QuerySelectorAll("script[src$='markazor-reader.js']"));
+        Assert.Equal(customShell ? "preserved" : null, home.Body!.GetAttribute("data-custom"));
+        string application = File.ReadAllText(Path.Combine(Output, "_markazor", "app.html"));
+        using var studio = new HtmlParser().ParseDocument(application);
+        Assert.Single(studio.QuerySelectorAll("script[src='_framework/blazor.webassembly.js']"));
+        Assert.Equal(customShell ? "preserved" : null, studio.Body!.GetAttribute("data-custom"));
+        foreach (string route in new[] { "studio", "studio/write", "studio/settings", "studio/setup", "studio/setup/github-callback" })
+        {
+            Assert.Equal(application, File.ReadAllText(Path.Combine(Output, route, "index.html")));
+        }
+
+        Assert.False(Directory.Exists(Path.Combine(Output, "setup")));
+        Assert.False(File.Exists(Path.Combine(Output, "markazor.settings.json")));
+        Assert.False(Directory.Exists(Path.Combine(Output, "content")));
     }
 
     [Fact]
@@ -73,6 +105,9 @@ public sealed class StaticSiteGeneratorTests : IDisposable
         JsonNode configuration = JsonNode.Parse(File.ReadAllText(Path.Combine(Output, "staticwebapp.config.json")))!;
         Assert.Equal("/_markazor/app.html", configuration["navigationFallback"]!["rewrite"]!.GetValue<string>());
         Assert.Equal("DENY", configuration["globalHeaders"]!["X-Frame-Options"]!.GetValue<string>());
+        Assert.Equal("dotnet-isolated:10.0", configuration["platform"]!["apiRuntime"]!.GetValue<string>());
+        JsonNode studioRoute = Assert.Single(configuration["routes"]!.AsArray(), static route => route!["route"]!.GetValue<string>() == "/studio*")!;
+        Assert.Equal("no-store", studioRoute["headers"]!["Cache-Control"]!.GetValue<string>());
         Assert.Contains("https://example.test/posts/hello", File.ReadAllText(Path.Combine(Output, "sitemap.xml")), StringComparison.Ordinal);
         Assert.Equal("en", JsonNode.Parse(File.ReadAllText(Path.Combine(Output, "manifest.webmanifest")))!["lang"]!.GetValue<string>());
         Assert.Equal("never", configuration["trailingSlash"]!.GetValue<string>());

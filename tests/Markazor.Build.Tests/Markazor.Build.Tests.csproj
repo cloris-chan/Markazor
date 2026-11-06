@@ -11,4 +11,11 @@
     <ProjectReference Include="..\..\src\Markazor.Build\Markazor.Build.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\Markazor.Templates\templates\Markazor.Site\**\*"
+          Exclude="..\..\src\Markazor.Templates\templates\Markazor.Site\**\bin\**;..\..\src\Markazor.Templates\templates\Markazor.Site\**\obj\**;..\..\src\Markazor.Templates\templates\Markazor.Site\**\.vs\**;..\..\src\Markazor.Templates\templates\Markazor.Site\**\Properties\launchSettings.json"
+          Link="Template\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\Markazor\buildTransitive\defaults\wwwroot\index.html;..\..\src\Markazor\buildTransitive\defaults\wwwroot\staticwebapp.config.json"
+          Link="SiteDefaults\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

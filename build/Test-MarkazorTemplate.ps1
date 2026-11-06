@@ -1,20 +1,18 @@
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory)]
     [string] $Version,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory)]
     [string] $PackageSource,
 
     [string] $WorkDirectory = 'artifacts/template-smoke',
-
     [string] $ProjectName = 'SmokeSite'
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
-
-$repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')
-$packageSourcePath = Resolve-Path -LiteralPath $PackageSource
+$repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$packageSourcePath = (Resolve-Path -LiteralPath $PackageSource).Path
 $workPath = Join-Path $repoRoot $WorkDirectory
 $generatedPath = Join-Path $workPath $ProjectName
 $publishPath = Join-Path $workPath 'publish'
@@ -22,158 +20,48 @@ $emptyPublishPath = Join-Path $workPath 'publish-empty'
 $webPublishPath = Join-Path $publishPath 'web'
 $functionsPublishPath = Join-Path $publishPath 'functions'
 $emptyWebPublishPath = Join-Path $emptyPublishPath 'web'
-$emptyFunctionsPublishPath = Join-Path $emptyPublishPath 'functions'
-$nugetPackagesPath = Join-Path ([System.IO.Path]::GetTempPath()) ('markazor-template-smoke-' + [guid]::NewGuid().ToString('N'))
-$consumerPath = Join-Path $nugetPackagesPath 'consumer'
-$siteConsumerPath = Join-Path $nugetPackagesPath 'site-consumer'
-$siteConsumerWebPath = Join-Path (Join-Path $siteConsumerPath 'src') 'SiteBuildConsumer.Web'
-$siteConsumerPublishPath = Join-Path $nugetPackagesPath 'site-consumer-publish'
-$themesConsumerPath = Join-Path $nugetPackagesPath 'themes-consumer'
+$nugetPackagesPath = Join-Path ([IO.Path]::GetTempPath()) ('markazor-template-smoke-' + [guid]::NewGuid().ToString('N'))
 $solutionPath = Join-Path $generatedPath "$ProjectName.slnx"
-$webProjectDirectory = Join-Path (Join-Path $generatedPath 'src') "$ProjectName.Web"
-$webProjectPath = Join-Path (Join-Path (Join-Path $generatedPath 'src') "$ProjectName.Web") "$ProjectName.Web.csproj"
-$functionsProjectPath = Join-Path (Join-Path (Join-Path $generatedPath 'src') "$ProjectName.Functions") "$ProjectName.Functions.csproj"
+$webProjectDirectory = Join-Path $generatedPath "src/$ProjectName.Web"
+$webProjectPath = Join-Path $webProjectDirectory "$ProjectName.Web.csproj"
+$functionsProjectPath = Join-Path $generatedPath "src/$ProjectName.Functions/$ProjectName.Functions.csproj"
 
-function Reset-Directory {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $Path
-    )
-
+function Reset-Directory([string] $Path) {
     if (Test-Path -LiteralPath $Path) {
-        for ($attempt = 1; $attempt -le 3; $attempt++) {
-            try {
-                Remove-Item -LiteralPath $Path -Recurse -Force
-                break
-            }
-            catch {
-                if ($attempt -eq 3) {
-                    throw
-                }
-
-                Start-Sleep -Seconds $attempt
-            }
-        }
+        Remove-Item -LiteralPath $Path -Recurse -Force
     }
-
-    New-Item -ItemType Directory -Path $Path | Out-Null
+    New-Item -ItemType Directory -Path $Path -Force | Out-Null
 }
 
-function Write-SmokeFile {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $RelativePath,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Content
-    )
-
+function Write-SmokeFile([string] $RelativePath, [string] $Content) {
     $path = Join-Path $generatedPath $RelativePath
-    $directory = Split-Path -Parent $path
-    if (-not (Test-Path -LiteralPath $directory)) {
-        New-Item -ItemType Directory -Path $directory | Out-Null
-    }
-
+    New-Item -ItemType Directory -Path (Split-Path -Parent $path) -Force | Out-Null
     Set-Content -LiteralPath $path -Value $Content -Encoding utf8 -NoNewline
 }
 
-function Test-StringContains {
-    param(
-        [AllowNull()]
-        [string] $Text,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Value,
-
-        [System.StringComparison] $Comparison = [System.StringComparison]::Ordinal
-    )
-
-    return $null -ne $Text -and $Text.Contains($Value, $Comparison)
-}
-
-function Convert-ToSlashPath {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $Path
-    )
-
-    return [System.IO.Path]::GetFullPath($Path).Replace('\', '/')
-}
-
-function Assert-NoMixedLineEndings {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $RootPath
-    )
-
-    $mixedFiles = @(
-        Get-ChildItem -LiteralPath $RootPath -Recurse -File |
-            Where-Object FullName -NotMatch '[\\/](bin|obj)[\\/]' |
-            ForEach-Object {
-                $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
-                if ($bytes.Length -gt 0 -and [Array]::IndexOf($bytes, [byte] 0) -lt 0) {
-                    $text = [System.Text.Encoding]::Latin1.GetString($bytes)
-                    $crlfCount = [regex]::Matches($text, '\r\n').Count
-                    $bareLfCount = [regex]::Matches($text, '(?<!\r)\n').Count
-                    $bareCrCount = [regex]::Matches($text, '\r(?!\n)').Count
-                    if ((($crlfCount -gt 0) -and ($bareLfCount -gt 0)) -or $bareCrCount -gt 0) {
-                        [pscustomobject] @{
-                            Path = $_.FullName
-                            CrlfCount = $crlfCount
-                            LfCount = $bareLfCount
-                            CrCount = $bareCrCount
-                        }
-                    }
-                }
-            }
-    )
-
-    if ($mixedFiles.Count -gt 0) {
-        $formatted = $mixedFiles |
-            ForEach-Object { "$($_.Path) (CRLF=$($_.CrlfCount), LF=$($_.LfCount), CR=$($_.CrCount))" }
-        throw "Generated template output must not contain mixed line endings. Files: $($formatted -join '; ')"
+function Assert-Files([string] $Root, [string[]] $Paths) {
+    foreach ($path in $Paths) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Root $path))) {
+            throw "Missing expected output: $Root/$path"
+        }
     }
 }
 
-function Invoke-DotNetBuildCapturingFailure {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $ProjectPath
-    )
-
+function Assert-BuildFails([string] $Diagnostic) {
     $PSNativeCommandUseErrorActionPreference = $false
-    $output = @(& dotnet build $ProjectPath --configuration Release --no-restore 2>&1)
-    return [pscustomobject] @{
-        ExitCode = $LASTEXITCODE
-        Output = $output
+    $output = @(& dotnet build $webProjectPath --configuration Release --no-restore 2>&1) -join [Environment]::NewLine
+    if ($LASTEXITCODE -eq 0 -or -not $output.Contains($Diagnostic)) {
+        throw "Expected build failure '$Diagnostic'. Actual output: $output"
     }
 }
 
-if (-not (Test-Path -LiteralPath $workPath)) {
-    New-Item -ItemType Directory -Path $workPath | Out-Null
+foreach ($path in @($generatedPath, $publishPath, $emptyPublishPath)) {
+    Reset-Directory $path
 }
-
-Reset-Directory -Path $generatedPath
-Reset-Directory -Path $publishPath
-Reset-Directory -Path $emptyPublishPath
 New-Item -ItemType Directory -Path $nugetPackagesPath | Out-Null
 $env:NUGET_PACKAGES = $nugetPackagesPath
-
-dotnet new install "Markazor.Templates@$Version" `
-    --add-source $packageSourcePath `
-    --force
-
-dotnet new blazorwasm `
-    --name ExistingSite `
-    --framework net10.0 `
-    --output $consumerPath `
-    --no-restore
-
-$consumerProjectPath = Join-Path $consumerPath 'ExistingSite.csproj'
-$consumerNuGetConfigPath = Join-Path $consumerPath 'NuGet.config'
-Set-Content `
-    -LiteralPath $consumerNuGetConfigPath `
-    -Value @"
+$nugetConfigPath = Join-Path $nugetPackagesPath 'NuGet.config'
+Set-Content -LiteralPath $nugetConfigPath -Value @"
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <config>
@@ -187,488 +75,137 @@ Set-Content `
 </configuration>
 "@
 
+dotnet new install "Markazor.Templates@$Version" --add-source $packageSourcePath --force
+
+$consumerPath = Join-Path $nugetPackagesPath 'consumer'
+$consumerProjectPath = Join-Path $consumerPath 'ExistingSite.csproj'
+dotnet new blazorwasm --name ExistingSite --framework net10.0 --output $consumerPath --no-restore
 dotnet add $consumerProjectPath package Markazor --version $Version --no-restore
-dotnet restore $consumerProjectPath --configfile $consumerNuGetConfigPath
-
-$consumerWebRoot = Join-Path $consumerPath 'wwwroot'
-$consumerStaticFiles = Get-ChildItem -LiteralPath $consumerWebRoot -Recurse -File |
-    ForEach-Object {
-        [pscustomobject] @{
-            Path = $_.FullName
-            Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-        }
-    }
-
-$consumerSiteBuildProperty = (dotnet msbuild $consumerProjectPath -getProperty:MarkazorEnableSiteBuild).Trim()
-if ($consumerSiteBuildProperty -ne 'false') {
-    throw "Markazor package consumers must not enable destructive site generation by default. Actual: $consumerSiteBuildProperty"
+dotnet restore $consumerProjectPath --configfile $nugetConfigPath
+$consumerStaticFiles = Get-ChildItem -LiteralPath (Join-Path $consumerPath 'wwwroot') -Recurse -File | Get-FileHash
+if ((dotnet msbuild $consumerProjectPath -getProperty:MarkazorEnableSiteBuild).Trim() -ne 'false') {
+    throw 'Ordinary package consumers must not enable site generation.'
 }
-
 dotnet build $consumerProjectPath --configuration Release --no-restore
-
-foreach ($staticFile in $consumerStaticFiles) {
-    if (-not (Test-Path -LiteralPath $staticFile.Path)) {
-        throw "Markazor package build removed an existing consumer static file: $($staticFile.Path)"
-    }
-
-    $currentHash = (Get-FileHash -LiteralPath $staticFile.Path -Algorithm SHA256).Hash
-    if ($currentHash -ne $staticFile.Hash) {
-        throw "Markazor package build changed an existing consumer static file: $($staticFile.Path)"
+foreach ($file in $consumerStaticFiles) {
+    if ((Get-FileHash -LiteralPath $file.Path).Hash -ne $file.Hash) {
+        throw "Markazor changed an existing consumer static file: $($file.Path)"
     }
 }
 
-dotnet new blazorwasm `
-    --name SiteBuildConsumer `
-    --framework net10.0 `
-    --output $siteConsumerWebPath `
-    --no-restore
-
+$siteConsumerPath = Join-Path $nugetPackagesPath 'site-consumer'
+$siteConsumerWebPath = Join-Path $siteConsumerPath 'src/SiteBuildConsumer.Web'
 $siteConsumerProjectPath = Join-Path $siteConsumerWebPath 'SiteBuildConsumer.csproj'
-$siteConsumerNuGetConfigPath = Join-Path $siteConsumerWebPath 'NuGet.config'
 $siteConsumerSourceWebRoot = Join-Path $siteConsumerWebPath 'wwwroot'
-$siteConsumerPublicRoot = Join-Path $siteConsumerPath 'public'
-Copy-Item -LiteralPath $consumerNuGetConfigPath -Destination $siteConsumerNuGetConfigPath
-New-Item -ItemType Directory -Path $siteConsumerPublicRoot | Out-Null
-Get-ChildItem -LiteralPath $siteConsumerSourceWebRoot -Force |
-    Move-Item -Destination $siteConsumerPublicRoot
+$siteConsumerPublishPath = Join-Path $nugetPackagesPath 'site-consumer-publish'
+dotnet new blazorwasm --name SiteBuildConsumer --framework net10.0 --output $siteConsumerWebPath --no-restore
+Copy-Item -LiteralPath $siteConsumerSourceWebRoot -Destination (Join-Path $siteConsumerPath 'public') -Recurse
 Remove-Item -LiteralPath $siteConsumerSourceWebRoot -Recurse -Force
-
-[xml] $siteConsumerProjectXml = Get-Content -LiteralPath $siteConsumerProjectPath
-$siteConsumerPropertyGroup = $siteConsumerProjectXml.CreateElement('PropertyGroup')
-$siteBuildProperty = $siteConsumerProjectXml.CreateElement('MarkazorEnableSiteBuild')
-$siteBuildProperty.InnerText = 'true'
-$siteConsumerPropertyGroup.AppendChild($siteBuildProperty) | Out-Null
-$siteConsumerProjectXml.Project.AppendChild($siteConsumerPropertyGroup) | Out-Null
-$siteConsumerProjectXml.Save($siteConsumerProjectPath)
-
+[xml] $project = Get-Content -LiteralPath $siteConsumerProjectPath
+$properties = $project.CreateElement('PropertyGroup')
+$properties.InnerXml = '<MarkazorEnableSiteBuild>true</MarkazorEnableSiteBuild>'
+$project.Project.AppendChild($properties) | Out-Null
+$project.Save($siteConsumerProjectPath)
 dotnet add $siteConsumerProjectPath package Markazor --version $Version --no-restore
-dotnet restore $siteConsumerProjectPath --configfile $siteConsumerNuGetConfigPath
-
-$siteConsumerSiteBuildProperty = (dotnet msbuild $siteConsumerProjectPath -getProperty:MarkazorEnableSiteBuild).Trim()
-$siteConsumerServiceWorkerManifest = (dotnet msbuild $siteConsumerProjectPath -getProperty:ServiceWorkerAssetsManifest).Trim()
-if ($siteConsumerSiteBuildProperty -ne 'true') {
-    throw 'Direct package consumers must be able to explicitly enable the Markazor site build.'
+dotnet restore $siteConsumerProjectPath --configfile $nugetConfigPath
+if ((dotnet msbuild $siteConsumerProjectPath -getProperty:ServiceWorkerAssetsManifest).Trim() -ne 'service-worker-assets.js') {
+    throw 'Explicit site generation must enable the service worker manifest.'
 }
-
-if ($siteConsumerServiceWorkerManifest -ne 'service-worker-assets.js') {
-    throw "Markazor site build must default ServiceWorkerAssetsManifest. Actual: $siteConsumerServiceWorkerManifest"
-}
-
 dotnet build $siteConsumerProjectPath --configuration Release --no-restore
 if (Test-Path -LiteralPath $siteConsumerSourceWebRoot) {
-    throw 'Markazor site build recreated the direct consumer source wwwroot.'
+    throw 'Site generation must not recreate the consumer source wwwroot.'
 }
-
 dotnet publish $siteConsumerProjectPath --configuration Release --no-restore --output $siteConsumerPublishPath
+Assert-Files (Join-Path $siteConsumerPublishPath 'wwwroot') @('index.html', 'service-worker.js', 'service-worker-assets.js', 'css/app.css', '_content/Markazor.Themes/theme.css')
 
-$siteConsumerPublishedWebRoot = Join-Path $siteConsumerPublishPath 'wwwroot'
-foreach ($siteConsumerExpectedFile in @(
-        'index.html',
-        'service-worker.js',
-        'service-worker-assets.js',
-        (Join-Path 'css' 'app.css'),
-        (Join-Path (Join-Path '_content' 'Markazor.Themes') 'theme.css'))) {
-    $siteConsumerPublishedFile = Join-Path $siteConsumerPublishedWebRoot $siteConsumerExpectedFile
-    if (-not (Test-Path -LiteralPath $siteConsumerPublishedFile)) {
-        throw "Direct Markazor site build publish is missing expected file: $siteConsumerPublishedFile"
-    }
-}
-
-dotnet new blazorwasm `
-    --name ThemesOnly `
-    --framework net10.0 `
-    --output $themesConsumerPath `
-    --no-restore
-
+$themesConsumerPath = Join-Path $nugetPackagesPath 'themes-consumer'
 $themesConsumerProjectPath = Join-Path $themesConsumerPath 'ThemesOnly.csproj'
-$themesConsumerNuGetConfigPath = Join-Path $themesConsumerPath 'NuGet.config'
-Copy-Item -LiteralPath $consumerNuGetConfigPath -Destination $themesConsumerNuGetConfigPath
+dotnet new blazorwasm --name ThemesOnly --framework net10.0 --output $themesConsumerPath --no-restore
 dotnet add $themesConsumerProjectPath package Markazor.Themes --version $Version --no-restore
-dotnet restore $themesConsumerProjectPath --configfile $themesConsumerNuGetConfigPath
+dotnet restore $themesConsumerProjectPath --configfile $nugetConfigPath
 dotnet build $themesConsumerProjectPath --configuration Release --no-restore
 
-dotnet new markazor-site `
-    --name $ProjectName `
-    --output $generatedPath
-
-Assert-NoMixedLineEndings -RootPath $generatedPath
-
-$generatedNuGetConfigPath = Join-Path $generatedPath 'NuGet.config'
-if (Test-Path -LiteralPath $generatedNuGetConfigPath) {
-    throw 'Generated template must not include NuGet.config.'
-}
-
-$generatedCentralPackagesPath = Join-Path $generatedPath 'Directory.Packages.props'
-[xml] $generatedCentralPackagesXml = Get-Content -LiteralPath $generatedCentralPackagesPath
-$generatedMarkazorPackageVersions = @(
-    $generatedCentralPackagesXml.Project.ItemGroup.PackageVersion |
-        Where-Object { $_.Include -in @('Markazor', 'Markazor.Api', 'Markazor.Themes') } |
-        ForEach-Object {
-            [pscustomobject] @{
-                Include = $_.Include
-                Version = $_.Version
-            }
-        }
-)
-
-foreach ($expectedPackage in @('Markazor', 'Markazor.Api', 'Markazor.Themes')) {
-    $generatedPackage = @($generatedMarkazorPackageVersions | Where-Object { $_.Include -eq $expectedPackage })[0]
-    if ($null -eq $generatedPackage) {
-        throw "Generated Directory.Packages.props is missing $expectedPackage."
-    }
-
-    if ($generatedPackage.Version -ne $Version) {
-        throw "Generated Directory.Packages.props must use the installed template package version for $expectedPackage. Expected: $Version. Actual: $($generatedPackage.Version)"
+dotnet new markazor-site --name $ProjectName --output $generatedPath
+[xml] $packages = Get-Content -LiteralPath (Join-Path $generatedPath 'Directory.Packages.props')
+foreach ($name in @('Markazor', 'Markazor.Api', 'Markazor.Themes')) {
+    $package = @($packages.Project.ItemGroup.PackageVersion | Where-Object Include -eq $name)
+    if ($package.Count -ne 1 -or $package[0].Version -ne $Version) {
+        throw "The installed template must use $name version $Version."
     }
 }
-
-Set-Content `
-    -LiteralPath $generatedNuGetConfigPath `
-    -Value @"
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <config>
-    <add key="globalPackagesFolder" value="$nugetPackagesPath" />
-  </config>
-  <packageSources>
-    <clear />
-    <add key="markazor-local" value="$packageSourcePath" />
-    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-  </packageSources>
-</configuration>
-"@
-
-$packageReferenceFiles = Get-ChildItem -LiteralPath $generatedPath -Recurse -Filter '*.csproj'
-$markazorPackageReferences = foreach ($file in $packageReferenceFiles) {
-    [xml] $projectXml = Get-Content -LiteralPath $file.FullName
-    $projectXml.Project.ItemGroup.PackageReference |
-        Where-Object { $_.Include -like 'Markazor*' } |
-        ForEach-Object {
-            [pscustomobject] @{
-                Project = $file.FullName
-                Include = $_.Include
-                ExcludeAssets = $_.ExcludeAssets
-            }
-        }
-}
-
-$unexpectedReferences = @($markazorPackageReferences | Where-Object { $_.Include -notin @('Markazor', 'Markazor.Api', 'Markazor.Themes') })
-
-if ($unexpectedReferences.Count -gt 0) {
-    $formatted = $unexpectedReferences |
-        ForEach-Object { "$($_.Project): $($_.Include)" }
-    throw "Generated template must reference only Markazor packages directly. Unexpected references: $($formatted -join ', ')"
-}
-
-[xml] $webProjectXml = Get-Content -LiteralPath $webProjectPath
-[xml] $functionsProjectXml = Get-Content -LiteralPath $functionsProjectPath
-$functionsApiReference = @($functionsProjectXml.Project.ItemGroup.PackageReference |
-        Where-Object { $_.Include -eq 'Markazor.Api' })[0]
-$functionsMarkazorReference = @($functionsProjectXml.Project.ItemGroup.PackageReference |
-        Where-Object { $_.Include -eq 'Markazor' })[0]
-$webMarkazorReference = @($webProjectXml.Project.ItemGroup.PackageReference |
-        Where-Object { $_.Include -eq 'Markazor' })[0]
-$webThemesReference = @($webProjectXml.Project.ItemGroup.PackageReference |
-        Where-Object { $_.Include -eq 'Markazor.Themes' })[0]
-
-if ($null -eq $functionsApiReference) {
-    throw 'Generated Functions project must reference Markazor.Api.'
-}
-
-if ($null -ne $functionsMarkazorReference) {
-    throw 'Generated Functions project must not reference Markazor directly.'
-}
-
-if ($null -eq $webMarkazorReference) {
-    throw 'Generated Web project must reference Markazor.'
-}
-
-if ($null -eq $webThemesReference) {
-    throw 'Generated Web project must reference Markazor.Themes.'
-}
-
-if (-not [string]::IsNullOrWhiteSpace($webMarkazorReference.ExcludeAssets)) {
-    throw 'Generated Web project must include Markazor analyzers.'
-}
-
-if ($webProjectXml.Project.PropertyGroup.TargetFramework -ne 'net10.0') {
-    throw "Generated Web project must explicitly target net10.0 for Azure Static Web Apps Oryx detection. Actual: $($webProjectXml.Project.PropertyGroup.TargetFramework)"
-}
-
-if ($functionsProjectXml.Project.PropertyGroup.TargetFramework -ne 'net10.0') {
-    throw "Generated Functions project must explicitly target net10.0 for Azure Static Web Apps Oryx detection. Actual: $($functionsProjectXml.Project.PropertyGroup.TargetFramework)"
-}
-
-$webTargetFramework = (dotnet msbuild $webProjectPath -getProperty:TargetFramework).Trim()
-$functionsTargetFramework = (dotnet msbuild $functionsProjectPath -getProperty:TargetFramework).Trim()
-if ($webTargetFramework -ne 'net10.0') {
-    throw "Generated Web project must target net10.0. Actual: $webTargetFramework"
-}
-
-if ($functionsTargetFramework -ne 'net10.0') {
-    throw "Generated Functions project must target net10.0. Actual: $functionsTargetFramework"
-}
-
-$generatedReadmePath = Join-Path $generatedPath 'README.md'
-if (Test-Path -LiteralPath $generatedReadmePath) {
-    throw 'Generated template must not include README.md initially.'
-}
-
-$siteSettingsPath = Join-Path (Join-Path $generatedPath 'public') 'markazor.settings.json'
-if (Test-Path -LiteralPath $siteSettingsPath) {
-    throw 'Generated template must not include public/markazor.settings.json initially.'
-}
-
-$contentPath = Join-Path $generatedPath 'content'
-if (Test-Path -LiteralPath $contentPath) {
-    throw 'Generated template must not include content/ initially.'
-}
-
-foreach ($rootName in @('posts', 'drafts', 'assets', 'public')) {
-    $rootPath = Join-Path $generatedPath $rootName
-    if (Test-Path -LiteralPath $rootPath) {
-        throw "Generated template must not include $rootName/ initially."
-    }
-}
-
-$generatedGitIgnorePath = Join-Path $generatedPath '.gitignore'
-if (Test-Path -LiteralPath $generatedGitIgnorePath) {
-    throw 'Generated template must not include .gitignore initially.'
-}
-
-$webSourceWwwrootPath = Join-Path $webProjectDirectory 'wwwroot'
-if (Test-Path -LiteralPath $webSourceWwwrootPath) {
-    throw "Generated Web project must not include a source-controlled wwwroot directory: $webSourceWwwrootPath"
-}
-
-$webSourceStaticWebAppConfigPath = Join-Path $webProjectDirectory 'staticwebapp.config.json'
-if (Test-Path -LiteralPath $webSourceStaticWebAppConfigPath) {
-    throw "Generated Web project must not include a source-controlled staticwebapp.config.json: $webSourceStaticWebAppConfigPath"
-}
-
-$localSettingsPath = Join-Path (Join-Path (Join-Path $generatedPath 'src') "$ProjectName.Functions") 'local.settings.json'
-if (Test-Path -LiteralPath $localSettingsPath) {
-    throw 'Generated template must not include Functions local.settings.json initially.'
-}
-
-$hostJsonPath = Join-Path (Join-Path (Join-Path $generatedPath 'src') "$ProjectName.Functions") 'host.json'
-if (Test-Path -LiteralPath $hostJsonPath) {
-    throw 'Generated template must not include Functions host.json initially.'
-}
-
+Copy-Item -LiteralPath $nugetConfigPath -Destination (Join-Path $generatedPath 'NuGet.config')
 dotnet restore $solutionPath
-
-$webSourceGeneratorProperty = (dotnet msbuild $webProjectPath -getProperty:MarkazorEnableSourceGenerator).Trim()
-$functionsSourceGeneratorProperty = (dotnet msbuild $functionsProjectPath -getProperty:MarkazorEnableSourceGenerator).Trim()
-$webSiteBuildProperty = (dotnet msbuild $webProjectPath -getProperty:MarkazorEnableSiteBuild).Trim()
-if ($webSiteBuildProperty -ne 'true') {
-    throw 'Generated Web project must explicitly enable the Markazor site build.'
+$web = (dotnet msbuild $webProjectPath '-getProperty:TargetFramework,MarkazorEnableSiteBuild,MarkazorEnableSourceGenerator' | ConvertFrom-Json).Properties
+$functions = (dotnet msbuild $functionsProjectPath '-getProperty:TargetFramework,MarkazorEnableSourceGenerator' | ConvertFrom-Json).Properties
+if ($web.TargetFramework -ne 'net10.0' -or $web.MarkazorEnableSiteBuild -ne 'true' -or $web.MarkazorEnableSourceGenerator -ne 'true' -or
+    $functions.TargetFramework -ne 'net10.0' -or $functions.MarkazorEnableSourceGenerator -eq 'true') {
+    throw 'Installed template projects did not enable the expected frameworks and generators.'
 }
-
-if ($webSourceGeneratorProperty -ne 'true') {
-    throw 'Generated Web project must enable the Markazor source generator.'
-}
-
-if ($functionsSourceGeneratorProperty -eq 'true') {
-    throw 'Generated Functions project must not enable the Markazor source generator.'
-}
-
 dotnet build $solutionPath --configuration Release --no-restore
-
 $sourceWebRoot = Join-Path $webProjectDirectory 'wwwroot'
 if (Test-Path -LiteralPath $sourceWebRoot) {
-    throw "Markazor site build must not create a source wwwroot directory: $sourceWebRoot"
+    throw 'Site generation must not create a source wwwroot.'
 }
-
-$generatedWebRoot = (dotnet msbuild $webProjectPath --property:Configuration=Release -getProperty:MarkazorGeneratedWebRoot).Trim()
-$expectedGeneratedWebRootPrefix = [System.IO.Path]::GetFullPath((Join-Path $webProjectDirectory 'obj'))
-if (-not ([System.IO.Path]::GetFullPath($generatedWebRoot).StartsWith(
-            $expectedGeneratedWebRootPrefix + [System.IO.Path]::DirectorySeparatorChar,
-            [System.StringComparison]::OrdinalIgnoreCase))) {
-    throw "Markazor generated web root must be inside obj. Actual: $generatedWebRoot"
+$generatedWebRoot = (dotnet msbuild $webProjectPath -property:Configuration=Release -getProperty:MarkazorGeneratedWebRoot).Trim()
+$intermediateRoot = [IO.Path]::GetFullPath((Join-Path $webProjectDirectory 'obj')) + [IO.Path]::DirectorySeparatorChar
+if (-not [IO.Path]::GetFullPath($generatedWebRoot).StartsWith($intermediateRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Generated web root must be inside obj: $generatedWebRoot"
 }
-
-$generatedWebRootExpectedFiles = @(
-    'index.html',
-    '404.html',
-    'manifest.webmanifest',
-    'staticwebapp.config.json',
-    'service-worker.js',
-    'service-worker.published.js',
-    (Join-Path (Join-Path 'studio' 'setup') 'index.html'),
-    (Join-Path (Join-Path (Join-Path 'studio' 'setup') 'github-callback') 'index.html'),
-    (Join-Path 'styles' 'site.css'),
-    (Join-Path 'scripts' 'site.js')
+Assert-Files $generatedWebRoot @(
+    'index.html', '404.html', 'manifest.webmanifest', 'staticwebapp.config.json',
+    'service-worker.js', 'service-worker.published.js', 'studio/setup/index.html',
+    'studio/setup/github-callback/index.html', 'styles/site.css', 'scripts/site.js',
+    '_content/Markazor.Themes/theme.css'
 )
 
-foreach ($expectedFile in $generatedWebRootExpectedFiles) {
-    $generatedFile = Join-Path $generatedWebRoot $expectedFile
-    if (-not (Test-Path -LiteralPath $generatedFile)) {
-        throw "Generated Markazor intermediate web root is missing expected build-time file: $generatedFile"
-    }
-}
-
-$generatedThemeCss = Join-Path (Join-Path (Join-Path $generatedWebRoot '_content') 'Markazor.Themes') 'theme.css'
-if (-not (Test-Path -LiteralPath $generatedThemeCss)) {
-    throw "Generated Markazor intermediate web root is missing selected theme CSS: $generatedThemeCss"
-}
-
-$generatedStaticWebAppConfigPath = Join-Path $generatedWebRoot 'staticwebapp.config.json'
-$generatedStaticWebAppConfig = Get-Content -Raw -LiteralPath $generatedStaticWebAppConfigPath
-if (Test-Path -LiteralPath (Join-Path $generatedWebRoot 'setup')) {
-    throw 'Generated setup pages must be under studio.'
-}
-
-if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"route": "/studio*"')) {
-    throw 'Generated staticwebapp.config.json is missing the /studio no-store route.'
-}
-
-if (-not (Test-StringContains -Text $generatedStaticWebAppConfig -Value '"apiRuntime": "dotnet-isolated:10.0"')) {
-    throw 'Generated staticwebapp.config.json is missing the Azure Functions runtime declaration.'
-}
-
-$sourceWebRootMarker = Join-Path $sourceWebRoot 'source-wwwroot.css'
 New-Item -ItemType Directory -Path $sourceWebRoot | Out-Null
-Set-Content -LiteralPath $sourceWebRootMarker -Value 'source web root must be rejected' -Encoding utf8 -NoNewline
-$sourceWebRootBuild = Invoke-DotNetBuildCapturingFailure -ProjectPath $webProjectPath
-if ($sourceWebRootBuild.ExitCode -eq 0) {
-    throw 'Markazor site build must fail when a source wwwroot contains user files.'
-}
-
-if (-not (Test-StringContains -Text ($sourceWebRootBuild.Output -join [Environment]::NewLine) -Value 'Markazor site build owns the final web root')) {
-    throw 'Source wwwroot build failure did not include the expected ownership diagnostic.'
-}
-
+Set-Content -LiteralPath (Join-Path $sourceWebRoot 'source-wwwroot.css') -Value 'User content'
+Assert-BuildFails 'Markazor site build owns the final web root'
 Remove-Item -LiteralPath $sourceWebRoot -Recurse -Force
-
-$reservedPublicAsset = Join-Path (Join-Path (Join-Path $generatedPath 'public') 'assets') 'blocked.txt'
-New-Item -ItemType Directory -Path (Split-Path -Parent $reservedPublicAsset) | Out-Null
-Set-Content -LiteralPath $reservedPublicAsset -Value 'public/assets must be rejected' -Encoding utf8 -NoNewline
-$reservedPublicBuild = Invoke-DotNetBuildCapturingFailure -ProjectPath $webProjectPath
-if ($reservedPublicBuild.ExitCode -eq 0) {
-    throw 'Markazor site build must fail when public/assets contains user files.'
-}
-
-if (-not (Test-StringContains -Text ($reservedPublicBuild.Output -join [Environment]::NewLine) -Value 'Markazor public overlay cannot contain reserved paths')) {
-    throw 'Reserved public asset build failure did not include the expected ownership diagnostic.'
-}
-
-Remove-Item -LiteralPath (Split-Path -Parent $reservedPublicAsset) -Recurse -Force
+$reservedPublicAssets = Join-Path $generatedPath 'public/assets'
+New-Item -ItemType Directory -Path $reservedPublicAssets -Force | Out-Null
+Set-Content -LiteralPath (Join-Path $reservedPublicAssets 'blocked.txt') -Value 'User content'
+Assert-BuildFails 'Markazor public overlay cannot contain reserved paths'
+Remove-Item -LiteralPath $reservedPublicAssets -Recurse -Force
 
 dotnet publish $webProjectPath --configuration Release --no-restore --output $emptyWebPublishPath
-dotnet publish $functionsProjectPath --configuration Release --no-restore --output $emptyFunctionsPublishPath
-
-$emptyPublishedSiteSettings = Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') 'markazor.settings.json'
-if (Test-Path -LiteralPath $emptyPublishedSiteSettings) {
-    throw "Empty generated web output must not include markazor.settings.json: $emptyPublishedSiteSettings"
-}
-
-$emptyPublishedContent = Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') 'content'
-if (Test-Path -LiteralPath $emptyPublishedContent) {
-    throw "Empty generated web output must not include content/: $emptyPublishedContent"
-}
-
-$emptyPublishedEditorBundle = Join-Path (Join-Path (Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') '_content') 'Markazor') 'markazor-markdown-editor.js'
-if (-not (Test-Path -LiteralPath $emptyPublishedEditorBundle)) {
-    throw "Published web output is missing the Markazor markdown editor bundle: $emptyPublishedEditorBundle"
-}
-
-$publishedMarkazorRoot = Split-Path -Parent $emptyPublishedEditorBundle
-foreach ($relativeAsset in @('markazor-markdown-editor.css', 'editor')) {
-    if (-not (Test-Path -LiteralPath (Join-Path $publishedMarkazorRoot $relativeAsset))) {
-        throw "Published editor dependency is missing: $relativeAsset"
+dotnet publish $functionsProjectPath --configuration Release --no-restore --output (Join-Path $emptyPublishPath 'functions')
+$emptyWebRoot = Join-Path $emptyWebPublishPath 'wwwroot'
+Assert-Files $emptyWebRoot @('index.html', '_markazor/app.html', 'styles/site.css', '_content/Markazor.Themes/theme.css')
+foreach ($path in @('markazor.settings.json', 'content')) {
+    if (Test-Path -LiteralPath (Join-Path $emptyWebRoot $path)) {
+        throw "Empty template publish must not create $path."
     }
 }
 
+$publishedMarkazorRoot = Join-Path $emptyWebRoot '_content/Markazor'
+Assert-Files $publishedMarkazorRoot @('markazor-markdown-editor.js', 'markazor-markdown-editor.css', 'editor')
 $hasMuyaLicense = $false
 foreach ($assetFile in Get-ChildItem -LiteralPath $publishedMarkazorRoot -File -Recurse | Where-Object Extension -In '.js', '.css') {
     $assetText = Get-Content -LiteralPath $assetFile.FullName -Raw
-    if ($assetText.Contains('Copyright (c) 2018-present Luo Ran')) {
-        $hasMuyaLicense = $true
-    }
-
+    $hasMuyaLicense = $hasMuyaLicense -or $assetText.Contains('Copyright (c) 2018-present Luo Ran')
     foreach ($reference in [regex]::Matches($assetText, '/_content/Markazor/[A-Za-z0-9_./-]+')) {
-        if ($reference.Value -notmatch '\.(js|css|woff2?|ttf|svg|png)$') {
-            continue
-        }
-
-        $relativeAsset = $reference.Value.Substring('/_content/Markazor/'.Length)
-        if (-not (Test-Path -LiteralPath (Join-Path $publishedMarkazorRoot $relativeAsset) -PathType Leaf)) {
-            throw "Published editor asset $($assetFile.Name) references a missing file: $relativeAsset"
+        if ($reference.Value -match '\.(js|css|woff2?|ttf|svg|png)$') {
+            Assert-Files $publishedMarkazorRoot @($reference.Value.Substring('/_content/Markazor/'.Length))
         }
     }
 }
-
 if (-not $hasMuyaLicense) {
     throw 'Published editor assets must retain the Muya MIT license notice.'
 }
 
-$emptyPublishedThemeCss = Join-Path (Join-Path (Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') '_content') 'Markazor.Themes') 'theme.css'
-if (-not (Test-Path -LiteralPath $emptyPublishedThemeCss)) {
-    throw "Published web output is missing the selected Markazor theme CSS: $emptyPublishedThemeCss"
-}
-
-$emptyPublishedSiteCss = Join-Path (Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') 'styles') 'site.css'
-if (-not (Test-Path -LiteralPath $emptyPublishedSiteCss)) {
-    throw "Published web output is missing generated fallback styles/site.css: $emptyPublishedSiteCss"
-}
-
-$emptyPublishedIndex = Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') 'index.html'
-$emptyPublishedIndexText = Get-Content -Raw -LiteralPath $emptyPublishedIndex
-if (Test-StringContains -Text $emptyPublishedIndexText -Value '#[.{fingerprint}]') {
-    throw 'Default published index.html must not contain unresolved framework fingerprint placeholders.'
-}
-
-if (Test-StringContains -Text $emptyPublishedIndexText -Value '_framework/blazor.webassembly.js') {
-    throw 'Default public index.html must be fully static and must not reference the Blazor WebAssembly boot script.'
-}
-
-if (-not (Test-StringContains -Text $emptyPublishedIndexText -Value 'markazor-reader.js')) {
-    throw 'Default public index.html must load the static reader enhancement module.'
-}
-
-$emptyPublishedApp = Join-Path (Join-Path (Join-Path $emptyWebPublishPath 'wwwroot') '_markazor') 'app.html'
-if (-not (Test-Path -LiteralPath $emptyPublishedApp)) {
-    throw "Published web output is missing the Markazor application shell: $emptyPublishedApp"
-}
-
-if (-not (Test-StringContains -Text (Get-Content -Raw -LiteralPath $emptyPublishedApp) -Value '_framework/blazor.webassembly.js')) {
-    throw 'The Markazor application shell must retain the Blazor WebAssembly boot script.'
-}
-
-$postMarkdownPath = Join-Path 'posts' 'C# hello%.md'
-$secondPostMarkdownPath = Join-Path 'posts' 'first-update.md'
-$draftMarkdownPath = Join-Path 'drafts' 'work-in-progress.md'
-$assetPath = Join-Path 'assets' 'smoke-asset.txt'
-$publicIndexPath = Join-Path 'public' 'index.html'
-$publicCssPath = Join-Path (Join-Path 'public' 'styles') 'site.css'
-$publicJsPath = Join-Path (Join-Path 'public' 'scripts') 'site.js'
-$publicRobotsPath = Join-Path 'public' 'robots.txt'
-
-Write-SmokeFile -RelativePath (Join-Path 'public' 'markazor.settings.json') -Content @"
+$siteSettingsPath = Join-Path $generatedPath 'public/markazor.settings.json'
+Write-SmokeFile 'public/markazor.settings.json' @"
 {
   "site": {
     "name": "$ProjectName",
     "description": "Smoke test site generated from Markazor templates.",
-    "baseUrls": [
-      "https://example.test"
-    ]
+    "baseUrls": ["https://example.test"]
   },
-  "github": {
-    "clientId": ""
-  },
-  "repository": {
-    "owner": "your-user",
-    "name": "$ProjectName",
-    "defaultBranch": "main"
-  },
-  "theme": {
-    "name": "default"
-  }
+  "theme": { "name": "default" }
 }
 "@
-
-Write-SmokeFile -RelativePath $publicIndexPath -Content @'
+Write-SmokeFile 'public/index.html' @'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -690,16 +227,12 @@ Write-SmokeFile -RelativePath $publicIndexPath -Content @'
 </body>
 </html>
 '@
-
-Write-SmokeFile -RelativePath $publicCssPath -Content 'body { --markazor-smoke-site-css: custom; }'
-Write-SmokeFile -RelativePath $publicJsPath -Content 'document.documentElement.dataset.markazorSmokeSiteJs = "custom";'
-Write-SmokeFile -RelativePath $publicRobotsPath -Content "User-agent: *`nAllow: /"
-New-Item -ItemType Directory -Path (Join-Path $generatedPath 'assets') -Force | Out-Null
-[System.IO.File]::WriteAllBytes(
-    (Join-Path $generatedPath (Join-Path 'assets' 'site-icon.png')),
-    [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lPyo1wAAAABJRU5ErkJggg=='))
-
-Write-SmokeFile -RelativePath $postMarkdownPath -Content @'
+Write-SmokeFile 'public/styles/site.css' 'body { --markazor-smoke-site-css: custom; }'
+Write-SmokeFile 'public/scripts/site.js' 'document.documentElement.dataset.markazorSmokeSiteJs = "custom";'
+Write-SmokeFile 'public/robots.txt' "User-agent: *`nAllow: /"
+Write-SmokeFile 'assets/smoke-asset.txt' 'smoke asset'
+[IO.File]::WriteAllBytes((Join-Path $generatedPath 'assets/site-icon.png'), [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lPyo1wAAAABJRU5ErkJggg=='))
+Write-SmokeFile 'posts/C# hello%.md' @'
 ---
 slug: hello-world
 title: Hello World
@@ -713,12 +246,10 @@ category: General
 
 This file is compiled into `Markazor.Generated.SiteIndex`.
 '@
-
-Write-SmokeFile -RelativePath $secondPostMarkdownPath -Content @'
+Write-SmokeFile 'posts/first-update.md' @'
 ---
 slug: first-update
 title: First Update
-summary: A short update published alongside longer articles.
 publishedAt: 2026-06-06T08:00:00Z
 tags: [writing, markazor]
 category: Writing
@@ -726,286 +257,102 @@ category: Writing
 
 Short updates and longer articles share the same public content history.
 '@
-
 for ($index = 0; $index -lt 10; $index++) {
-    Write-SmokeFile -RelativePath "posts/pagination-$index.md" -Content "# Pagination $index"
+    Write-SmokeFile "posts/pagination-$index.md" "# Pagination $index"
 }
+Write-SmokeFile 'drafts/work-in-progress.md' "---`nslug: work-in-progress`ndraft: true`n---`nPrivate draft."
 
-Write-SmokeFile -RelativePath $draftMarkdownPath -Content @'
----
-slug: work-in-progress
-title: Work in progress
-summary: This draft must never appear in the published site.
-publishedAt: 2026-06-06T00:00:00Z
-tags: [private]
-category: Writing
-draft: true
----
-
-# Work in progress
-
-This file is available to the authenticated editor through GitHub, not to public readers.
-'@
-
-Write-SmokeFile -RelativePath $assetPath -Content 'smoke asset'
-
-$watchOutput = & dotnet watch --project $webProjectPath --list 2>&1
-$watchOutputText = ($watchOutput -join [Environment]::NewLine).Replace('\', '/')
-$expectedWatchSources = @(
-    (Convert-ToSlashPath -Path $siteSettingsPath),
-    (Convert-ToSlashPath -Path (Join-Path $generatedPath $assetPath)),
-    (Convert-ToSlashPath -Path (Join-Path $generatedPath $publicIndexPath)),
-    (Convert-ToSlashPath -Path (Join-Path $generatedPath $publicCssPath)),
-    (Convert-ToSlashPath -Path (Join-Path $generatedPath $publicJsPath)),
-    (Convert-ToSlashPath -Path (Join-Path $generatedPath $postMarkdownPath)),
-    (Convert-ToSlashPath -Path (Join-Path $generatedPath $secondPostMarkdownPath)),
-    (Convert-ToSlashPath -Path (Join-Path $generatedPath $draftMarkdownPath))
-)
-
-foreach ($expectedWatchSource in $expectedWatchSources) {
-    if (-not (Test-StringContains -Text $watchOutputText -Value $expectedWatchSource)) {
-        throw "Generated Web project watch list is missing source file: $expectedWatchSource"
+$watchOutput = (& dotnet watch --project $webProjectPath --list 2>&1) -join [Environment]::NewLine
+$watchOutput = $watchOutput.Replace('\', '/')
+foreach ($relative in @('public/markazor.settings.json', 'assets/smoke-asset.txt', 'public/index.html', 'public/styles/site.css', 'public/scripts/site.js', 'posts/C# hello%.md', 'posts/first-update.md', 'drafts/work-in-progress.md')) {
+    $path = [IO.Path]::GetFullPath((Join-Path $generatedPath $relative)).Replace('\', '/')
+    if (-not $watchOutput.Contains($path)) {
+        throw "Watch list is missing source file: $path"
     }
 }
-
-$generatedWebRootWatchPath = (Convert-ToSlashPath -Path $generatedWebRoot) + '/'
-if (Test-StringContains -Text $watchOutputText -Value $generatedWebRootWatchPath) {
-    throw "Generated Web project must not watch the Markazor intermediate web root directly: $generatedWebRootWatchPath"
-}
-
-$siteSettings = Get-Content -Raw -LiteralPath $siteSettingsPath
-if (-not (Test-StringContains -Text $siteSettings -Value ('"name": "' + $ProjectName + '"'))) {
-    throw 'Smoke markazor.settings.json is missing the configured site title.'
+if ($watchOutput.Contains([IO.Path]::GetFullPath($generatedWebRoot).Replace('\', '/').TrimEnd('/') + '/')) {
+    throw 'The intermediate web root must not be watched.'
 }
 
 dotnet build $solutionPath --configuration Release --no-restore
-
 $validSiteSettings = Get-Content -Raw -LiteralPath $siteSettingsPath
-$unknownThemeSettings = $validSiteSettings.Replace('"name": "default"', '"name": "missing-theme"')
-Set-Content -LiteralPath $siteSettingsPath -Value $unknownThemeSettings -Encoding utf8 -NoNewline
-
-$unknownThemeBuild = Invoke-DotNetBuildCapturingFailure -ProjectPath $webProjectPath
-if ($unknownThemeBuild.ExitCode -eq 0) {
-    throw 'Generated Web project must fail build for an unknown Markazor theme.'
-}
-
-if (-not (Test-StringContains -Text ($unknownThemeBuild.Output -join [Environment]::NewLine) -Value "Unknown Markazor theme 'missing-theme'")) {
-    throw 'Unknown theme build failure did not include the expected diagnostic.'
-}
-
-$noThemeSettings = $validSiteSettings.Replace('"name": "default"', '"name": "none"')
-Set-Content -LiteralPath $siteSettingsPath -Value $noThemeSettings -Encoding utf8 -NoNewline
+Set-Content -LiteralPath $siteSettingsPath -Value $validSiteSettings.Replace('"name": "default"', '"name": "missing-theme"') -NoNewline
+Assert-BuildFails "Unknown Markazor theme 'missing-theme'"
+Set-Content -LiteralPath $siteSettingsPath -Value $validSiteSettings.Replace('"name": "default"', '"name": "none"') -NoNewline
 dotnet build $webProjectPath --configuration Release --no-restore
-if (-not [string]::IsNullOrWhiteSpace((Get-Content -Raw -LiteralPath $generatedThemeCss))) {
-    throw 'The none theme must emit an empty theme.css.'
+foreach ($file in @('theme.css', 'theme.js')) {
+    if (-not [string]::IsNullOrWhiteSpace((Get-Content -Raw -LiteralPath (Join-Path $generatedWebRoot "_content/Markazor.Themes/$file")))) {
+        throw "The none theme must emit an empty $file."
+    }
 }
-
-$generatedThemeJs = Join-Path (Split-Path -Parent $generatedThemeCss) 'theme.js'
-if (-not [string]::IsNullOrWhiteSpace((Get-Content -Raw -LiteralPath $generatedThemeJs))) {
-    throw 'The none theme must emit an empty theme.js.'
-}
-
-Set-Content -LiteralPath $siteSettingsPath -Value $validSiteSettings -Encoding utf8 -NoNewline
-dotnet build $webProjectPath --configuration Release --no-restore
-
+Set-Content -LiteralPath $siteSettingsPath -Value $validSiteSettings -NoNewline
 dotnet publish $webProjectPath --configuration Release --no-restore --output $webPublishPath
 dotnet publish $functionsProjectPath --configuration Release --no-restore --output $functionsPublishPath
 
-$functionsMetadataPath = Join-Path $functionsPublishPath 'functions.metadata'
-if (-not (Test-Path -LiteralPath $functionsMetadataPath)) {
-    throw "Published Functions output is missing functions.metadata: $functionsMetadataPath"
-}
-
-$functionsHostJsonPath = Join-Path $functionsPublishPath 'host.json'
-if (-not (Test-Path -LiteralPath $functionsHostJsonPath)) {
-    throw "Published Functions output is missing generated host.json: $functionsHostJsonPath"
-}
-
-$functionsHostJson = Get-Content -Raw -LiteralPath $functionsHostJsonPath | ConvertFrom-Json
-if ($functionsHostJson.version -ne '2.0') {
-    throw "Published Functions host.json has an unexpected version: $($functionsHostJson.version)"
-}
-
-$functionsMetadata = Get-Content -Raw -LiteralPath $functionsMetadataPath | ConvertFrom-Json
-$functionNames = @($functionsMetadata | ForEach-Object { $_.name })
-foreach ($expectedFunctionName in @('GitHubAuthStart', 'GitHubAuthCallback', 'GitHubAuthRefresh', 'SetupStatus')) {
-    if ($expectedFunctionName -notin $functionNames) {
-        throw "Published Functions metadata is missing expected function: $expectedFunctionName"
+$functionsMetadata = Get-Content -Raw -LiteralPath (Join-Path $functionsPublishPath 'functions.metadata') | ConvertFrom-Json
+foreach ($name in @('GitHubAuthStart', 'GitHubAuthCallback', 'GitHubAuthRefresh', 'SetupStatus')) {
+    if ($name -notin $functionsMetadata.name) {
+        throw "Published Functions metadata is missing $name."
     }
 }
+$functionRoutes = $functionsMetadata.bindings | Where-Object type -eq httpTrigger | Select-Object -ExpandProperty route
+foreach ($route in @('auth/github/start', 'auth/github/callback', 'auth/github/refresh', 'setup/status')) {
+    if ($route -notin $functionRoutes) {
+        throw "Published Functions metadata is missing route $route."
+    }
+}
+if ((Get-Content -Raw -LiteralPath (Join-Path $functionsPublishPath 'host.json') | ConvertFrom-Json).version -ne '2.0') {
+    throw 'Published Functions host.json must use version 2.0.'
+}
+if ((Get-FileHash -LiteralPath (Join-Path $functionsPublishPath 'markazor.settings.json')).Hash -ne (Get-FileHash -LiteralPath $siteSettingsPath).Hash) {
+    throw 'Published Functions must use the canonical public settings.'
+}
 
-$functionRoutes = @(
-    $functionsMetadata |
-        ForEach-Object { $_.bindings } |
-        Where-Object { $_.type -eq 'httpTrigger' } |
-        ForEach-Object { $_.route }
+$publishedWebRoot = Join-Path $webPublishPath 'wwwroot'
+Assert-Files $publishedWebRoot @(
+    '_markazor/content/posts/C# hello%.md.json', '_markazor/content/posts/first-update.md.json',
+    'tags/c#/index.html', 'manifest.webmanifest', 'service-worker.js', 'service-worker-assets.js'
 )
-foreach ($expectedFunctionRoute in @('auth/github/start', 'auth/github/callback', 'auth/github/refresh', 'setup/status')) {
-    if ($expectedFunctionRoute -notin $functionRoutes) {
-        throw "Published Functions metadata is missing expected route: $expectedFunctionRoute"
+foreach ($relative in @('assets/smoke-asset.txt', 'assets/site-icon.png', 'public/markazor.settings.json', 'public/styles/site.css', 'public/scripts/site.js', 'public/robots.txt')) {
+    $source = Join-Path $generatedPath $relative
+    $published = Join-Path $publishedWebRoot ($relative -replace '^public/', '')
+    if ((Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath $published).Hash) {
+        throw "Publish did not preserve the user asset: $relative"
     }
 }
-
-$publicPost = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') (Join-Path 'content' ($postMarkdownPath + '.json'))
-if (-not (Test-Path -LiteralPath $publicPost)) {
-    throw "Published output is missing compiled post content: $publicPost"
+$publishedWorkerSource = (Get-Content -Raw -LiteralPath (Join-Path $generatedWebRoot 'service-worker.published.js')).ReplaceLineEndings("`n").Trim()
+foreach ($root in @($emptyWebRoot, $publishedWebRoot)) {
+    $worker = (Get-Content -Raw -LiteralPath (Join-Path $root 'service-worker.js')).ReplaceLineEndings("`n").Trim()
+    if (-not $worker.EndsWith($publishedWorkerSource, [StringComparison]::Ordinal)) {
+        throw 'Publish must select the production service worker.'
+    }
+    foreach ($file in @('index.html', '_markazor/app.html')) {
+        $html = Get-Content -Raw -LiteralPath (Join-Path $root $file)
+        if ($html.Contains('#[.{fingerprint}]')) {
+            throw "Published $file contains an unresolved SDK fingerprint."
+        }
+        if ($root -eq $publishedWebRoot -and -not $html.Contains('data-smoke-shell="custom"')) {
+            throw "Publish did not use the custom shell for $file."
+        }
+    }
 }
-
-$publishedReservedTagPage = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'tags') 'c#') 'index.html'
-if (-not (Test-Path -LiteralPath $publishedReservedTagPage)) {
-    throw "Published output is missing the static taxonomy page for a reserved-character tag: $publishedReservedTagPage"
+if (Test-Path -LiteralPath (Join-Path $publishedWebRoot '_markazor/content/drafts')) {
+    throw 'Published output must not contain drafts.'
 }
-
-$secondPublicPost = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'posts' 'first-update.md.json')
-if (-not (Test-Path -LiteralPath $secondPublicPost)) {
-    throw "Published output is missing compiled article content: $secondPublicPost"
+$manifest = Get-Content -Raw -LiteralPath (Join-Path $publishedWebRoot 'service-worker-assets.js')
+foreach ($excluded in @('drafts/', 'work-in-progress.md', 'staticwebapp.config.json')) {
+    if ($manifest.Contains($excluded, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Service worker assets must not include $excluded."
+    }
 }
-
-$publicAsset = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'assets') 'smoke-asset.txt'
-if (-not (Test-Path -LiteralPath $publicAsset)) {
-    throw "Published output is missing root asset under wwwroot/assets: $publicAsset"
-}
-
-$publishedSiteSettings = Join-Path (Join-Path $webPublishPath 'wwwroot') 'markazor.settings.json'
-if (-not (Test-Path -LiteralPath $publishedSiteSettings)) {
-    throw "Published web output is missing markazor.settings.json: $publishedSiteSettings"
-}
-
-$publishedManifest = Join-Path (Join-Path $webPublishPath 'wwwroot') 'manifest.webmanifest'
-if (-not (Test-Path -LiteralPath $publishedManifest)) {
-    throw "Published web output is missing manifest.webmanifest: $publishedManifest"
-}
-
-$publishedManifestJson = Get-Content -Raw -LiteralPath $publishedManifest | ConvertFrom-Json
-if ($publishedManifestJson.name -ne $ProjectName) {
-    throw "Published manifest.webmanifest did not use the configured site name. Actual: $($publishedManifestJson.name)"
-}
-
-if ($publishedManifestJson.short_name -ne $ProjectName) {
-    throw "Published manifest.webmanifest did not use the configured short site name. Actual: $($publishedManifestJson.short_name)"
-}
-
-if ($publishedManifestJson.description -ne 'Smoke test site generated from Markazor templates.') {
-    throw "Published manifest.webmanifest did not use the configured site description. Actual: $($publishedManifestJson.description)"
-}
-
-$publishedFunctionsSettings = Join-Path $functionsPublishPath 'markazor.settings.json'
-if (-not (Test-Path -LiteralPath $publishedFunctionsSettings)) {
-    throw "Published Functions output is missing markazor.settings.json: $publishedFunctionsSettings"
-}
-
-if (-not (Test-StringContains -Text (Get-Content -Raw -LiteralPath $publishedFunctionsSettings) -Value ('"name": "' + $ProjectName + '"'))) {
-    throw 'Published Functions markazor.settings.json is not the canonical public settings file.'
-}
-
-$publishedIndex = Join-Path (Join-Path $webPublishPath 'wwwroot') 'index.html'
-$publishedIndexText = Get-Content -Raw -LiteralPath $publishedIndex
-if (-not (Test-StringContains -Text $publishedIndexText -Value 'data-smoke-shell="custom"')) {
-    throw 'Published index.html did not use the full public shell override.'
-}
-
-if (Test-StringContains -Text $publishedIndexText -Value '#[.{fingerprint}]') {
-    throw 'Published index.html must not contain unresolved framework fingerprint placeholders.'
-}
-
-if (Test-StringContains -Text $publishedIndexText -Value '_framework/blazor.webassembly.js') {
-    throw 'Published public index.html must not reference the Blazor WebAssembly boot script.'
-}
-
-$publishedApp = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'app.html'
-$publishedAppText = Get-Content -Raw -LiteralPath $publishedApp
-if (-not (Test-StringContains -Text $publishedAppText -Value 'data-smoke-shell="custom"')) {
-    throw 'Published Markazor application shell did not retain the public shell override.'
-}
-
-if (-not (Test-StringContains -Text $publishedAppText -Value '_framework/blazor.webassembly.js')) {
-    throw 'Published Markazor application shell must retain the Blazor WebAssembly boot script.'
-}
-
-$publishedFavicon = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'assets') 'site-icon.png'
-if (-not (Test-Path -LiteralPath $publishedFavicon)) {
-    throw "Published web output is missing the configured favicon asset: $publishedFavicon"
-}
-
-$publishedSiteCss = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'styles') 'site.css'
-if (-not (Test-StringContains -Text (Get-Content -Raw -LiteralPath $publishedSiteCss) -Value '--markazor-smoke-site-css: custom')) {
-    throw 'Published styles/site.css did not use the public CSS override.'
-}
-
-$publishedSiteJs = Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') 'scripts') 'site.js'
-if (-not (Test-StringContains -Text (Get-Content -Raw -LiteralPath $publishedSiteJs) -Value 'markazorSmokeSiteJs')) {
-    throw 'Published scripts/site.js did not use the public JavaScript override.'
-}
-
-$publishedRobots = Join-Path (Join-Path $webPublishPath 'wwwroot') 'robots.txt'
-if (-not (Test-Path -LiteralPath $publishedRobots)) {
-    throw 'Published web output is missing an arbitrary public overlay file.'
-}
-
-$draftFile = Join-Path (Join-Path (Join-Path (Join-Path $webPublishPath 'wwwroot') '_markazor') 'content') (Join-Path 'drafts' 'work-in-progress.md')
-if (Test-Path -LiteralPath $draftFile) {
-    throw "Published output must not include draft markdown: $draftFile"
-}
-
-$serviceWorkerAssets = Join-Path (Join-Path $webPublishPath 'wwwroot') 'service-worker-assets.js'
-if (-not (Test-Path -LiteralPath $serviceWorkerAssets)) {
-    throw "Published output is missing service-worker-assets.js: $serviceWorkerAssets"
-}
-
-$publishedServiceWorker = Join-Path (Join-Path $webPublishPath 'wwwroot') 'service-worker.js'
-if (-not (Test-Path -LiteralPath $publishedServiceWorker)) {
-    throw "Published output is missing service-worker.js: $publishedServiceWorker"
-}
-
-$publishedServiceWorkerText = Get-Content -Raw -LiteralPath $publishedServiceWorker
-if (-not (Test-StringContains -Text $publishedServiceWorkerText -Value "event.data?.type === 'SKIP_WAITING'" -Comparison ([System.StringComparison]::Ordinal))) {
-    throw 'Published service-worker.js must support explicit SKIP_WAITING activation.'
-}
-
-if (Test-StringContains -Text $publishedServiceWorkerText -Value 'await self.skipWaiting();' -Comparison ([System.StringComparison]::Ordinal)) {
-    throw 'Published service-worker.js must not automatically skip waiting during install.'
-}
-
-if (-not (Test-StringContains -Text $publishedServiceWorkerText -Value 'const page = self.markazorRoutes[path];' -Comparison ([System.StringComparison]::Ordinal))) {
-    throw 'Published service-worker.js must route static navigations through the generated route map.'
-}
-
-if (-not (Test-StringContains -Text $publishedServiceWorkerText -Value "cache.match('/404.html')" -Comparison ([System.StringComparison]::Ordinal))) {
-    throw 'Published service-worker.js must use the static 404 page for unknown offline navigations.'
-}
-
-$serviceWorkerAssetsText = Get-Content -Raw -LiteralPath $serviceWorkerAssets
-if ((Test-StringContains -Text $serviceWorkerAssetsText -Value 'drafts/' -Comparison ([System.StringComparison]::OrdinalIgnoreCase)) -or
-    (Test-StringContains -Text $serviceWorkerAssetsText -Value 'work-in-progress.md' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
-    throw 'service-worker-assets.js must not contain draft content paths.'
-}
-
-if (Test-StringContains -Text $serviceWorkerAssetsText -Value 'staticwebapp.config.json' -Comparison ([System.StringComparison]::OrdinalIgnoreCase)) {
-    throw 'service-worker-assets.js must not contain staticwebapp.config.json because Azure Static Web Apps handles it as deployment configuration.'
-}
-
-if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/first-update.md.json' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
-    throw 'service-worker-assets.js must contain public article content paths.'
-}
-
-if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_markazor/content/posts/C# hello%.md.json' -Comparison ([System.StringComparison]::Ordinal))) {
-    throw 'service-worker-assets.js must retain the SDK manifest path for reserved-character post filenames.'
-}
-
-if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value 'tags/c#/index.html' -Comparison ([System.StringComparison]::Ordinal))) {
-    throw 'service-worker-assets.js must contain the static taxonomy page for a reserved-character tag.'
-}
-
-if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value 'assets/smoke-asset.txt' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
-    throw 'service-worker-assets.js must contain root asset paths.'
-}
-
-if (-not (Test-StringContains -Text $serviceWorkerAssetsText -Value '_content/Markazor/markazor-markdown-editor.js' -Comparison ([System.StringComparison]::OrdinalIgnoreCase))) {
-    throw 'service-worker-assets.js must contain the Markazor markdown editor bundle.'
+foreach ($required in @('_markazor/content/posts/first-update.md.json', '_markazor/content/posts/C# hello%.md.json', 'tags/c#/index.html', 'assets/smoke-asset.txt', '_content/Markazor/markazor-markdown-editor.js')) {
+    if (-not $manifest.Contains($required, [StringComparison]::Ordinal)) {
+        throw "Service worker assets are missing $required."
+    }
 }
 
 $run = dotnet msbuild $webProjectPath -property:Configuration=Release '-getProperty:RunCommand,RunArguments' | ConvertFrom-Json
-$server = [System.Diagnostics.Process]::Start([System.Diagnostics.ProcessStartInfo] @{
+$server = [Diagnostics.Process]::Start([Diagnostics.ProcessStartInfo] @{
     FileName = $run.Properties.RunCommand
     Arguments = $run.Properties.RunArguments + ' --urls http://127.0.0.1:0'
     WorkingDirectory = $webProjectDirectory
