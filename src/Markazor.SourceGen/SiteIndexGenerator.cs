@@ -87,6 +87,46 @@ public sealed class SiteIndexGenerator : IIncrementalGenerator
                 string generatedSource = SiteIndexSourceWriter.Write(sourceArticles, source.Right);
                 productionContext.AddSource("SiteIndex.g.cs", SourceText.From(generatedSource, Encoding.UTF8));
             });
+
+        context.RegisterSourceOutput(
+            context.CompilationProvider.Select(static (compilation, _) =>
+                compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Components.WebAssembly.Hosting.WebAssemblyHostBuilder") is not null),
+            static (productionContext, isWebAssembly) =>
+            {
+                if (isWebAssembly)
+                {
+                    productionContext.AddSource("MarkazorHostBuilderExtensions.g.cs", SourceText.From("""
+                        using System;
+                        using System.Net.Http;
+                        using Markazor.Components;
+                        using Markazor.Core.Setup;
+                        using Markazor.Generated;
+                        using Microsoft.AspNetCore.Components.Web;
+                        using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+                        using Microsoft.Extensions.DependencyInjection;
+
+                        namespace Markazor;
+
+                        internal static class MarkazorHostBuilderExtensions
+                        {
+                            public static WebAssemblyHostBuilder UseMarkazor(this WebAssemblyHostBuilder builder)
+                            {
+                                builder.RootComponents.Add<MarkazorApp>("#app");
+                                builder.RootComponents.Add<HeadOutlet>("head::after");
+                                builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+                                builder.Services.AddMarkazor(options =>
+                                {
+                                    options.Articles = SiteIndex.Articles;
+                                    options.Site.Name = MarkazorSitePublicSettings.NormalizeName(SiteIndex.Site.Name);
+                                    options.Site.Description = MarkazorSitePublicSettings.NormalizeDescription(SiteIndex.Site.Description);
+                                    options.Site.BaseUrl = SiteIndex.Site.BaseUrl;
+                                });
+                                return builder;
+                            }
+                        }
+                        """, Encoding.UTF8));
+                }
+            });
     }
 }
 

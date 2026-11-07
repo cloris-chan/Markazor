@@ -28,6 +28,8 @@ public sealed class TemplateContractTests
         [
             "global.json", "NuGet.config", "README.md", ".gitignore", "public", "content", "posts", "drafts", "assets",
             "src/MarkazorSite.Web/wwwroot", "src/MarkazorSite.Web/staticwebapp.config.json",
+            "src/MarkazorSite.Web/App.razor", "src/MarkazorSite.Web/App.razor.cs", "src/MarkazorSite.Web/_Imports.razor",
+            "src/MarkazorSite.Web/Pages", "src/MarkazorSite.Web/Layout",
             "src/MarkazorSite.Functions/local.settings.json", "src/MarkazorSite.Functions/host.json",
         ];
         Assert.All(absent, path => Assert.False(Path.Exists(Path.Combine(TemplateRoot, path)), path));

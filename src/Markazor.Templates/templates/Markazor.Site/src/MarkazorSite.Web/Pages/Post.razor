@@ -1,9 +1,0 @@
-@page "/posts/{Value}"
-@using Markazor.Reading
-
-<ReaderPage Kind="MarkazorReaderPageKind.Post" Value="@Value" />
-
-@code {
-    [Parameter]
-    public string? Value { get; set; }
-}

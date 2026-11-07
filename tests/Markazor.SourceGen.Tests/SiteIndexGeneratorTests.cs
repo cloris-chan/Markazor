@@ -18,6 +18,16 @@ public sealed class SiteIndexGeneratorTests
 
     private readonly IReadOnlyList<MetadataReference> references = CreateReferences();
 
+    [Fact]
+    public void WebAssemblySitesCompileWithOnlyUseMarkazor()
+    {
+        GeneratorExecution execution = RunGenerator([], webAssembly: true);
+        Assert.Empty(execution.Diagnostics);
+        using MemoryStream assemblyStream = new();
+        EmitResult result = execution.OutputCompilation.Emit(assemblyStream, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(result.Success, FormatDiagnostics(result.Diagnostics));
+    }
+
     [Theory]
     [InlineData("---\ntitle: \"Hello \\\"World\\\"\"\nsummary: \"C:\\\\docs\\\\\"\ntags: [one, \"reader, writer\", don't, 'it''s']\n---\nBody")]
     [InlineData("---\ntitle: Unterminated\ntags: [ignored]")]
@@ -289,13 +299,16 @@ public sealed class SiteIndexGeneratorTests
 
     private GeneratorExecution RunGenerator(
         IReadOnlyList<AdditionalText> additionalTexts,
-        AnalyzerConfigOptionsProvider? analyzerConfigOptionsProvider = null)
+        AnalyzerConfigOptionsProvider? analyzerConfigOptionsProvider = null,
+        bool webAssembly = false)
     {
         CSharpCompilation inputCompilation = CSharpCompilation.Create(
             "Markazor.SourceGen.Tests.GeneratedAssembly",
-            [CSharpSyntaxTree.ParseText("namespace TestProject { internal static class Anchor { } }", ParseOptions)],
-            references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            [CSharpSyntaxTree.ParseText(webAssembly
+                ? "using Markazor; using Microsoft.AspNetCore.Components.WebAssembly.Hosting; var builder = WebAssemblyHostBuilder.CreateDefault(args); builder.UseMarkazor(); await builder.Build().RunAsync();"
+                : "namespace TestProject { internal static class Anchor { } }", ParseOptions)],
+            references.Where(reference => webAssembly || Path.GetFileName(reference.Display) != "Microsoft.AspNetCore.Components.WebAssembly.dll"),
+            new CSharpCompilationOptions(webAssembly ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary));
 
         GeneratorDriver driver = analyzerConfigOptionsProvider is null
             ? CSharpGeneratorDriver.Create(
@@ -314,7 +327,7 @@ public sealed class SiteIndexGeneratorTests
             out ImmutableArray<Diagnostic> generationDiagnostics);
 
         GeneratorDriverRunResult runResult = driver.GetRunResult();
-        Assert.Single(runResult.GeneratedTrees);
+        Assert.Equal(webAssembly ? 2 : 1, runResult.GeneratedTrees.Length);
 
         return new GeneratorExecution(
             outputCompilation,
@@ -361,6 +374,7 @@ public sealed class SiteIndexGeneratorTests
         return [.. trustedPlatformAssemblies
             .Split(Path.PathSeparator)
             .Append(typeof(ArticleMeta).Assembly.Location)
+            .Append(typeof(Microsoft.AspNetCore.Components.WebAssembly.Hosting.WebAssemblyHostBuilder).Assembly.Location)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(static path => MetadataReference.CreateFromFile(path))];
     }

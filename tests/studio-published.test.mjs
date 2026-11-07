@@ -12,7 +12,7 @@ const require = createRequire(new URL('../src/Markazor/package.json', import.met
 const { chromium } = require('playwright');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
 
-test('published Studio initializes and edits through the trimmed Blazor interop', { timeout: 60000 }, async t => {
+test('published site boots built-in routes and edits through trimmed Blazor interop', { timeout: 60000 }, async t => {
   await stat(resolve(root, '_markazor/app.html'));
   const server = createServer(async (request, response) => {
     try {
@@ -45,11 +45,17 @@ test('published Studio initializes and edits through the trimmed Blazor interop'
   await page.goto(origin);
   await page.waitForLoadState('networkidle');
   assert.ok(!requests.some(url => /markazor-markdown-editor[^/]*\.js/.test(url)), 'Public reading must not load Muya');
+  assert.equal(await page.locator('body').getAttribute('data-smoke-shell'), 'custom');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--markazor-smoke-site-css').trim()), 'custom');
+  assert.equal(await page.locator('html').getAttribute('data-markazor-smoke-site-js'), 'custom');
 
   await page.goto(`${origin}/studio/write?markazor-preview=1`);
   await page.waitForSelector('.is-muya-ready', { timeout: 20000 }).catch(error => {
     assert.fail(`Published editor failed to initialize: ${errors.join('\n')}\n${error.message}`);
   });
+  assert.equal(await page.locator('body').getAttribute('data-smoke-shell'), 'custom');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--markazor-smoke-site-css').trim()), 'custom');
+  assert.equal(await page.locator('html').getAttribute('data-markazor-smoke-site-js'), 'custom');
   await page.addStyleTag({ content: '.markazor-muya-popover ::-webkit-scrollbar { width: 16px; height: 16px; }' });
   assert.equal(await page.locator('.mu-container').count(), 1);
   assert.equal(await page.locator('.markazor-markdown-editor-fallback').isVisible(), false);
@@ -134,6 +140,13 @@ test('published Studio initializes and edits through the trimmed Blazor interop'
   assert.equal(await page.locator('#markazor-content-browser').isVisible(), false);
   assert.ok(!(await page.locator('.markazor-markdown-editor-fallback').inputValue()).includes('Published 繁體中文.'));
   assert.ok(await page.evaluate(url => window.revokedImageUrls.includes(url), imagePreviewUrl), 'Switching documents must revoke the uploaded image preview');
+  await page.route(url => ['/posts/first-update', '/missing'].includes(url.pathname), route =>
+    route.fulfill({ path: resolve(root, '_markazor/app.html'), contentType: 'text/html' }));
+  await page.goto(`${origin}/posts/first-update`);
+  await page.getByRole('heading', { name: 'First Update', exact: true }).waitFor();
+  await page.getByText('Short updates and longer articles share the same public content history.', { exact: true }).waitFor();
+  await page.goto(`${origin}/missing`);
+  await page.getByRole('heading', { name: 'Page not found', exact: true }).waitFor();
   assert.deepEqual(errors, []);
   assert.deepEqual(failed, []);
 });

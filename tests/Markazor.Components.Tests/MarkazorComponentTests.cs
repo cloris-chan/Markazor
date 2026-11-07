@@ -13,6 +13,36 @@ namespace Markazor.Components.Tests;
 
 public sealed class MarkazorComponentTests
 {
+    [Theory]
+    [InlineData("/", "Markazor Site.")]
+    [InlineData("/page/2", "Markazor Site.")]
+    [InlineData("/posts", "Posts")]
+    [InlineData("/posts/page/2", "Posts")]
+    [InlineData("/posts/missing", "Article not found")]
+    [InlineData("/categories", "Categories")]
+    [InlineData("/categories/Reading", "Reading")]
+    [InlineData("/categories/Reading/page/2", "Reading")]
+    [InlineData("/tags", "Tags")]
+    [InlineData("/tags/C%23", "#C#")]
+    [InlineData("/tags/C%23/page/2", "#C#")]
+    [InlineData("/archive", "Archive")]
+    [InlineData("/not-found", "Page not found")]
+    [InlineData("/missing", "Page not found")]
+    public void BuiltInApplicationRoutesUseTheReaderLayout(string route, string heading)
+    {
+        using BunitContext context = new();
+        using HttpClient httpClient = new();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IMarkazorReaderService>(new MarkazorReaderService(httpClient, new Markazor.Configuration.MarkazorOptions()));
+        context.Services.AddSingleton<IMarkazorPwaUpdateService>(new FakePwaUpdateService());
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(route);
+
+        IRenderedComponent<MarkazorApp> component = context.Render<MarkazorApp>();
+
+        Assert.Equal(heading, component.Find(".site-shell main h1").TextContent);
+        Assert.Single(component.FindAll(".site-shell"));
+    }
+
     [Fact]
     public void ArticleListShowsAnAccessibleEmptyState()
     {
@@ -111,12 +141,7 @@ public sealed class MarkazorComponentTests
             context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
         navigation.NavigateTo("/studio/settings");
 
-        IRenderedComponent<StudioLayout> component = context.Render<StudioLayout>(parameters => parameters
-            .Add(static item => item.Body, builder =>
-            {
-                builder.OpenComponent<StudioPage>(0);
-                builder.CloseComponent();
-            }));
+        IRenderedComponent<MarkazorApp> component = context.Render<MarkazorApp>();
 
         component.WaitForAssertion(() =>
         {

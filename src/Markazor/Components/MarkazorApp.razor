@@ -1,0 +1,25 @@
+@using System.Diagnostics.CodeAnalysis
+@attribute [UnconditionalSuppressMessage("Trimming", "IL2111", Justification = "The router's page components are preserved by the constructor.")]
+
+<Router AppAssembly="@typeof(MarkazorApp).Assembly" NotFoundPage="@typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(ReaderLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+</Router>
+
+@code {
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(Pages.Home))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(Pages.Posts))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(Pages.Post))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(Pages.Categories))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(Pages.Tags))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(Pages.Archive))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(Pages.NotFound))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(SetupPage))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(StudioPage))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(GitHubCallbackPage))]
+    public MarkazorApp()
+    {
+    }
+}

@@ -5,7 +5,6 @@
     <MarkazorEnableSiteBuild>true</MarkazorEnableSiteBuild>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
     <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);IL2111</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
